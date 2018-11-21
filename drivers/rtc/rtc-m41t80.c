@@ -30,6 +30,8 @@
 #include <linux/watchdog.h>
 #endif
 
+#include <linux/regulator/consumer.h>
+
 #define M41T80_REG_SSEC	0
 #define M41T80_REG_SEC	1
 #define M41T80_REG_MIN	2
@@ -66,6 +68,12 @@
 #define M41T80_FEATURE_WD	(1 << 3)	/* Extra watchdog resolution */
 #define M41T80_FEATURE_SQ_ALT	(1 << 4)	/* RSx bits are in reg 4 */
 
+
+
+#define M41T80_WATCHDOG_OFIE	(1 << 7)	/* OFIE: Oscillator fail interrupt enable */
+#define M41T80_FLAGS_OF			(1 << 2)	/* OF: Oscillator fail bit */
+
+
 static DEFINE_MUTEX(m41t80_rtc_mutex);
 static const struct i2c_device_id m41t80_id[] = {
 	{ "m41t62", M41T80_FEATURE_SQ | M41T80_FEATURE_SQ_ALT },
@@ -86,6 +94,8 @@ MODULE_DEVICE_TABLE(i2c, m41t80_id);
 struct m41t80_data {
 	u8 features;
 	struct rtc_device *rtc;
+	/*OEM, 20170920, add for 5V*/
+	struct regulator *reg_p5v;
 };
 
 static int m41t80_get_datetime(struct i2c_client *client,
@@ -183,6 +193,31 @@ static int m41t80_set_datetime(struct i2c_client *client, struct rtc_time *tm)
 	}
 	return 0;
 }
+
+/*pp, Tony L Cai  2017/4/17, set M41t83 otp for rtc calibration{ */
+static int m41t80_set_otp(struct i2c_client *client, uint otp_state )
+{
+	u8 wbuf=0;
+	u8 ret_val=0;
+
+	/*set OTP*/
+	ret_val=i2c_smbus_read_byte_data(client,M41T80_REG_SQW);
+	if(ret_val<0){
+		pr_err("Read SQW(13h) failed!\n");
+		return -EIO;
+	}
+	if(0x01==otp_state)
+		wbuf=ret_val | 0x01;
+	else
+		wbuf=ret_val & 0xfe;
+	if(i2c_smbus_write_byte_data(client,M41T80_REG_SQW,wbuf)<0){
+		pr_err("Write SQW(13h) failed!\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+/*}pp, Tony L Cai  2017/4/17, set M41t83 otp for rtc calibration*/
 
 #if defined(CONFIG_RTC_INTF_PROC) || defined(CONFIG_RTC_INTF_PROC_MODULE)
 static int m41t80_rtc_proc(struct device *dev, struct seq_file *seq)
@@ -631,10 +666,11 @@ static struct notifier_block wdt_notifier = {
 static int m41t80_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
-	int rc = 0;
+	int rc = 0,index=0;
 	struct rtc_device *rtc = NULL;
 	struct rtc_time tm;
 	struct m41t80_data *clientdata = NULL;
+	pr_info("----m41t80_probe enter------\n");
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C
 				     | I2C_FUNC_SMBUS_BYTE_DATA))
@@ -644,6 +680,21 @@ static int m41t80_probe(struct i2c_client *client,
 				GFP_KERNEL);
 	if (!clientdata)
 		return -ENOMEM;
+
+	/*pp, tony.l.cai, 20170607, rtc regulator enable{*/
+	clientdata->reg_p5v = devm_regulator_get(&client->dev,"p5v_arm-supply");
+	if (IS_ERR(clientdata->reg_p5v)) {
+		rc = PTR_ERR(clientdata->reg_p5v);
+		pr_err("--%s: devm_regulator_get rtc regulator failed !!!!-----error:%d\n", __func__, rc);
+		return rc;
+	}
+	rc = regulator_enable(clientdata->reg_p5v);
+	if( rc )
+	{
+		pr_err("---%s:-get-regulator---end---error:%d--\n",__func__,rc);
+		return rc;
+	}
+    /*}pp, tony.l.cai, 20170607, rtc regulator enable*/
 
 	clientdata->features = id->driver_data;
 	i2c_set_clientdata(client, clientdata);
@@ -677,6 +728,20 @@ static int m41t80_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Can't clear HT bit\n");
 		return rc;
 	}
+	/*pp,tony.l.cai,20170607,change invalid to default time{*/
+	rc = m41t80_get_datetime(client, &tm);
+	pr_info("tm_year=%d,tm_mon=%d,tm_mday=%d,tm_hour=%d,tm_min=%d,tm_sec=%d, time status:%d\n", \
+		tm.tm_year + 1900,tm.tm_mon + 1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec,rc);
+
+	if(rc < 0){
+		pr_info("-----rtc time not initialized, set to default !-----\n");
+		tm.tm_wday=5;
+		tm.tm_mday=1;
+		tm.tm_mon=0;
+		tm.tm_year=16;//pp,tony.l.cai,20170510,change default time to 20160101
+		m41t80_set_datetime(client, &tm);
+	}
+	/*}pp,tony.l.cai,20170607,change invalid to default time*/
 
 	/* Make sure ST (stop) bit is cleared */
 	rc = i2c_smbus_read_byte_data(client, M41T80_REG_SEC);
@@ -689,10 +754,58 @@ static int m41t80_probe(struct i2c_client *client,
 		return rc;
 	}
 
+	rc=i2c_smbus_write_byte_data(client, M41T80_REG_FLAGS, 0);
+
+	if(rc < 0)
+		return rc;
+
+
 	rc = m41t80_sysfs_register(&client->dev);
 	if (rc)
 		return rc;
 
+
+
+	/*pp, Tony L Cai  2017/4/17, set M41t83 otp for rtc calibration{*/
+	rc=i2c_smbus_read_byte_data(client, M41T80_REG_SQW);
+	if(rc<0){
+		pr_err("Begin to read SQW failed!\n");
+		return rc;
+	}
+
+	if(0==(rc & 0x01)){
+		if(0==m41t80_set_otp(client, 0x01))
+			pr_info("==============set OTP  Success!================\n");
+		else{
+			pr_err("==============set OTP Failed!!===================\n");
+			return rc;
+		}
+	}
+	else{
+		if(1==(rc & 0x01))
+			pr_info("==============OTP has been set!================\n");
+	}
+	/*}pp, Tony L Cai  2017/4/17, set M41t83 otp for rtc calibration*/
+
+
+    // Read all values
+	pr_debug( "===================== Read All RTC registers =====================\n");
+	for (index = 0; index <= 0x13; index++) {
+		rc = i2c_smbus_read_byte_data(client, index);
+		if (!(rc < 0)) {
+			pr_debug("REG-0x%x, Value = 0x%x\n", index, rc);
+		}
+	}
+
+    // Read OF bits
+	rc = i2c_smbus_read_byte_data(client, M41T80_REG_FLAGS);
+	if (!(rc < 0)) {
+		pr_info( "... REG-0x0F, Value = 0x%x\n", rc);
+		if(rc & M41T80_FLAGS_OF)
+			pr_err( ".... OF bit been set\n");
+	}
+
+       /*}pp,tony.l.cai,20170228,time init for the rtc*/
 #ifdef CONFIG_RTC_DRV_M41T80_WDT
 	if (clientdata->features & M41T80_FEATURE_HT) {
 		save_client = client;
@@ -706,6 +819,7 @@ static int m41t80_probe(struct i2c_client *client,
 		}
 	}
 #endif
+	pr_info("m41t80_probe OK\n");
 	return 0;
 }
 
@@ -723,14 +837,42 @@ static int m41t80_remove(struct i2c_client *client)
 	return 0;
 }
 
+/* OEM, 2017/09/20, Terry.Yan , add shutdown interface { */
+static void m41t80_shutdown(struct i2c_client *client)
+{
+
+	struct m41t80_data *clientdata = i2c_get_clientdata(client);
+
+	if( clientdata->reg_p5v )
+	{
+		regulator_disable(clientdata->reg_p5v);
+		pr_info("%s: disable p5v\n", __func__);
+	}
+}
+/* OEM, 2017/09/20, Terry.Yan, add shutdown interface { */
+
+/* OEM, 2017/01/11, Jack W Lu, add RTC m41t83{ */
+#ifdef CONFIG_OF
+static const struct of_device_id m41t80_dt_match[] = {
+	{ .compatible = "st,m41t83" },
+	{ },
+};
+#else
+#define m41t80_dt_match NULL
+#endif
+
 static struct i2c_driver m41t80_driver = {
 	.driver = {
-		.name = "rtc-m41t80",
+		.name = "rtc-m41t83",
+		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(m41t80_dt_match),
 	},
 	.probe = m41t80_probe,
 	.remove = m41t80_remove,
+	.shutdown = m41t80_shutdown,
 	.id_table = m41t80_id,
 };
+/* OEM 2017/01/11, Jack W Lu, add RTC m41t83} */
 
 module_i2c_driver(m41t80_driver);
 

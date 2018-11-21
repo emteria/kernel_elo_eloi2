@@ -3975,6 +3975,11 @@ static int tasha_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 	return ret;
 }
 
+/*20170228 Jack W Lu: change SPK PA power on time {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+extern void msm_ext_spk_power_amp_on(void);
+#endif
+/*20170228 Jack W Lu: change SPK PA power on time }*/
 static int tasha_codec_enable_lineout_pa(struct snd_soc_dapm_widget *w,
 					 struct snd_kcontrol *kcontrol,
 					 int event)
@@ -4013,6 +4018,11 @@ static int tasha_codec_enable_lineout_pa(struct snd_soc_dapm_widget *w,
 		 * HW requirement
 		 */
 		usleep_range(5000, 5500);
+/*20170228 Jack W Lu: change SPK PA power on time {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+		msm_ext_spk_power_amp_on();
+#endif
+/*20170228 Jack W Lu: change SPK PA power on time }*/
 		snd_soc_update_bits(codec, lineout_vol_reg,
 				    0x10, 0x00);
 		/* Remove mix path mute if it is enabled */

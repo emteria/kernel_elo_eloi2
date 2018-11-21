@@ -269,9 +269,15 @@ static void option_instat_callback(struct urb *urb);
 #define TELIT_PRODUCT_CC864_DUAL		0x1005
 #define TELIT_PRODUCT_CC864_SINGLE		0x1006
 #define TELIT_PRODUCT_DE910_DUAL		0x1010
+/*[+] Kelly, porting Telit 4G modem LE910-NAG*/
+#define TELIT_PRODUCT_CE910_DUAL		0x1011
+/*[-] Kelly, porting Telit 4G modem LE910-NAG*/
 #define TELIT_PRODUCT_UE910_V2			0x1012
 #define TELIT_PRODUCT_LE920			0x1200
 #define TELIT_PRODUCT_LE910			0x1201
+/*[+] Kelly, porting Telit 4G modem LE910-NAG*/
+#define TELIT_PRODUCT_LE910_USBCFG4		0x1206
+/*[-] Kelly, porting Telit 4G modem LE910-NAG*/
 
 /* ZTE PRODUCTS */
 #define ZTE_VENDOR_ID				0x19d2
@@ -602,6 +608,18 @@ static const struct option_blacklist_info telit_le920_blacklist = {
 	.sendsetup = BIT(0),
 	.reserved = BIT(1) | BIT(5),
 };
+
+/*[+] Kelly, porting Telit 4G modem LE910-NAG*/
+static const struct option_blacklist_info telit_le922_blacklist_usbcfg0 = {
+	.sendsetup = BIT(2),
+	.reserved = BIT(0) | BIT(1) | BIT(3),
+};
+
+static const struct option_blacklist_info telit_le922_blacklist_usbcfg3 = {
+	.sendsetup = BIT(0),
+	.reserved = BIT(1) | BIT(2) | BIT(3),
+};
+/*[-] Kelly, porting Telit 4G modem LE910-NAG*/
 
 static const struct option_blacklist_info sierra_mc73xx_blacklist = {
 	.sendsetup = BIT(0) | BIT(2),
@@ -1153,9 +1171,16 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_CC864_DUAL) },
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_CC864_SINGLE) },
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_DE910_DUAL) },
+	/*[+] Kelly, porting Telit 4G modem LE910-NAG*/
+	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_CE910_DUAL) },
+	/*[-] Kelly, porting Telit 4G modem LE910-NAG*/
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_UE910_V2) },
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_LE910),
 		.driver_info = (kernel_ulong_t)&telit_le910_blacklist },
+	/*[+] Kelly, porting Telit 4G modem LE910-NAG*/
+	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_LE910_USBCFG4),
+		.driver_info = (kernel_ulong_t)&telit_le922_blacklist_usbcfg3 },
+	/*[-] Kelly, porting Telit 4G modem LE910-NAG*/
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_LE920),
 		.driver_info = (kernel_ulong_t)&telit_le920_blacklist },
 	{ USB_DEVICE_AND_INTERFACE_INFO(ZTE_VENDOR_ID, ZTE_PRODUCT_MF622, 0xff, 0xff, 0xff) }, /* ZTE WCDMA products */

@@ -1,0 +1,56 @@
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/* 2017/03/31, Jerry Zhai, add this file to Enable GPS function */
+/* 2017/04/12, Terry Yan, change file name to AAIO2 commom */
+
+
+&soc {
+	oem-extio{
+		compatible = "oem,extio";
+		pinctrl-names = "default";
+		pinctrl-0 = <&extio_in_default &extio_out_default>;
+
+		extio1-1v8-in = <&tlmm 140 0x0>;
+		extio2-1v8-in = <&tlmm 141 0x0>;
+		extio3-out-en = <&tlmm 139 0x0>;
+		extio-in-debounce = <100>;
+		status = "okay";
+	};
+
+	oem-ptdet{
+		compatible = "oem,ptdet";
+		pinctrl-names = "default";
+		pinctrl-0 = <&ptdet_io_default>;
+
+		ptdet-ac-detect = <&tlmm 43 0x0>;
+		ptdet-poe-detect = <&tlmm 44 0x1>;
+		ptdet-in-debounce = <100>;
+		status = "okay";
+	};
+
+
+/* 20170526 JackWLu: I2.0 add external BCR GPIOs (Use USB ID pin for trigger) {*/
+	gpio-accessory{
+		compatible = "gpio-accessory";
+		pinctrl-names = "gpio_accessory_active","gpio_accessory_suspend";
+		pinctrl-0 = <&nbcr_txd_gpio_active &nbcr_beeper_gpio_active>;
+		pinctrl-1 = <&nbcr_txd_gpio_suspend &nbcr_beeper_gpio_suspend>;
+
+		/* I2.0 external Barcode trigger GPIO */
+		ex-bcr-tg-d1-gpio = <&tlmm 35 0x0>;
+		ex-bcr-tg-d2-gpio = <&tlmm 28 0x0>;
+		ex-bcr-tg-d3-gpio = <&tlmm 31 0x0>;
+		ex-bcr-tg-d4-gpio = <&tlmm 34 0x0>;
+		status = "okay";
+	};
+/* 20170526 JackWLu: I2.0 add external BCR GPIOs (Use USB ID pin for trigger) }*/
+};

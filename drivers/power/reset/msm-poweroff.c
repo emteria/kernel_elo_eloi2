@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -152,6 +152,8 @@ static bool get_dload_mode(void)
 	return dload_mode_enabled;
 }
 
+/*2018-05-16 Q, JackWLu, remove 'reboot edl' interface for security. CVE-2017-13174 {*/
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -176,6 +178,8 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
+/*2018-05-16 Q, JackWLu, remove 'reboot edl' interface for security. CVE-2017-13174 }*/
 
 static int dload_set(const char *val, struct kernel_param *kp)
 {
@@ -287,8 +291,7 @@ static void msm_restart_prepare(const char *cmd)
 			need_warm_reset = true;
 	} else {
 		need_warm_reset = (get_dload_mode() ||
-				((cmd != NULL && cmd[0] != '\0') &&
-				strcmp(cmd, "userrequested")));
+				(cmd != NULL && cmd[0] != '\0'));
 	}
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
@@ -330,8 +333,12 @@ static void msm_restart_prepare(const char *cmd)
 			if (!ret)
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+/*2018-05-16 Q, JackWLu, remove 'reboot edl' interface for security. CVE-2017-13174 {*/
+#if 0
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
+/*2018-05-16 Q, JackWLu, remove 'reboot edl' interface for security. CVE-2017-13174 }*/
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}

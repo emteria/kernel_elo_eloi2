@@ -255,3 +255,17 @@ config USB_LINK_LAYER_TEST
 	  This driver is for generating specific traffic for Super Speed Link
 	  Layer Test Device. Say Y only when you want to conduct USB Super Speed
 	  Link Layer Test for host controllers.
+
+# PP, 20170301 Jack W Lu, Add USB2517(HUB2.0) & GL3523(HUB3.0) SMBUS driver {
+config USB2517_SMBUS
+       tristate "USB2517 USB HUB2.0 SMBUS Driver"
+       depends on I2C
+       help
+         This option enables support for SMSC USB2517 HSIC to HUB2.0 SMBUS Driver.
+
+config GL3523_SMBUS
+       tristate "GL3523 USB HUB3.0 SMBUS Driver"
+       depends on I2C
+       help
+         This option enables support for SMSC GL3523 SSIC to HUB3.0 SMBUS Driver.
+# PP, 20170301 Jack W Lu, Add USB2517(HUB2.0) & GL3523(HUB3.0) SMBUS driver }

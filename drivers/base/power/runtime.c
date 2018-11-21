@@ -612,7 +612,12 @@ static int rpm_resume(struct device *dev, int rpmflags)
 	    && dev->power.runtime_status == RPM_ACTIVE)
 		retval = 1;
 	else if (dev->power.disable_depth > 0)
-		retval = -EACCES;
+    {
+/* adil.zhu, 20170623, a workaround for camera open fail issue { */
+		//retval = -EACCES;
+		retval = 0;
+/* adil.zhu, 20170623, a workaround for camera open fail issue } */
+    }
 	if (retval)
 		goto out;
 

@@ -398,7 +398,8 @@ LINUXINCLUDE    := \
 		-Iarch/$(hdr-arch)/include/generated \
 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
 		-Iinclude \
-		$(USERINCLUDE)
+		$(USERINCLUDE) \
+		-I$(OEM_HEADER_FILE_PATH)
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 

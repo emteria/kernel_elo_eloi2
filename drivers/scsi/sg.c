@@ -510,7 +510,7 @@ sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 		old_hdr->result = EIO;
 		break;
 	case DID_ERROR:
-		old_hdr->result = (srp->sense_b[0] == 0 &&
+		old_hdr->result = (srp->sense_b[0] == 0 && 
 				  hp->masked_status == GOOD) ? 0 : EIO;
 		break;
 	default:
@@ -875,10 +875,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 			return -ENXIO;
 		if (!access_ok(VERIFY_WRITE, p, SZ_SG_IO_HDR))
 			return -EFAULT;
-		mutex_lock(&sfp->parentdp->open_rel_lock);
+		mutex_lock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794
 		result = sg_new_write(sfp, filp, p, SZ_SG_IO_HDR,
 				 1, read_only, 1, &srp);
-		mutex_unlock(&sfp->parentdp->open_rel_lock);
+		mutex_unlock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794		 
 		if (result < 0)
 			return result;
 		result = wait_event_interruptible(sfp->read_wait,
@@ -918,9 +918,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 			sfp->low_dma = 1;
 			if ((0 == sfp->low_dma) && (0 == sg_res_in_use(sfp))) {
 				val = (int) sfp->reserve.bufflen;
+				mutex_lock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794
 				sg_remove_scat(sfp, &sfp->reserve);
 				sg_build_reserve(sfp, val);
-				mutex_unlock(&sfp->parentdp->open_rel_lock);
+				mutex_unlock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794
 			}
 		} else {
 			if (atomic_read(&sdp->detaching))
@@ -995,9 +996,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		if (val != sfp->reserve.bufflen) {
 			if (sg_res_in_use(sfp) || sfp->mmap_called)
 				return -EBUSY;
+			mutex_lock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794
 			sg_remove_scat(sfp, &sfp->reserve);
 			sg_build_reserve(sfp, val);
-			mutex_unlock(&sfp->parentdp->open_rel_lock);
+			mutex_unlock(&sfp->parentdp->open_rel_lock);//20180521, for CVE-2017-0794
 		}
 		return 0;
 	case SG_GET_RESERVED_SIZE:
@@ -2688,9 +2690,6 @@ static void sg_proc_debug_helper(struct seq_file *s, Sg_device * sdp)
 			seq_puts(s, srp->done ?
 				 ((1 == srp->done) ?  "rcv:" : "fin:")
 				  : "act:");
-			seq_printf(s, srp->done ?
-				   ((1 == srp->done) ?  "rcv:" : "fin:")
-				   : "act:");
 			seq_printf(s, " id=%d blen=%d",
 				   srp->header.pack_id, blen);
 			if (srp->done)

@@ -247,6 +247,7 @@ static struct notifier_block wnb = {
 };
 
 #define NVBIN_FILE "wlan/prima/WCNSS_qcom_wlan_nv.bin"
+#define NVBIN_BACKUP_FILE "wlan/pronto/WCNSS_qcom_wlan_nv.bin"  //  2017/03/24, Jerry Zhai, Change WLAN nv bin load path
 
 /* On SMD channel 4K of maximum data can be transferred, including message
  * header, so NV fragment size as next multiple of 1Kb is 3Kb.
@@ -2063,23 +2064,21 @@ void extract_cal_data(int len)
 		return;
 	}
 
-	mutex_lock(&penv->dev_lock);
 	rc = smd_read(penv->smd_ch, (unsigned char *)&calhdr,
 			sizeof(struct cal_data_params));
 	if (rc < sizeof(struct cal_data_params)) {
 		pr_err("wcnss: incomplete cal header read from smd\n");
-		mutex_unlock(&penv->dev_lock);
 		return;
 	}
 
 	if (penv->fw_cal_exp_frag != calhdr.frag_number) {
 		pr_err("wcnss: Invalid frgament");
-		goto unlock_exit;
+		goto exit;
 	}
 
 	if (calhdr.frag_size > WCNSS_MAX_FRAME_SIZE) {
 		pr_err("wcnss: Invalid fragment size");
-		goto unlock_exit;
+		goto exit;
 	}
 
 	if (penv->fw_cal_available) {
@@ -2088,9 +2087,8 @@ void extract_cal_data(int len)
 		penv->fw_cal_exp_frag++;
 		if (calhdr.msg_flags & LAST_FRAGMENT) {
 			penv->fw_cal_exp_frag = 0;
-			goto unlock_exit;
+			goto exit;
 		}
-		mutex_unlock(&penv->dev_lock);
 		return;
 	}
 
@@ -2098,7 +2096,7 @@ void extract_cal_data(int len)
 		if (calhdr.total_size > MAX_CALIBRATED_DATA_SIZE) {
 			pr_err("wcnss: Invalid cal data size %d",
 				calhdr.total_size);
-			goto unlock_exit;
+			goto exit;
 		}
 		kfree(penv->fw_cal_data);
 		penv->fw_cal_rcvd = 0;
@@ -2106,10 +2104,11 @@ void extract_cal_data(int len)
 				GFP_KERNEL);
 		if (penv->fw_cal_data == NULL) {
 			smd_read(penv->smd_ch, NULL, calhdr.frag_size);
-			goto unlock_exit;
+			goto exit;
 		}
 	}
 
+	mutex_lock(&penv->dev_lock);
 	if (penv->fw_cal_rcvd + calhdr.frag_size >
 			MAX_CALIBRATED_DATA_SIZE) {
 		pr_err("calibrated data size is more than expected %d",
@@ -2144,6 +2143,8 @@ void extract_cal_data(int len)
 
 unlock_exit:
 	mutex_unlock(&penv->dev_lock);
+
+exit:
 	wcnss_send_cal_rsp(fw_status);
 	return;
 }
@@ -2379,6 +2380,13 @@ static void wcnss_nvbin_dnld(void)
 	down_read(&wcnss_pm_sem);
 
 	ret = request_firmware(&nv, NVBIN_FILE, dev);
+/* 2017/03/24, Jerry Zhai, Change WLAN nv bin load path {*/
+	if(ret)
+	{
+		ret = request_firmware(&nv, NVBIN_BACKUP_FILE, dev);
+		pr_info("wcnss: nv bin path = %s\n", NVBIN_BACKUP_FILE);
+	}
+/* 2017/03/24, Jerry Zhai, Change WLAN nv bin load path }*/
 
 	if (ret || !nv || !nv->data || !nv->size) {
 		pr_err("wcnss: %s: request_firmware failed for %s (ret = %d)\n",

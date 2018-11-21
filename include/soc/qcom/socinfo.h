@@ -22,6 +22,11 @@
 #include <linux/of.h>
 
 #include <asm/cputype.h>
+
+/*Qisda, Terry.Yan, 20170125, add OEM SMEM interface{*/
+#include <oem_smem_struct.h>
+/*Qisda, Terry.Yan, 20170125, add OEM SMEM interface }*/
+
 /*
  * SOC version type with major number in the upper 16 bits and minor
  * number in the lower 16 bits.  For example:
@@ -248,4 +253,13 @@ enum pmic_model socinfo_get_pmic_model(void);
 uint32_t socinfo_get_pmic_die_revision(void);
 int __init socinfo_init(void) __must_check;
 
+/*Qisda, Terry.Yan, 20170125, add OEM HW ID interface {*/
+PROJECT_ID_TYPE socinfo_get_project_id(void);
+BOARD_ID_TYPE socinfo_get_board_id(void);
+PANEL_ID_TYPE socinfo_get_panel_id(void);
+unsigned int socinfo_get_hw_id(void);
+char *socinfo_get_sn(void);
+char *socinfo_get_ethaddr(void);
+char *socinfo_get_wifiaddr(void);
+/*Qisda, Terry.Yan, 20170125, add OEM HW ID interface }*/
 #endif

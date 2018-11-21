@@ -16,6 +16,7 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include "mdss_hdmi_util.h"
+#include <soc/qcom/socinfo.h>//Leo Guo add for Puck HDMI issue
 
 #define RESOLUTION_NAME_STR_LEN 30
 #define HDMI_SEC_TO_MS 1000
@@ -558,6 +559,7 @@ int hdmi_get_video_id_code(struct msm_hdmi_mode_timing_info *timing_in,
 	int i, vic = -1;
 	struct msm_hdmi_mode_timing_info supported_timing = {0};
 	u32 ret;
+	PROJECT_ID_TYPE pro_id=socinfo_get_project_id();//Leo Guo add for Puck HDMI issue
 
 	if (!timing_in) {
 		pr_err("invalid input\n");
@@ -586,8 +588,12 @@ int hdmi_get_video_id_code(struct msm_hdmi_mode_timing_info *timing_in,
 			continue;
 		if (timing_in->back_porch_v != supported_timing.back_porch_v)
 			continue;
-		if (timing_in->pixel_freq != supported_timing.pixel_freq)
-			continue;
+		//Leo Guo modify following for correct resolution selection for Puck
+		if(pro_id!=PROJECT_PUCK)
+		{
+			if (timing_in->pixel_freq != supported_timing.pixel_freq)
+				continue;
+		}
 		if (timing_in->refresh_rate != supported_timing.refresh_rate)
 			continue;
 

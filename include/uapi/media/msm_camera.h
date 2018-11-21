@@ -226,6 +226,26 @@
 #define MSM_CAM_IOCTL_AXI_RELEASE \
 	_IO(MSM_CAM_IOCTL_MAGIC, 67)
 
+#define MSM_CAM_IOCTL_V4L2_EVT_NATIVE_CMD \
+	_IOWR(MSM_CAM_IOCTL_MAGIC, 68, struct msm_camera_v4l2_ioctl_t)
+
+#define MSM_CAM_IOCTL_V4L2_EVT_NATIVE_FRONT_CMD \
+	_IOWR(MSM_CAM_IOCTL_MAGIC, 69, struct msm_camera_v4l2_ioctl_t)
+
+#define MSM_CAM_IOCTL_AXI_LOW_POWER_MODE \
+	_IOWR(MSM_CAM_IOCTL_MAGIC, 70, uint8_t *)
+
+#define MSM_CAM_IOCTL_INTF_MCTL_MAPPING_CFG \
+	_IOR(MSM_CAM_IOCTL_MAGIC, 71, struct intf_mctl_mapping_cfg *)
+
+struct ioctl_native_cmd {
+	unsigned short mode;
+	unsigned short address;
+	unsigned short value_1;
+	unsigned short value_2;
+	unsigned short value_3;
+};
+
 struct v4l2_event_and_payload {
 	struct v4l2_event evt;
 	uint32_t payload_length;
@@ -281,6 +301,7 @@ struct msm_mctl_post_proc_cmd {
 #define PP_RAW_SNAP ((0x01)<<1)
 #define PP_PREV  ((0x01)<<2)
 #define PP_THUMB ((0x01)<<3)
+#define PP_RDI   BIT(4)
 #define PP_MASK		(PP_SNAP|PP_RAW_SNAP|PP_PREV|PP_THUMB)
 
 #define MSM_CAM_CTRL_CMD_DONE  0
@@ -399,7 +420,8 @@ struct msm_cam_evt_divert_frame {
 struct msm_mctl_pp_cmd_ack_event {
 	uint32_t cmd;        /* VPE_CMD_ZOOM? */
 	int      status;     /* 0 done, < 0 err */
-	uint32_t cookie;     /* daemon's cookie */
+	//uint32_t cookie;     /* daemon's cookie */
+	uint64_t cookie;     /* daemon's cookie */
 };
 
 struct msm_mctl_pp_event_info {
@@ -534,11 +556,13 @@ struct msm_camera_cfg_cmd {
 #define CMD_AXI_CFG_SEC_ALL_CHNLS      BIT(11)
 #define CMD_AXI_CFG_TERT1              BIT(12)
 #define CMD_AXI_CFG_TERT2              BIT(13)
+#define CMD_AXI_CFG_TERT3              BIT(14)
 
 #define CMD_AXI_START  0xE1
 #define CMD_AXI_STOP   0xE2
 #define CMD_AXI_RESET  0xE3
 #define CMD_AXI_ABORT  0xE4
+#define CMD_AXI_STOP_RECOVERY  0xE5
 
 
 
@@ -712,6 +736,7 @@ struct outputCfg {
 #define OUTPUT_TYPE_SAWB   BIT(12)
 #define OUTPUT_TYPE_IHST   BIT(13)
 #define OUTPUT_TYPE_CSTA   BIT(14)
+#define OUTPUT_TYPE_R2   BIT(15)
 
 struct fd_roi_info {
 	void *info;
@@ -883,7 +908,9 @@ struct msm_stats_buf {
 #define MSM_V4L2_PID_INST_HANDLE            (V4L2_CID_PRIVATE_BASE+16)
 #define MSM_V4L2_PID_MMAP_INST              (V4L2_CID_PRIVATE_BASE+17)
 #define MSM_V4L2_PID_PP_PLANE_INFO          (V4L2_CID_PRIVATE_BASE+18)
-#define MSM_V4L2_PID_MAX                    MSM_V4L2_PID_PP_PLANE_INFO
+//#define MSM_V4L2_PID_MAX                    MSM_V4L2_PID_PP_PLANE_INFO
+#define MSM_V4L2_PID_AVTIMER                (V4L2_CID_PRIVATE_BASE+19)
+#define MSM_V4L2_PID_MAX                     MSM_V4L2_PID_AVTIMER
 
 /* camera operation mode for video recording - two frame output queues */
 #define MSM_V4L2_CAM_OP_DEFAULT         0
@@ -1215,6 +1242,8 @@ struct sensor_pict_fps {
 struct exp_gain_cfg {
 	uint16_t gain;
 	uint32_t line;
+	int32_t luma_avg;
+	uint16_t fgain;
 };
 
 struct focus_cfg {
@@ -1722,6 +1751,7 @@ struct msm_actuator_reg_params_t {
 	uint32_t hw_mask;
 	uint16_t reg_addr;
 	uint16_t hw_shift;
+	uint16_t data_shift;	
 	uint16_t data_type;
 	uint16_t addr_type;
 	uint16_t reg_data;
@@ -2085,6 +2115,7 @@ struct msm_camera_vfe_params_t {
 	uint16_t port_info;
 	uint32_t inst_handle;
 	uint16_t cmd_type;
+	uint8_t stream_error;
 };
 
 enum msm_camss_irq_idx {
@@ -2156,18 +2187,81 @@ enum msm_cpp_frame_type {
 	MSM_CPP_REALTIME_FRAME,
 };
 
+struct msm_cpp_frame_strip_info {
+	int scale_v_en;
+	int scale_h_en;
+
+	int upscale_v_en;
+	int upscale_h_en;
+
+	int src_start_x;
+	int src_end_x;
+	int src_start_y;
+	int src_end_y;
+
+	/* Padding is required for upscaler because it does not
+	 * pad internally like other blocks, also needed for rotation
+	 * rotation expects all the blocks in the stripe to be the same size
+	 * Padding is done such that all the extra padded pixels
+	 * are on the right and bottom
+	*/
+	int pad_bottom;
+	int pad_top;
+	int pad_right;
+	int pad_left;
+
+	int v_init_phase;
+	int h_init_phase;
+	int h_phase_step;
+	int v_phase_step;
+
+	int prescale_crop_width_first_pixel;
+	int prescale_crop_width_last_pixel;
+	int prescale_crop_height_first_line;
+	int prescale_crop_height_last_line;
+
+	int postscale_crop_height_first_line;
+	int postscale_crop_height_last_line;
+	int postscale_crop_width_first_pixel;
+	int postscale_crop_width_last_pixel;
+
+	int dst_start_x;
+	int dst_end_x;
+	int dst_start_y;
+	int dst_end_y;
+
+	int bytes_per_pixel;
+	unsigned int source_address;
+	unsigned int destination_address;
+	unsigned int src_stride;
+	unsigned int dst_stride;
+	int rotate_270;
+	int horizontal_flip;
+	int vertical_flip;
+	int scale_output_width;
+	int scale_output_height;
+};
+
 struct msm_cpp_frame_info_t {
 	int32_t frame_id;
 	uint32_t inst_id;
 	uint32_t client_id;
 	enum msm_cpp_frame_type frame_type;
 	uint32_t num_strips;
+	struct msm_cpp_frame_strip_info *strip_info;
 };
 
 struct msm_ver_num_info {
 	uint32_t main;
 	uint32_t minor;
 	uint32_t rev;
+};
+
+struct intf_mctl_mapping_cfg {
+	int is_bayer_sensor;
+	int vnode_id;
+	int num_entries;
+	uint32_t image_modes[MSM_V4L2_EXT_CAPTURE_MODE_MAX];
 };
 
 #define VIDIOC_MSM_CPP_CFG \

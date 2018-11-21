@@ -39,12 +39,23 @@
 #include <linux/kfifo.h>
 #include <linux/idr.h>
 #include "pl2303.h"
+#include <soc/qcom/socinfo.h>
 
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <gregkh@linuxfoundation.org>"
 #define DRIVER_DESC "USB Serial Driver core"
 
 #define USB_SERIAL_TTY_MAJOR	188
 #define USB_SERIAL_TTY_MINORS	512	/* should be enough for a while */
+
+/*carl.s.hua 20170606, add for pl2303 tty port and Tilet modem {*/
+#define TTY_PORT_START_MODEM 4
+#define TTY_PORT_START_NORMAL 10
+
+#define TELIT_MODEM_VENDOR_ID  0x1bc7
+#define TELIT_MODEM_PRODUCT_ID_1 0x1201
+#define TELIT_MODEM_PRODUCT_ID_2 0x1206
+
+/*carl.s.hua 20170606, add for pl2303 tty port and Tilet modem }*/
 
 /* There is no MODULE_DEVICE_TABLE for usbserial.c.  Instead
    the MODULE_DEVICE_TABLE declarations in each serial driver
@@ -85,18 +96,88 @@ exit:
 	return port;
 }
 
+/*carl.s.hua 20170610, add for special pl2303 tty port and Tilet modem {*/
+#define PP15_CFD_PATH "1.2.5"
+#define PP15_PRINTER_PATH "1.2.6"
+
+extern char * exhub_get_cfd_port_number(void);
+extern char * exhub_get_rj45s2_port_number(void);
+/*carl.s.hua 20170610, add for special pl2303 tty port and Tilet modem }*/
+
 static int allocate_minors(struct usb_serial *serial, int num_ports)
 {
 	struct usb_serial_port *port;
 	unsigned int i, j;
 	int minor;
+	PROJECT_ID_TYPE prjType;
 
 	dev_dbg(&serial->interface->dev, "%s %d\n", __func__, num_ports);
 
 	mutex_lock(&table_lock);
 	for (i = 0; i < num_ports; ++i) {
 		port = serial->port[i];
-		minor = idr_alloc(&serial_minors, port, 0, 0, GFP_KERNEL);
+		minor=-1;
+
+/*carl.s.hua 20170610, add for special pl2303 tty port and Tilet modem {*/
+		if ((le16_to_cpu(serial->dev->descriptor.idVendor) == PL2303_VENDOR_ID) &&
+			(le16_to_cpu(serial->dev->descriptor.idProduct) == PL2303_PRODUCT_ID))
+		{
+			printk("allocate_minors:	devpath=%s .\n", serial->dev->devpath);
+
+			prjType = socinfo_get_project_id();
+			if (prjType ==PROJECT_PAYPOINT_REFRESH )
+        	{
+				if ( ( strncmp(serial->dev->devpath, PP15_CFD_PATH, strlen(PP15_CFD_PATH)) == 0 )
+				|| ( strncmp(serial->dev->devpath, PP15_PRINTER_PATH, strlen(PP15_PRINTER_PATH)) == 0 ) )
+				{
+					printk("%s is PP15_CFD_PATH or PP15_PRINTER_PATH.\n", serial->dev->devpath);
+					minor = idr_alloc(&serial_minors, port, 0, TTY_PORT_START_MODEM, GFP_KERNEL);
+				}
+
+			}else if (prjType ==PROJECT_PAYPOINT2 )
+			{
+				char   RJ45S1_Path[16] = {0};
+				char* RJ45S2_Path = exhub_get_rj45s2_port_number();
+				char* CFD_Path = exhub_get_cfd_port_number();
+
+				if ( (RJ45S2_Path != NULL)
+					&&(CFD_Path != NULL) )
+				{
+					strncpy(RJ45S1_Path, RJ45S2_Path, strlen(RJ45S2_Path));
+					RJ45S1_Path[strlen(RJ45S2_Path)-1]='1';
+
+					printk("allocate_minors:	RJ45S1_Path=%s .\n", RJ45S1_Path);
+					printk("allocate_minors:	RJ45S2_Path=%s .\n", RJ45S2_Path);
+					printk("allocate_minors:	CFD_Path=%s .\n", CFD_Path);
+
+					if( ( strncmp(serial->dev->devpath, RJ45S1_Path, strlen(RJ45S1_Path)) == 0 )
+						|| ( strncmp(serial->dev->devpath, RJ45S2_Path, strlen(RJ45S2_Path)) == 0 )
+						|| ( strncmp(serial->dev->devpath, CFD_Path, strlen(CFD_Path)) == 0 ) )
+						minor = idr_alloc(&serial_minors, port, 0, TTY_PORT_START_MODEM, GFP_KERNEL);
+				}
+			}
+
+			dev_dbg(&serial->interface->dev, "PL2303_device: %s, minor=%d. \n", serial->dev->devpath, minor);
+			if(minor < 0)
+				dev_dbg(&serial->interface->dev, "PL2303_devices: %s,  fail alloc , need realloc from normal. \n", serial->dev->devpath);
+		}
+		else if ((le16_to_cpu(serial->dev->descriptor.idVendor) == TELIT_MODEM_VENDOR_ID) &&
+			((le16_to_cpu(serial->dev->descriptor.idProduct) == TELIT_MODEM_PRODUCT_ID_1)
+			||(le16_to_cpu(serial->dev->descriptor.idProduct) == TELIT_MODEM_PRODUCT_ID_2)) )
+		{
+			minor = idr_alloc(&serial_minors, port, TTY_PORT_START_MODEM, TTY_PORT_START_NORMAL, GFP_KERNEL);
+			dev_dbg(&serial->interface->dev, "Telit modem device: %s, minor=%d. \n", serial->dev->devpath, minor);
+			if(minor < 0)
+				dev_dbg(&serial->interface->dev, "Telit modem devices: %s, fail alloc. need realloc from normal. \n", serial->dev->devpath);
+		}
+
+		if (minor < 0)
+		{
+			minor = idr_alloc(&serial_minors, port, TTY_PORT_START_NORMAL, 0, GFP_KERNEL);
+			dev_dbg(&serial->interface->dev, " mormal device: %s, minor=%d. \n", serial->dev->devpath, minor);
+		}
+/*carl.s.hua 20170610, add for special pl2303 tty port and Tilet modem }*/
+
 		if (minor < 0)
 			goto error;
 		port->minor = minor;

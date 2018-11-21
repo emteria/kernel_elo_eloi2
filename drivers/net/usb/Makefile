@@ -37,4 +37,7 @@ obj-$(CONFIG_USB_NET_HUAWEI_CDC_NCM)	+= huawei_cdc_ncm.o
 obj-$(CONFIG_USB_VL600)		+= lg-vl600.o
 obj-$(CONFIG_USB_NET_QMI_WWAN)	+= qmi_wwan.o
 obj-$(CONFIG_USB_NET_CDC_MBIM)	+= cdc_mbim.o
-
+# Qisda, Jerry Zhai, 2016/12/13, Porting CYUSB3610 ether driver
+obj-$(CONFIG_USB_NET_CYUSB)	+= cyusb3610.o
+# Qisda, Jerry.Zhai, 2017/09/12, usb ethernet pwr control
+obj-$(CONFIG_USB_NET_GIGABIT) += usb_gigabit_eth.o

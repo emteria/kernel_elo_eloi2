@@ -757,10 +757,12 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case ASHMEM_SET_SIZE:
 		ret = -EINVAL;
+		mutex_lock(&ashmem_mutex);//20180521, CVE-2017-13216
 		if (!asma->file) {
 			ret = 0;
 			asma->size = (size_t) arg;
 		}
+		mutex_unlock(&ashmem_mutex);//C20180521, CVE-2017-13216
 		break;
 	case ASHMEM_GET_SIZE:
 		ret = asma->size;

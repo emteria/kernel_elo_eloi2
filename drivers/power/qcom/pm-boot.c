@@ -41,6 +41,10 @@ static int msm_pm_tz_boot_init(void)
 		else if (num_possible_cpus() == 4)
 			flag = SCM_FLAG_WARMBOOT_CPU0 | SCM_FLAG_WARMBOOT_CPU1 |
 				SCM_FLAG_WARMBOOT_CPU2 | SCM_FLAG_WARMBOOT_CPU3;
+		/*OEM, 20171017, don't print warning for cpu number 8 {*/
+		else if(num_possible_cpus() == 8)
+			pr_debug("%s: the number of possible cpus: 8\n", __func__);
+		/*OEM, 20171017, don't print warning for cpu number 8 }*/
 		else
 			__WARN();
 

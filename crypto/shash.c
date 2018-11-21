@@ -24,11 +24,14 @@
 
 static const struct crypto_type crypto_shash_type;
 
-static int shash_no_setkey(struct crypto_shash *tfm, const u8 *key,
+/*OEM, 20180712, CVE-2017-17806 {*/
+int shash_no_setkey(struct crypto_shash *tfm, const u8 *key,
 			   unsigned int keylen)
 {
 	return -ENOSYS;
 }
+EXPORT_SYMBOL_GPL(shash_no_setkey);
+/*OEM, 20180712, CVE-2017-17806 }*/
 
 static int shash_setkey_unaligned(struct crypto_shash *tfm, const u8 *key,
 				  unsigned int keylen)

@@ -10,7 +10,8 @@
  * GNU General Public License for more details.
  *
  */
-
+#include <linux/module.h>
+#include <linux/moduleparam.h>//Leo Guo add for ftd to read ic id
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -28,6 +29,11 @@
 #include <linux/pm_runtime.h>
 #include "msm_dba_internal.h"
 #include <linux/mdss_io_util.h>
+#include "ddcci_i2c.h"
+
+//Leo Guo add for ftd to read ic id
+int hdmi_ic_version=0;
+module_param(hdmi_ic_version, int, 0444);
 
 #define ADV7533_REG_CHIP_REVISION (0x00)
 #define ADV7533_DSI_CEC_I2C_ADDR_REG (0xE1)
@@ -74,10 +80,11 @@
 #define CFG_CEC_INTERRUPTS       BIT(3)
 
 #define MAX_OPERAND_SIZE	14
-#define CEC_MSG_SIZE            (MAX_OPERAND_SIZE + 2)
+#define MAX_CEC_FRAME_SIZE      (MAX_OPERAND_SIZE + 2)
+#define CEC_MSG_SIZE            (MAX_CEC_FRAME_SIZE + 1)
 
 enum adv7533_i2c_addr {
-	I2C_ADDR_MAIN = 0x3D,
+	I2C_ADDR_MAIN = 0x39,
 	I2C_ADDR_CEC_DSI = 0x3C,
 };
 
@@ -188,43 +195,44 @@ static struct adv7533_reg_cfg adv7533_cec_en[] = {
 
 static struct adv7533_reg_cfg adv7533_cec_tg_init[] = {
 	/* TG programming for 19.2MHz, divider 25 */
-	{I2C_ADDR_CEC_DSI, 0xBE, 0x61, 0},
+	//{I2C_ADDR_CEC_DSI, 0xBE, 0x61, 0},
+	{I2C_ADDR_CEC_DSI, 0xBE, 0x3D, 0},
 	{I2C_ADDR_CEC_DSI, 0xC1, 0x0D, 0},
-	{I2C_ADDR_CEC_DSI, 0xC2, 0x80, 0},
+	{I2C_ADDR_CEC_DSI, 0xC2, 0x2F, 0},
 	{I2C_ADDR_CEC_DSI, 0xC3, 0x0C, 0},
-	{I2C_ADDR_CEC_DSI, 0xC4, 0x9A, 0},
+	{I2C_ADDR_CEC_DSI, 0xC4, 0x4E, 0},
 	{I2C_ADDR_CEC_DSI, 0xC5, 0x0E, 0},
-	{I2C_ADDR_CEC_DSI, 0xC6, 0x66, 0},
-	{I2C_ADDR_CEC_DSI, 0xC7, 0x0B, 0},
-	{I2C_ADDR_CEC_DSI, 0xC8, 0x1A, 0},
-	{I2C_ADDR_CEC_DSI, 0xC9, 0x0A, 0},
-	{I2C_ADDR_CEC_DSI, 0xCA, 0x33, 0},
-	{I2C_ADDR_CEC_DSI, 0xCB, 0x0C, 0},
-	{I2C_ADDR_CEC_DSI, 0xCC, 0x00, 0},
+	{I2C_ADDR_CEC_DSI, 0xC6, 0x10, 0},
+	{I2C_ADDR_CEC_DSI, 0xC7, 0x0A, 0},
+	{I2C_ADDR_CEC_DSI, 0xC8, 0xD7, 0},
+	{I2C_ADDR_CEC_DSI, 0xC9, 0x09, 0},
+	{I2C_ADDR_CEC_DSI, 0xCA, 0xF6, 0},
+	{I2C_ADDR_CEC_DSI, 0xCB, 0x0B, 0},
+	{I2C_ADDR_CEC_DSI, 0xCC, 0xB8, 0},
 	{I2C_ADDR_CEC_DSI, 0xCD, 0x07, 0},
-	{I2C_ADDR_CEC_DSI, 0xCE, 0x33, 0},
+	{I2C_ADDR_CEC_DSI, 0xCE, 0x08, 0},
 	{I2C_ADDR_CEC_DSI, 0xCF, 0x05, 0},
-	{I2C_ADDR_CEC_DSI, 0xD0, 0xDA, 0},
+	{I2C_ADDR_CEC_DSI, 0xD0, 0xB7, 0},
 	{I2C_ADDR_CEC_DSI, 0xD1, 0x08, 0},
-	{I2C_ADDR_CEC_DSI, 0xD2, 0x8D, 0},
+	{I2C_ADDR_CEC_DSI, 0xD2, 0x5A, 0},
 	{I2C_ADDR_CEC_DSI, 0xD3, 0x01, 0},
-	{I2C_ADDR_CEC_DSI, 0xD4, 0xCD, 0},
+	{I2C_ADDR_CEC_DSI, 0xD4, 0xC2, 0},
 	{I2C_ADDR_CEC_DSI, 0xD5, 0x04, 0},
-	{I2C_ADDR_CEC_DSI, 0xD6, 0x80, 0},
+	{I2C_ADDR_CEC_DSI, 0xD6, 0x65, 0},
 	{I2C_ADDR_CEC_DSI, 0xD7, 0x05, 0},
-	{I2C_ADDR_CEC_DSI, 0xD8, 0x66, 0},
+	{I2C_ADDR_CEC_DSI, 0xD8, 0x46, 0},
 	{I2C_ADDR_CEC_DSI, 0xD9, 0x03, 0},
-	{I2C_ADDR_CEC_DSI, 0xDA, 0x26, 0},
+	{I2C_ADDR_CEC_DSI, 0xDA, 0x13, 0},
 	{I2C_ADDR_CEC_DSI, 0xDB, 0x0A, 0},
-	{I2C_ADDR_CEC_DSI, 0xDC, 0xCD, 0},
+	{I2C_ADDR_CEC_DSI, 0xDC, 0x8C, 0},
 	{I2C_ADDR_CEC_DSI, 0xDE, 0x00, 0},
-	{I2C_ADDR_CEC_DSI, 0xDF, 0xC0, 0},
+	{I2C_ADDR_CEC_DSI, 0xDF, 0xBC, 0},
 	{I2C_ADDR_CEC_DSI, 0xE1, 0x00, 0},
-	{I2C_ADDR_CEC_DSI, 0xE2, 0xE6, 0},
+	{I2C_ADDR_CEC_DSI, 0xE2, 0xE1, 0},
 	{I2C_ADDR_CEC_DSI, 0xE3, 0x02, 0},
-	{I2C_ADDR_CEC_DSI, 0xE4, 0xB3, 0},
+	{I2C_ADDR_CEC_DSI, 0xE4, 0xA3, 0},
 	{I2C_ADDR_CEC_DSI, 0xE5, 0x03, 0},
-	{I2C_ADDR_CEC_DSI, 0xE6, 0x9A, 0},
+	{I2C_ADDR_CEC_DSI, 0xE6, 0x84, 0},
 };
 
 static struct adv7533_reg_cfg adv7533_cec_power[] = {
@@ -400,7 +408,16 @@ static int adv7533_read_device_rev(struct adv7533 *pdata)
 
 	ret = adv7533_read(pdata, I2C_ADDR_MAIN, ADV7533_REG_CHIP_REVISION,
 							&rev, 1);
+	printk("adv7533_read_device_rev rev is %x\n",rev);
 
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x00, &rev, 1);
+	printk("adv7533_read_chipid[00] is %x\n", rev);
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x01, &rev, 1);
+	printk("adv7533_read_chipid[01] is %x\n", rev);
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x02, &rev, 1);
+	printk("adv7533_read_chipid[02] is %x\n", rev);
+
+	hdmi_ic_version=rev;//Leo Guo add for ftd to read ic id
 	return ret;
 }
 
@@ -773,18 +790,18 @@ static int adv7533_cec_prepare_msg(struct adv7533 *pdata, u8 *msg, u32 size)
 	op_sz = size - 2;
 
 	/* write header */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x70, msg[0]);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x70, msg[0]);
 
 	/* write opcode */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x71, msg[1]);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x71, msg[1]);
 
 	/* write operands */
 	for (i = 0; i < op_sz && i < MAX_OPERAND_SIZE; i++) {
 		pr_debug("%s: writing operands\n", __func__);
-		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x72 + i, msg[i + 2]);
+		ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x72 + i, msg[i + 2]);
 	}
 
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x80, size);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x80, size);
 
 end:
 	return ret;
@@ -913,6 +930,8 @@ static int adv7533_edid_read_init(struct adv7533 *pdata)
 		pr_err("%s: invalid pdata\n", __func__);
 		goto end;
 	}
+
+    ddcci_i2c_switch(I2C_SWITCH_TO_EDID);
 
 	/* initiate edid read in adv7533 */
 	adv7533_write(pdata, I2C_ADDR_MAIN, 0x41, 0x10);
@@ -1078,6 +1097,8 @@ static void adv7533_intr_work(struct work_struct *work)
 
 		adv7533_notify_clients(&pdata->dev_info,
 			MSM_DBA_CB_HPD_CONNECT);
+
+        ddcci_i2c_switch(I2C_SWITCH_TO_DDC);
 	}
 
 	if (pdata->cec_enabled)
@@ -1454,6 +1475,38 @@ exit:
 
 }
 
+
+#if 0
+/* test pattern mode for adv7533, need dsi clk 594Mhz*/	// lewis 
+static int adv7533_test_pattern(struct adv7533 *pdata,
+								bool enable) 
+{ 
+printk("\n[Lewis] adv7533_test_pattern() enable=%d\n\n", enable);
+
+	if (enable)	{ 
+ 		/*Set to test pattern*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x55, 0x80); 
+
+ 		/*Set HDMI enable*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x03, 0x89); 
+ 
+ 
+ 		/*Set to HDMI output*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0xAF, 0x16); 
+ 
+ 
+ 	} else { 
+ 		/*Disable test pattern*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x55, 0x00); 
+ 	} 
+ 
+ 
+ 	return 0; 
+} 
+#endif
+
+
+
 static int adv7533_video_on(void *client, bool on,
 	struct msm_dba_video_cfg *cfg, u32 flags)
 {
@@ -1464,6 +1517,10 @@ static int adv7533_video_on(void *client, bool on,
 
 	if (!pdata || !cfg) {
 		pr_err("%s: invalid platform data\n", __func__);
+		if (!cfg) {
+			/* hdmi disable */
+			adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x03, 0x09);
+		}
 		return ret;
 	}
 
@@ -1506,6 +1563,19 @@ static int adv7533_video_on(void *client, bool on,
 				sizeof(adv7533_video_en));
 
 	mutex_unlock(&pdata->ops_mutex);
+	
+	/* test pattern mode*/ 	// lewis
+	#if 0
+	ret = adv7533_test_pattern(pdata, true); 
+	if(ret < 0)	
+	{ 
+		printk("[Lewis] adi7533_test_pattern failed!!\n"); 
+	} 
+	#endif
+	
+		
+	
+	
 	return ret;
 }
 
@@ -1645,7 +1715,7 @@ static int adv7533_hdmi_cec_write(void *client, u32 size,
 		goto end;
 
 	/* Enable CEC msg tx with NACK 3 retries */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x81, 0x07);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x81, 0x07);
 end:
 	mutex_unlock(&pdata->ops_mutex);
 	return ret;
@@ -1893,15 +1963,6 @@ static int adv7533_probe(struct i2c_client *client,
 		gpio_set_value(pdata->switch_gpio, pdata->switch_flags);
 
 	pdata->irq = gpio_to_irq(pdata->irq_gpio);
-
-	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
-		IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "adv7533", pdata);
-	if (ret) {
-		pr_err("%s: Failed to enable ADV7533 interrupt\n",
-			__func__);
-		goto err_irq;
-	}
-
 	dev_set_drvdata(&client->dev, &pdata->dev_info);
 	ret = msm_dba_helper_sysfs_init(&client->dev);
 	if (ret) {
@@ -1923,6 +1984,14 @@ static int adv7533_probe(struct i2c_client *client,
 	}
 
 	INIT_DELAYED_WORK(&pdata->adv7533_intr_work_id, adv7533_intr_work);
+//Leo Guo move here for ELO monitor display issue
+	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
+		IRQF_TRIGGER_LOW | IRQF_ONESHOT, "adv7533", pdata);
+	if (ret) {
+		pr_err("%s: Failed to enable ADV7533 interrupt\n",
+			__func__);
+		goto err_irq;
+	}
 
 	pm_runtime_enable(&client->dev);
 	pm_runtime_set_active(&client->dev);

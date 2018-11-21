@@ -579,5 +579,23 @@ config USBNET_IPA_BRIDGE
 	  Select this if you want to enable USB to IPA bridge.
 	  This will pass IP traffic directly to IPA and bypass the network stack.
 
+# Qisda, Jerry Zhai, 2016/12/13, Porting CYUSB3610 ether driver
+config USB_NET_CYUSB
+	tristate "CYPRESS CYUSB3610 based USB3.0 Ethernet adapters"
+	depends on USB_USBNET
+	help
+	  Choose this option if you have a CYPRESS USB ethernet device.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cyusb3610.
+
+# Qisda, Jerry Zhai, 2017/09/12, usb3.0 based ethernet power on driver
+config USB_NET_GIGABIT
+	tristate "USB3.0 based Gigabit Ethernet adapters"
+	depends on USB_USBNET
+	help
+	  Choose this option if you have a USB3.0 based ethernet device.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usb_gigabit_eth.
+
 endif # USB_NET_DRIVERS
 

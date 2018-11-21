@@ -1,3 +1,9 @@
+# Adil.Zhu, 20170207, Define Customization config
+config SHIP_IMAGE
+	bool "For SHIP Special Config"
+	default n
+# Adil.Zhu, 20170207, Define Customization config
+
 config ARM64
 	def_bool y
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE

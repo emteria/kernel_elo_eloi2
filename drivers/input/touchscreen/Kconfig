@@ -1137,4 +1137,21 @@ config TOUCHSCREEN_MAXIM_STI
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+config TOUCHSCREEN_SIS_I2C
+	tristate "SiS 9200 family I2C touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for I2C connected SiS touch panels.
+
+	  If unsure, say N.
+	  
+	  To compile this driver as a module, choose M here: the
+	  module will be called sis_i2c.
+config GPIO_INT_PIN_FOR_SIS
+        	hex "Enter gpio pin"
+        	default 41
+        	depends on TOUCHSCREEN_SIS_I2C
+        	help
+            		Configure GPIO pin used for INT from SiS by entering number in hex format.
+
 endif

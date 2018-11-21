@@ -686,7 +686,7 @@ struct sock *inet_csk_clone_lock(const struct sock *sk,
 		inet_sk(newsk)->inet_sport = htons(inet_rsk(req)->ir_num);
 		newsk->sk_write_space = sk_stream_write_space;
 
-		inet_sk(newsk)->mc_list = NULL;
+		inet_sk(newsk)->mc_list = NULL;  // 2018/05/30, patch for CVE-2017-8890
 
 		newsk->sk_mark = inet_rsk(req)->ir_mark;
 

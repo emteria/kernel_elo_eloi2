@@ -40,6 +40,44 @@
 #include <linux/ktime.h>
 #include "pmic-voter.h"
 
+#include <linux/qpnp-smbcharger.h>
+
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control {*/
+#include <soc/qcom/socinfo.h>
+static char prj_Type = 0;
+static char board_id = 0;
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control }*/
+
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#define PP_SUPPORT_USB_SWITCH
+#define PP_P5V_USB_EN 1
+#define PP_P5V_USB_DIS 0
+#define PP_UART_ON 1
+#define PP_UART_OFF 0
+#define PP_USB_HOST_ON 1
+#define PP_USB_HOST_OFF 0
+#define PP_USB_ADB_ON 0
+#define PP_USB_ADB_OFF 1
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN {*/
+#define PP_USB_OTG_VBUS_ON 1
+#define PP_USB_OTG_VBUS_OFF 0
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN }*/
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+/*20161230 Jack W Lu: add for chip enable control {*/
+//#define PP_GL3523_NEED_CHIP_RESET
+#ifdef PP_GL3523_NEED_CHIP_RESET
+#define PP_USB_HUB_RESET 1
+#define PP_USB_HUB_NORMAL 0
+//delay time : 100 ms
+#define PP_USB_HUB_RESET_DELAY 100
+#endif
+/*20161230 Jack W Lu: add for chip enable control }*/
+
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#define PP_SUPPORT_MANUAL_OTG_CONTROL
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
 /* Mask/Bit helpers */
 #define _SMB_MASK(BITS, POS) \
 	((unsigned char)(((1 << (BITS)) - 1) << (POS)))
@@ -51,6 +89,7 @@ struct smbchg_regulator {
 	struct regulator_desc	rdesc;
 	struct regulator_dev	*rdev;
 };
+
 
 struct parallel_usb_cfg {
 	struct power_supply		*psy;
@@ -109,6 +148,25 @@ struct smbchg_chip {
 	u8				revision[4];
 
 	/* configuration parameters */
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+	int				usb_switch_1_gpio;/*USB_Switch1_S: for ADB: L, for HOST: H, front of HUB3*/
+	int				usb_switch_2_gpio;/*USB_Switch2_S: for ADB: L, for HOST: H, back of HUB2*/
+	int				usb_switch_3_gpio;/*USB_Switch3_S: for UART: H, for HOST: L, for TYPE-A*/
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN {*/
+	int				mini_usb_otg_vbus_enable;/*for Mini_USB_EN: High enable*/
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN }*/
+#endif
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+	/*OEM, 20171026, add for P5V*/
+	struct regulator *reg_p5v_usb;
+
+/*20161230 Jack W Lu: add for chip enable control {*/
+#ifdef PP_GL3523_NEED_CHIP_RESET
+	int				gl3523_chip_en;/*for reset: LOW enable*/
+#endif
+/*20161230 Jack W Lu: add for chip enable control }*/
 	int				iterm_ma;
 	int				usb_max_current_ma;
 	int				typec_current_ma;
@@ -250,6 +308,9 @@ struct smbchg_chip {
 	struct work_struct		usb_set_online_work;
 	struct delayed_work		vfloat_adjust_work;
 	struct delayed_work		hvdcp_det_work;
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection {*/
+	struct delayed_work		otg_hub3_det_work;
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection }*/
 	spinlock_t			sec_access_lock;
 	struct mutex			therm_lvl_lock;
 	struct mutex			usb_set_online_lock;
@@ -429,6 +490,16 @@ enum hvdcp_voters {
 	NUM_HVDCP_VOTERS,
 };
 static int smbchg_debug_mask;
+
+struct regulator *g_reg_p5v_usb = NULL;
+
+
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+static irqreturn_t usbid_change_handler(int irq, void *_chip);
+#endif
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
 module_param_named(
 	debug_mask, smbchg_debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -487,6 +558,7 @@ module_param_named(
 	int, S_IRUSR | S_IWUSR
 );
 
+/*20170220 Jack W Lu: Remove USB OTG detection log {*/
 #define pr_smb(reason, fmt, ...)				\
 	do {							\
 		if (smbchg_debug_mask & (reason))		\
@@ -502,6 +574,7 @@ module_param_named(
 		else							\
 			pr_debug_ratelimited(fmt, ##__VA_ARGS__);	\
 	} while (0)
+/*20170220 Jack W Lu: Remove USB OTG detection log }*/
 
 static int smbchg_read(struct smbchg_chip *chip, u8 *val,
 			u16 addr, int count)
@@ -712,6 +785,32 @@ static enum pwr_path_type smbchg_get_pwr_path(struct smbchg_chip *chip)
 #define USBIN_SRC_DET_BIT		BIT(2)
 #define FMB_STS_MASK			SMB_MASK(3, 0)
 #define USBID_GND_THRESHOLD		0x495
+
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+char u8_smb_force_otg_enable = 1;// 1: default is OTG HOST mode
+char u8_smb_force_uart_enable = 0;// 0: default is UART OFF
+
+static int __init oem_force_usb_device_mode(char *str)
+{
+	pr_info("%s: adb is enabled\n", __func__);
+	u8_smb_force_otg_enable = 0;
+	return 1;
+}
+
+__setup("ro.oem.adb=1", oem_force_usb_device_mode);
+
+static int __init oem_force_uart_on(char *str)
+{
+	pr_info("%s: UART switch is enabled\n", __func__);
+	u8_smb_force_uart_enable = 1;
+	return 1;
+}
+
+__setup("ro.oem.uart=1", oem_force_uart_on);
+#endif
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
 static bool is_otg_present_schg(struct smbchg_chip *chip)
 {
 	int rc;
@@ -788,8 +887,27 @@ static bool is_otg_present_schg_lite(struct smbchg_chip *chip)
 	return !!(reg & RID_GND_DET_STS);
 }
 
+/*OEM, 20170503, Terry.Yan, add interface to get usb device info {*/
+bool is_usb_device_mode(void)
+{
+	#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+	return !u8_smb_force_otg_enable;
+	#else
+	return true;
+	#endif
+}
+EXPORT_SYMBOL_GPL(is_usb_device_mode);
+/*OEM, 20170503, Terry.Yan, add interface to get usb device info }*/
+
 static bool is_otg_present(struct smbchg_chip *chip)
 {
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+	printk("is_otg_present schg_version = %d\n", chip->schg_version);
+	return (u8_smb_force_otg_enable!=0);//USB mode = 0, OTG HOST = 1
+#endif
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
 	if (chip->schg_version == QPNP_SCHG_LITE)
 		return is_otg_present_schg_lite(chip);
 
@@ -2782,6 +2900,267 @@ static int force_dcin_icl_write(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(force_dcin_icl_ops, NULL,
 		force_dcin_icl_write, "0x%02llx\n");
+
+extern void gl3523_poweron(void);
+extern void gl3523_reset(void);
+extern void usb2517_default_port(void);
+/*2017-07-19 Jack W Lu: Add VBUS control for I2.0 {*/
+static int typea_mini_usb_otg_vbus_enable = 0;
+
+char smb_typea_otg_vbus_control(char enable)
+{
+	int vbus_on = PP_USB_OTG_VBUS_ON;
+	int vbus_off = PP_USB_OTG_VBUS_OFF;
+	if(typea_mini_usb_otg_vbus_enable == 0)
+	{
+		printk("typea_mini_usb_otg_vbus_enable is error\n");
+		return -1;
+	}
+
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control {*/
+	if(((prj_Type == PROJECT_AAIO2_STD_101)||
+		(prj_Type == PROJECT_AAIO2_STD_156)||
+		(prj_Type == PROJECT_AAIO2_STD_215)) && (board_id > BOARD_EVT2) )//DVT PVT ...
+	{
+		vbus_on = PP_USB_OTG_VBUS_OFF;
+		vbus_off = PP_USB_OTG_VBUS_ON;
+	}
+
+	if((prj_Type == PROJECT_AAIO2_VALUE_101)||
+		(prj_Type == PROJECT_AAIO2_VALUE_156))
+	{
+		vbus_on = PP_USB_OTG_VBUS_OFF;
+		vbus_off = PP_USB_OTG_VBUS_ON;
+	}
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control }*/
+
+	if(enable != 0)
+	{
+		gpio_direction_output(typea_mini_usb_otg_vbus_enable, vbus_on);//mini vbus on
+		printk("smb_typea_otg_vbus_control is ON vbus_on = %d\n", vbus_on);
+	}
+	else
+	{
+		gpio_direction_output(typea_mini_usb_otg_vbus_enable, vbus_off);//mini vbus off
+		printk("smb_typea_otg_vbus_control is OFF vbus_off = %d\n", vbus_off);
+	}
+	return 0;
+}
+/*2017-07-19 Jack W Lu: Add VBUS control for I2.0 }*/
+
+static void smb_force_otg_gpio_control(struct smbchg_chip *chip)
+{
+	if ((chip->usb_switch_1_gpio > 0) &&
+		(chip->mini_usb_otg_vbus_enable > 0) &&
+		(chip->usb_switch_2_gpio > 0)
+#ifdef PP_GL3523_NEED_CHIP_RESET
+		&&(chip->gl3523_chip_en > 0)
+#endif
+		)
+	{
+		pr_smb(PR_STATUS, "GPIO ALL OK\n");
+	}
+	else
+	{
+		printk("GPIO error\n");
+		return;
+	}
+
+	if(u8_smb_force_otg_enable == 1)
+	{
+		//force to OTG, NO ADB
+#ifdef PP_SUPPORT_USB_SWITCH
+		smb_typea_otg_vbus_control(PP_USB_OTG_VBUS_ON);//mini vbus on
+		gpio_direction_output(chip->usb_switch_1_gpio, PP_USB_HOST_ON);//HOST ON
+		gpio_direction_output(chip->usb_switch_2_gpio, PP_USB_HOST_ON);//HOST ON
+#endif
+		printk("smb_force_otg_gpio_control PP_USB_HOST_ON\n");
+		//HUB3.0 chip reset
+#ifdef PP_GL3523_NEED_CHIP_RESET
+		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_RESET);
+		msleep(PP_USB_HUB_RESET_DELAY);
+		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_NORMAL);
+#else
+		gl3523_reset();
+		usb2517_default_port();
+#endif
+	}
+	else if(u8_smb_force_otg_enable == 2)
+	{
+		//force to OTG, 2.0 still to adb port
+#ifdef PP_SUPPORT_USB_SWITCH
+		smb_typea_otg_vbus_control(PP_USB_OTG_VBUS_ON);//mini vbus on
+		gpio_direction_output(chip->usb_switch_1_gpio, PP_USB_ADB_ON);//ADB ON
+		gpio_direction_output(chip->usb_switch_2_gpio, PP_USB_ADB_ON);//ADB ON
+#endif
+		pr_smb(PR_STATUS, "smb_force_otg_gpio_control 2.0\n");
+		//HUB chip enable
+#ifdef PP_GL3523_NEED_CHIP_RESET
+		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_RESET);
+		msleep(PP_USB_HUB_RESET_DELAY);
+		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_NORMAL);
+#else
+		gl3523_reset();
+		usb2517_default_port();
+#endif
+	}
+	else
+	{
+		//force to ADB, NO HOST device support
+#ifdef PP_SUPPORT_USB_SWITCH
+		smb_typea_otg_vbus_control(PP_USB_OTG_VBUS_OFF);//mini vbus off
+		gpio_direction_output(chip->usb_switch_1_gpio, PP_USB_ADB_ON);//ADB ON
+		gpio_direction_output(chip->usb_switch_2_gpio, PP_USB_ADB_ON);//ADB ON
+#endif
+		printk("smb_force_otg_gpio_control PP_USB_ADB_ON\n");
+		//HUB chip disable
+#ifdef PP_GL3523_NEED_CHIP_RESET
+//		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_RESET);
+#endif
+	}
+	return;
+}
+
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+static int smb_force_otg_host_set(void *data, u64 val)
+{
+	struct smbchg_chip *chip = data;
+	printk("smb_force_otg_host_set val = %d\n", (char)val);
+
+	u8_smb_force_otg_enable = (char)val;
+
+	smb_force_otg_gpio_control(chip);
+	usbid_change_handler(0, chip);
+	printk("u8_smb_force_otg_enable = %d\n", u8_smb_force_otg_enable);
+	return 0;
+}
+
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting {*/
+static int smb_force_otg_host_get(void *_data, u64 * val)
+{
+	char ret = 0;
+	ret = (u8_smb_force_otg_enable != 0);
+	*val = ret;
+	pr_smb(PR_STATUS, "smb_force_otg_host_get USB mode = %d\n", ret);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(smb_force_otg_host_ops, smb_force_otg_host_get,
+		smb_force_otg_host_set, "0x%02llx\n");
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting }*/
+#endif
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting {*/
+static int smb_force_uart_set(void *data, u64 val)
+{
+	struct smbchg_chip *chip = data;
+	u8_smb_force_uart_enable = (char)val;
+	printk("u8_smb_force_uart_enable = %d\n", u8_smb_force_uart_enable);
+	if(u8_smb_force_uart_enable == 1)
+	{
+		//force to UART
+		gpio_direction_output(chip->usb_switch_3_gpio, PP_UART_ON);//UART ON
+		pr_smb(PR_STATUS, "smb_force_uart_set PP_UART_ON\n");
+	}
+	else
+	{
+		//force to type-A USB
+		gpio_direction_output(chip->usb_switch_3_gpio, PP_UART_OFF);//UART OFF
+		pr_smb(PR_STATUS, "smb_force_uart_set PP_UART_OFF\n");
+	}
+	return 0;
+}
+
+static int smb_force_uart_get(void *_data, u64 * val)
+{
+	char ret = 0;
+	ret = (u8_smb_force_uart_enable != 0);
+	*val = ret;
+	pr_smb(PR_STATUS, "smb_force_uart_get USB mode = %d\n", ret);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(smb_force_uart_output_ops, smb_force_uart_get,
+		smb_force_uart_set, "0x%02llx\n");
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting }*/
+#endif
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+/*20170904 Jack W Lu: Add official sysfs for OTG & UART control {*/
+static ssize_t smb_force_otg_ctl_set(struct device *dev,
+			      struct device_attribute *da,
+			      const char *buf, size_t count)
+{
+	struct smbchg_chip *data = dev_get_drvdata(dev);
+	unsigned long val = 0;
+	int ret;
+
+	if (kstrtoul(buf, 10, &val))
+		return -1;
+	printk("smb_force_otg_ctl_set enter = %ld\n", val);
+
+	ret = smb_force_otg_host_set((void *)data, (u64)val);
+	return count;
+}
+
+static ssize_t smb_force_otg_ctl_get(struct device *dev,
+		     struct device_attribute *attr,
+		     char *buf)
+{
+	char ret = 0;
+	ret = (u8_smb_force_otg_enable != 0);
+	printk("smb_force_otg_ctl_get = %d\n", ret);
+	return snprintf(buf, 8, "0x%02x\n", ret);
+}
+
+static ssize_t smb_force_uart_ctl_set(struct device *dev,
+			      struct device_attribute *da,
+			      const char *buf, size_t count)
+{
+	struct smbchg_chip *data = dev_get_drvdata(dev);
+	unsigned long val = 0;
+	int ret;
+
+	if (kstrtoul(buf, 10, &val))
+		return -1;
+	printk("smb_force_uart_ctl_set enter = %ld\n", val);
+
+	ret = smb_force_uart_set((void *)data, (u64)val);
+	return count;
+}
+
+static ssize_t smb_force_uart_ctl_get(struct device *dev,
+		     struct device_attribute *attr,
+		     char *buf)
+{
+	char ret = 0;
+	ret = (u8_smb_force_uart_enable != 0);
+	printk("smb_force_uart_ctl_get = %d\n", ret);
+	return snprintf(buf, 8, "0x%02x\n", ret);
+}
+
+static struct device_attribute smb_force_otg_ctl_attr =
+	__ATTR(smb_force_otg_ctl, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP, smb_force_otg_ctl_get, smb_force_otg_ctl_set);
+
+static struct device_attribute smb_force_uart_ctl_attr =
+	__ATTR(smb_force_uart_ctl, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP, smb_force_uart_ctl_get, smb_force_uart_ctl_set);
+/*20170904 Jack W Lu: Add official sysfs for OTG & UART control }*/
+
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection {*/
+static void smbchg_otg_hub3_det_work(struct work_struct *work)
+{
+	struct smbchg_chip *chip = container_of(work,
+				struct smbchg_chip,
+				otg_hub3_det_work.work);
+	printk("smbchg_otg_hub3_det_work enter\n");
+	smb_force_otg_gpio_control(chip);
+	usbid_change_handler(0, chip);
+}
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection }*/
 
 /*
  * set the dc charge path's maximum allowed current draw
@@ -7926,6 +8305,39 @@ static int create_debugfs_entries(struct smbchg_chip *chip)
 			"Couldn't create force dcin icl check file\n");
 		return -EINVAL;
 	}
+/*2016-12-12 Jack W Lu: Add manual OTG control {*/
+#ifdef PP_SUPPORT_MANUAL_OTG_CONTROL
+	ent = debugfs_create_file("smb_force_otg_host_mode",
+				  S_IFREG | S_IWUSR | S_IRUGO,
+				  chip->debug_root, chip,
+				  &smb_force_otg_host_ops);
+	if (!ent) {
+		dev_err(chip->dev,
+			"Couldn't create smb_force_otg_host_mode\n");
+		return -EINVAL;
+	}
+#endif
+/*2016-12-12 Jack W Lu: Add manual OTG control }*/
+
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+	ent = debugfs_create_file("smb_force_uart_output",
+				  S_IFREG | S_IWUSR | S_IRUGO,
+				  chip->debug_root, chip,
+				  &smb_force_uart_output_ops);
+	if (!ent) {
+		dev_err(chip->dev,
+			"Couldn't create smb_force_uart_output\n");
+		return -EINVAL;
+	}
+#endif
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+/*20170904 Jack W Lu: Add official sysfs for OTG & UART control {*/
+	device_create_file(chip->dev, &smb_force_otg_ctl_attr);
+	device_create_file(chip->dev, &smb_force_uart_ctl_attr);
+/*20170904 Jack W Lu: Add official sysfs for OTG & UART control }*/
+
 	return 0;
 }
 
@@ -8059,14 +8471,18 @@ static int smbchg_probe(struct spmi_device *spmi)
 	struct smbchg_chip *chip;
 	struct power_supply *usb_psy, *typec_psy = NULL;
 	struct qpnp_vadc_chip *vadc_dev = NULL, *vchg_vadc_dev = NULL;
+/*2016-11-25 Jack W Lu: remove typec {*/
+#ifdef CONFIG_QPNP_TYPEC
 	const char *typec_psy_name;
-
+#endif
+/*2016-11-25 Jack W Lu: remove typec }*/
 	usb_psy = power_supply_get_by_name("usb");
 	if (!usb_psy) {
 		pr_smb(PR_STATUS, "USB supply not found, deferring probe\n");
 		return -EPROBE_DEFER;
 	}
-
+/*2016-11-25 Jack W Lu: remove typec {*/
+#ifdef CONFIG_QPNP_TYPEC
 	if (of_property_read_bool(spmi->dev.of_node, "qcom,external-typec")) {
 		/* read the type power supply name */
 		rc = of_property_read_string(spmi->dev.of_node,
@@ -8084,6 +8500,8 @@ static int smbchg_probe(struct spmi_device *spmi)
 			return -EPROBE_DEFER;
 		}
 	}
+#endif
+/*2016-11-25 Jack W Lu: remove typec }*/
 
 	if (of_find_property(spmi->dev.of_node, "qcom,dcin-vadc", NULL)) {
 		vadc_dev = qpnp_get_vadc(&spmi->dev, "dcin");
@@ -8112,6 +8530,170 @@ static int smbchg_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "Unable to allocate memory\n");
 		return -ENOMEM;
 	}
+
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN {*/
+	//for qcom,mini-usb-otg-vbus-enable
+	chip->mini_usb_otg_vbus_enable = of_get_named_gpio(spmi->dev.of_node,
+						"qcom,mini-usb-otg-vbus-enable", 0);
+	if (chip->mini_usb_otg_vbus_enable < 0) {
+		pr_smb(PR_STATUS, "%s: %s property not found %d\n",
+			__func__, "mini_usb_otg_vbus_enable", chip->mini_usb_otg_vbus_enable);
+	}
+	if (gpio_is_valid(chip->mini_usb_otg_vbus_enable)) {
+		pr_smb(PR_STATUS, "%s: mini_usb_otg_vbus_enable request %d\n", __func__,
+			chip->mini_usb_otg_vbus_enable);
+		rc = gpio_request(chip->mini_usb_otg_vbus_enable, "mini_usb_otg_vbus_enable");
+		if (rc) {
+			dev_err(&spmi->dev,
+				"%s: mini_usb_otg_vbus_enable request failed, ret:%d\n",
+				__func__, rc);
+			return rc;
+		}
+		printk("mini_usb_otg_vbus_enable request OK\n");
+/*2017-07-19 Jack W Lu: Add VBUS control for I2.0 {*/
+		typea_mini_usb_otg_vbus_enable = chip->mini_usb_otg_vbus_enable;
+/*2017-07-19 Jack W Lu: Add VBUS control for I2.0 }*/
+	}
+	else
+		printk("mini_usb_otg_vbus_enable is bad ==%d !\n", chip->mini_usb_otg_vbus_enable);
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN }*/
+
+	//for usb_switch_1_gpio
+	chip->usb_switch_1_gpio = of_get_named_gpio(spmi->dev.of_node,
+						"qcom,usb_switch_1_gpio", 0);
+	if (chip->usb_switch_1_gpio < 0) {
+		pr_smb(PR_STATUS, "%s: %s property not found %d\n",
+			__func__, "usb_switch_1_gpio", chip->usb_switch_1_gpio);
+	}
+	if (gpio_is_valid(chip->usb_switch_1_gpio)) {
+		pr_smb(PR_STATUS, "%s: usb_switch_1_gpio request %d\n", __func__,
+			chip->usb_switch_1_gpio);
+		rc = gpio_request(chip->usb_switch_1_gpio, "usb_switch_1_gpio");
+		if (rc) {
+			dev_err(&spmi->dev,
+				"%s: usb_switch_1_gpio request failed, ret:%d\n",
+				__func__, rc);
+			return rc;
+		}
+		printk("usb_switch_1_gpio req OK\n");
+	}
+	else
+		printk("usb_switch_1_gpio is bad ==%d !\n", chip->usb_switch_1_gpio);
+
+	//for usb_switch_2_gpio
+	chip->usb_switch_2_gpio = of_get_named_gpio(spmi->dev.of_node,
+						"qcom,usb_switch_2_gpio", 0);
+	if (chip->usb_switch_2_gpio < 0) {
+		pr_smb(PR_STATUS, "%s: %s property not found %d\n",
+			__func__, "usb_switch_2_gpio", chip->usb_switch_2_gpio);
+	}
+	if (gpio_is_valid(chip->usb_switch_2_gpio)) {
+		pr_smb(PR_STATUS, "%s: usb_switch_2_gpio request %d\n", __func__,
+			chip->usb_switch_2_gpio);
+		rc = gpio_request(chip->usb_switch_2_gpio, "usb_switch_2_gpio");
+		if (rc) {
+			dev_err(&spmi->dev,
+				"%s: usb_switch_2_gpio request failed, ret:%d\n",
+				__func__, rc);
+			return rc;
+		}
+		printk("usb_switch_2_gpio req OK\n");
+	}
+	else
+		printk("usb_switch_2_gpio is bad ==%d !\n", chip->usb_switch_2_gpio);
+
+	//for usb_switch_3_gpio
+	chip->usb_switch_3_gpio = of_get_named_gpio(spmi->dev.of_node,
+						"qcom,uart_switch_3_gpio", 0);
+	if (chip->usb_switch_3_gpio < 0) {
+		pr_smb(PR_STATUS, "%s: %s property not found %d\n",
+			__func__, "uart_switch_3_gpio", chip->usb_switch_3_gpio);
+	}
+	if (gpio_is_valid(chip->usb_switch_3_gpio)) {
+		pr_smb(PR_STATUS, "%s: usb_switch_3_gpio request %d\n", __func__,
+			chip->usb_switch_3_gpio);
+		rc = gpio_request(chip->usb_switch_3_gpio, "usb_switch_3_gpio");
+		if (rc) {
+			dev_err(&spmi->dev,
+				"%s: usb_switch_3_gpio request failed, ret:%d\n",
+				__func__, rc);
+			return rc;
+		}
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting {*/
+#if 0
+		gpio_direction_output(chip->usb_switch_3_gpio, PP_UART_ON);//UART ON
+#endif
+		printk("usb_switch_3_gpio set High OK\n");
+	}
+	else
+		printk("usb_switch_3_gpio is bad ==%d !\n", chip->usb_switch_3_gpio);
+#endif
+	smb_force_uart_set((void *)chip, (u8_smb_force_uart_enable!=0));
+/*20170220 Jack W Lu: Add read attribute for OTG & UART setting }*/
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+/*20161230 Jack W Lu: add for chip enable control {*/
+#ifdef PP_GL3523_NEED_CHIP_RESET
+	//for qcom,gl3523-chip-enable-gpio
+	chip->gl3523_chip_en = of_get_named_gpio(spmi->dev.of_node,
+						"qcom,gl3523-chip-enable-gpio", 0);
+	printk("gl3523_chip_en is gpio ==%d !\n", chip->gl3523_chip_en);
+	if (chip->gl3523_chip_en < 0) {
+		pr_smb(PR_STATUS, "%s: %s property not found %d\n",
+			__func__, "gl3523_chip_en", chip->gl3523_chip_en);
+	}
+	if (gpio_is_valid(chip->gl3523_chip_en)) {
+		pr_smb(PR_STATUS, "%s: gl3523_chip_en request %d\n", __func__,
+			chip->gl3523_chip_en);
+		rc = gpio_request(chip->gl3523_chip_en, "gl3523_chip_en");
+		if (rc) {
+			dev_err(&spmi->dev,
+				"%s: gl3523_chip_en request failed, ret:%d\n",
+				__func__, rc);
+			return rc;
+		}
+		printk("gl3523_chip_en request OK\n");
+		gpio_direction_output(chip->gl3523_chip_en, PP_USB_HUB_NORMAL);
+		msleep(PP_USB_HUB_RESET_DELAY);
+	}
+	else
+		printk("gl3523_chip_en is bad ==%d !\n", chip->gl3523_chip_en);
+#endif
+/*20161230 Jack W Lu: add for chip enable control }*/
+/*pp, tony.l.cai, 20170605, gpio regulator enable for p5v_usb{*/
+#ifdef GPIO_P5V_USB_ENABLE
+	gl3523_poweron();
+#endif
+/*}pp, tony.l.cai, 20170605, gpio regulator enable for p5v_usb*/
+
+	/*OEM, 20171026, add for P5V*/
+	chip->reg_p5v_usb = devm_regulator_get(&spmi->dev,"p5v_usb-gpio-supply");
+	if (IS_ERR(chip->reg_p5v_usb)) {
+		rc = PTR_ERR(chip->reg_p5v_usb);
+		pr_err("--%s: devm_regulator_get USB P5V regulator failed !!!!-----rc:%d\n", __func__, rc);
+		return rc;
+	}
+
+	g_reg_p5v_usb = chip->reg_p5v_usb;
+
+	rc = regulator_enable(chip->reg_p5v_usb);
+	if(rc)
+	{
+		pr_err("---%s:-get-regulator---end---error:%d--\n",__func__,rc);
+		return rc;
+	}
+	printk("p5v_usb-gpio-supply request OK\n");
+	/*OEM, 20171026, add for P5V*/
+
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control {*/
+	prj_Type = socinfo_get_project_id();
+	board_id = socinfo_get_board_id();
+/*2017-09-06 Jack W Lu: patch for I2.0 DVT typeA VBUS control }*/
+
+	/*default set VBUS off*/
+	smb_typea_otg_vbus_control(PP_USB_OTG_VBUS_OFF);//mini vbus off
 
 	chip->fcc_votable = create_votable(&spmi->dev,
 			"SMBCHG: fcc",
@@ -8188,6 +8770,10 @@ static int smbchg_probe(struct spmi_device *spmi)
 			smbchg_parallel_usb_en_work);
 	INIT_DELAYED_WORK(&chip->vfloat_adjust_work, smbchg_vfloat_adjust_work);
 	INIT_DELAYED_WORK(&chip->hvdcp_det_work, smbchg_hvdcp_det_work);
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection {*/
+	INIT_DELAYED_WORK(&chip->otg_hub3_det_work, smbchg_otg_hub3_det_work);
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection }*/
+
 	init_completion(&chip->src_det_lowered);
 	init_completion(&chip->src_det_raised);
 	init_completion(&chip->usbin_uv_lowered);
@@ -8318,6 +8904,11 @@ static int smbchg_probe(struct spmi_device *spmi)
 			chip->usb_present);
 		power_supply_set_present(chip->usb_psy, chip->usb_present);
 	}
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection {*/
+	schedule_delayed_work(&chip->otg_hub3_det_work,
+				msecs_to_jiffies(300));
+	printk("otg_hub3_det_work start later-------------\n");
+/*2017-09-25 Jack W Lu: add delay work for HUB3 OTG detection }*/
 
 	rerun_hvdcp_det_if_necessary(chip);
 
@@ -8342,12 +8933,94 @@ unregister_batt_psy:
 	power_supply_unregister(&chip->batt_psy);
 out:
 	handle_usb_removal(chip);
+
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+	if (chip->usb_switch_1_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_1_gpio %d\n",
+			__func__, chip->usb_switch_1_gpio);
+		gpio_free(chip->usb_switch_1_gpio);
+		chip->usb_switch_1_gpio = 0;
+	}
+	if (chip->usb_switch_2_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_2_gpio %d\n",
+			__func__, chip->usb_switch_2_gpio);
+		gpio_free(chip->usb_switch_2_gpio);
+		chip->usb_switch_2_gpio = 0;
+	}
+	if (chip->usb_switch_3_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_3_gpio %d\n",
+			__func__, chip->usb_switch_3_gpio);
+		gpio_free(chip->usb_switch_3_gpio);
+		chip->usb_switch_3_gpio = 0;
+	}
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN {*/
+	if (chip->mini_usb_otg_vbus_enable> 0) {
+		pr_smb(PR_STATUS, "%s free mini_usb_otg_vbus_enable %d\n",
+			__func__, chip->mini_usb_otg_vbus_enable);
+		gpio_free(chip->mini_usb_otg_vbus_enable);
+		chip->mini_usb_otg_vbus_enable = 0;
+	}
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN }*/
+#endif
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+
+/*20161230 Jack W Lu: add for chip enable control {*/
+#ifdef PP_GL3523_NEED_CHIP_RESET
+	if (chip->gl3523_chip_en> 0) {
+		pr_smb(PR_STATUS, "%s free gl3523_chip_en %d\n",
+			__func__, chip->gl3523_chip_en);
+		gpio_free(chip->gl3523_chip_en);
+		chip->gl3523_chip_en = 0;
+	}
+#endif
+/*20161230 Jack W Lu: add for chip enable control }*/
 	return rc;
 }
 
 static int smbchg_remove(struct spmi_device *spmi)
 {
 	struct smbchg_chip *chip = dev_get_drvdata(&spmi->dev);
+/*2016-12-12 Jack W Lu: Add USB switch control {*/
+#ifdef PP_SUPPORT_USB_SWITCH
+	if (chip->usb_switch_1_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_1_gpio %d\n",
+			__func__, chip->usb_switch_1_gpio);
+		gpio_free(chip->usb_switch_1_gpio);
+		chip->usb_switch_1_gpio = 0;
+	}
+	if (chip->usb_switch_2_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_2_gpio %d\n",
+			__func__, chip->usb_switch_2_gpio);
+		gpio_free(chip->usb_switch_2_gpio);
+		chip->usb_switch_2_gpio = 0;
+	}
+	if (chip->usb_switch_3_gpio > 0) {
+		pr_smb(PR_STATUS, "%s free usb_switch_3_gpio %d\n",
+			__func__, chip->usb_switch_3_gpio);
+		gpio_free(chip->usb_switch_3_gpio);
+		chip->usb_switch_3_gpio = 0;
+	}
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN {*/
+	if (chip->mini_usb_otg_vbus_enable> 0) {
+		pr_smb(PR_STATUS, "%s free mini_usb_otg_vbus_enable %d\n",
+			__func__, chip->mini_usb_otg_vbus_enable);
+		gpio_free(chip->mini_usb_otg_vbus_enable);
+		chip->mini_usb_otg_vbus_enable = 0;
+	}
+/*20161228 Jack W Lu: mini USB OTG VBUS enable---Mini_USB_EN }*/
+#endif
+/*2016-12-12 Jack W Lu: Add USB switch control }*/
+/*20161230 Jack W Lu: add for chip enable control {*/
+#ifdef PP_GL3523_NEED_CHIP_RESET
+	if (chip->gl3523_chip_en> 0) {
+		pr_smb(PR_STATUS, "%s free gl3523_chip_en %d\n",
+			__func__, chip->gl3523_chip_en);
+		gpio_free(chip->gl3523_chip_en);
+		chip->gl3523_chip_en = 0;
+	}
+#endif
+/*20161230 Jack W Lu: add for chip enable control }*/
 
 	debugfs_remove_recursive(chip->debug_root);
 
@@ -8363,6 +9036,16 @@ static void smbchg_shutdown(struct spmi_device *spmi)
 {
 	struct smbchg_chip *chip = dev_get_drvdata(&spmi->dev);
 	int i, rc;
+	/*2017-11-29 Jack W Lu:disable type-A levelshift to forbidden PC VBUS leak {*/
+	smb_typea_otg_vbus_control(0);
+	/*2017-11-29 Jack W Lu:disable type-A levelshift to forbidden PC VBUS leak }*/
+
+	/*disable p5v*/
+	if( chip->reg_p5v_usb != NULL )
+	{
+		regulator_disable(chip->reg_p5v_usb);
+		pr_info("disable USB p5v\n");
+	}
 
 	if (!(chip->wa_flags & SMBCHG_RESTART_WA))
 		return;

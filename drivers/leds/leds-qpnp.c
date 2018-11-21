@@ -1074,6 +1074,28 @@ static int qpnp_gpio_set(struct qpnp_led_data *led)
 
 		led->gpio_cfg->enable = true;
 	} else {
+		/*pp,Tony.L.Cai,20170412,change for pm8953 gpio led{*/
+		rc = qpnp_led_masked_write(led,
+				LED_GPIO_MODE_CTRL(led->base),
+				LED_GPIO_MODE_MASK,
+				0x10);
+		if (rc) {
+			dev_err(&led->spmi_dev->dev,
+					"Failed to write led mode reg\n");
+			goto err_gpio_reg_write;
+		}
+
+		rc = qpnp_led_masked_write(led,
+				LED_GPIO_EN_CTRL(led->base),
+				LED_GPIO_EN_MASK,
+				LED_GPIO_EN_ENABLE);
+		if (rc) {
+			dev_err(&led->spmi_dev->dev,
+					"Failed to write led enable reg\n");
+			goto err_gpio_reg_write;
+		}
+		/*}pp,Tony.L.Cai,20170412,change for pm8953 gpio led*/
+		/*
 		rc = qpnp_led_masked_write(led,
 				LED_GPIO_MODE_CTRL(led->base),
 				LED_GPIO_MODE_MASK,
@@ -1093,7 +1115,7 @@ static int qpnp_gpio_set(struct qpnp_led_data *led)
 					"Failed to write led enable reg\n");
 			goto err_gpio_reg_write;
 		}
-
+		*/
 		led->gpio_cfg->enable = false;
 	}
 
@@ -4036,7 +4058,7 @@ static int qpnp_leds_probe(struct spmi_device *spmi)
 
 		if (led->id == QPNP_ID_LED_MPP) {
 			if (!led->mpp_cfg->pwm_cfg)
-				break;
+				goto init_led; //pp,tony.l.cai,20170413,bug:break cannot probe normally
 			if (led->mpp_cfg->pwm_cfg->mode == PWM_MODE) {
 				rc = sysfs_create_group(&led->cdev.dev->kobj,
 					&pwm_attr_group);
@@ -4109,14 +4131,18 @@ static int qpnp_leds_probe(struct spmi_device *spmi)
 			}
 		}
 
+init_led:
 		/* configure default state */
 		if (led->default_on) {
 			led->cdev.brightness = led->cdev.max_brightness;
 			__qpnp_led_work(led, led->cdev.brightness);
 			if (led->turn_off_delay_ms > 0)
 				qpnp_led_turn_off(led);
-		} else
+		} else{
 			led->cdev.brightness = LED_OFF;
+			//pp,20170420,tony.l.cai,bug fix for led default off that need to be set in led registers
+			__qpnp_led_work(led, led->cdev.brightness);
+		}
 
 		parsed_leds++;
 	}

@@ -66,8 +66,26 @@ int console_printk[4] = {
 	CONSOLE_LOGLEVEL_DEFAULT,	/* default_console_loglevel */
 };
 
+/*OEM, 20170428, setup console loglevel base cmdline parameter {*/
 /* Deferred messaged from sched code are marked by this special level */
 #define SCHED_MESSAGE_LOGLEVEL -2
+
+static int __init set_console_loglevel(char *str)
+{
+	long loglevel;
+
+	loglevel = simple_strtol(str, NULL, 10);
+
+
+	if( loglevel >= 0 && loglevel <=7 )
+		console_loglevel = (int) loglevel;
+
+	printk("%s: default level: %d\n", __func__, console_loglevel);
+
+	return 1;
+}
+__setup("console_loglevel=", set_console_loglevel);
+/*OEM, 20170428, setup console loglevel base cmdline parameter }*/
 
 /*
  * Low level drivers may need that to know if they can schedule in

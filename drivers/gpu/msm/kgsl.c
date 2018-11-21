@@ -2163,7 +2163,7 @@ static long _gpuobj_map_useraddr(struct kgsl_device *device,
 		struct kgsl_mem_entry *entry,
 		struct kgsl_gpuobj_import *param)
 {
-	struct kgsl_gpuobj_import_useraddr useraddr = {0};
+	struct kgsl_gpuobj_import_useraddr useraddr;
 	int ret;
 
 	param->flags &= KGSL_MEMFLAGS_GPUREADONLY
@@ -2841,7 +2841,9 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 	long ret = 0;
 	bool full_flush = false;
 	uint64_t size = 0;
-	int i, count = 0;
+/*Leo Guo modify this function for CVE-2018-5831,QC-CR#2161310 */
+	//int i, count = 0;
+	int i;
 	void __user *ptr;
 
 	if (param->count == 0 || param->count > 128)
@@ -2853,8 +2855,10 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 
 	entries = kzalloc(param->count * sizeof(*entries), GFP_KERNEL);
 	if (entries == NULL) {
-		ret = -ENOMEM;
-		goto out;
+		//ret = -ENOMEM;
+		//goto out;
+		kfree(objs);
+		return -ENOMEM;
 	}
 
 	ptr = to_user_ptr(param->objs);
@@ -2871,7 +2875,7 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 		if (entries[i] == NULL)
 			continue;
 
-		count++;
+		//count++;
 
 		if (!(objs[i].op & KGSL_GPUMEM_CACHE_RANGE))
 			size += entries[i]->memdesc.size;
@@ -2879,12 +2883,17 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 			size += (entries[i]->memdesc.size - objs[i].offset);
 
 		full_flush = check_full_flush(size, objs[i].op);
-		if (full_flush)
-			break;
+		//if (full_flush)
+			//break;
+		if (full_flush) {
+			trace_kgsl_mem_sync_full_cache(i, size);
+			flush_cache_all();
+			goto out;
+		}
 
 		ptr += sizeof(*objs);
 	}
-
+#if 0
 	if (full_flush) {
 		trace_kgsl_mem_sync_full_cache(count, size);
 		flush_cache_all();
@@ -2895,12 +2904,19 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 						objs[i].offset, objs[i].length,
 						objs[i].op);
 	}
+#endif
+	for (i = 0; !ret && i < param->count; i++)
+		if (entries[i])
+			ret = _kgsl_gpumem_sync_cache(entries[i],
+					objs[i].offset, objs[i].length,
+						objs[i].op);
 
+out:
 	for (i = 0; i < param->count; i++)
 		if (entries[i])
 			kgsl_mem_entry_put(entries[i]);
 
-out:
+//out:
 	kfree(entries);
 	kfree(objs);
 

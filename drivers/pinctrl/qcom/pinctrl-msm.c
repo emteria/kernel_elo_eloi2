@@ -510,6 +510,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
 	int drive;
 	int pull;
 	u32 ctl_reg;
+	int val;
 
 	static const char * const pulls[] = {
 		"no pull",
@@ -525,10 +526,13 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
 	func = (ctl_reg >> g->mux_bit) & 7;
 	drive = (ctl_reg >> g->drv_bit) & 7;
 	pull = (ctl_reg >> g->pull_bit) & 3;
-
+	//pp,tony.l.cai,20170822,append the gpio value for gpio debug
+	val = readl(pctrl->regs + g->io_reg);
+	val = !!(val & BIT(g->in_bit));
 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
 	seq_printf(s, " %s", pulls[pull]);
+	seq_printf(s, " %d", val);
 }
 
 static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
@@ -792,6 +796,10 @@ static struct irq_chip msm_gpio_irq_chip = {
 	.name           = "msmgpio",
 	.irq_mask       = msm_gpio_irq_mask,
 	.irq_unmask     = msm_gpio_irq_unmask,
+	/*OEM, 20180510, add irq_enable/disable interface {*/
+	.irq_enable     = msm_gpio_irq_unmask,
+	.irq_disable    = msm_gpio_irq_mask,
+	/*OEM, 20180510, add irq_enable/disable interface }*/
 	.irq_ack        = msm_gpio_irq_ack,
 	.irq_set_type   = msm_gpio_irq_set_type,
 	.irq_set_wake   = msm_gpio_irq_set_wake,

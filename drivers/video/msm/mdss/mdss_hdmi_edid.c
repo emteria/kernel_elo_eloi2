@@ -1895,6 +1895,13 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl)
 	sink_data = &edid_ctrl->sink_data;
 
 	sink_data->disp_multi_3d_mode_list_cnt = 0;
+	
+	/********
+	 *
+	 * Tony.Yang, 2018.04.28, the parser should parse the detailed timing section in both of blk0 and blk1.
+	 * 1) Parse video data block in blk1.
+	 *
+	 ********/
 	if (svd != NULL) {
 		++svd;
 		for (i = 0; i < len; ++i, ++svd) {
@@ -1932,7 +1939,22 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl)
 			if (video_format == HDMI_VFRMT_640x480p60_4_3)
 				has480p = true;
 		}
-	} else if (!num_of_cea_blocks || read_block0_res) {
+	}
+
+    /*
+        The above video block parsing should not be combined with the following
+        detailed timing processing, otherwise detailed timing will not be parsed
+        if there is video block data.
+     */
+     
+    /********
+     *
+	 * Tony.Yang, 2018.04.28, the parser should parse the detailed timing section in both of blk0 and blk1.
+	 * 2) Parse detailed timing section only in blk0.
+	 * if (!num_of_cea_blocks || read_block0_res) {
+	 *
+	 ********/
+    if (!num_of_cea_blocks) {
 		/* Detailed timing descriptors */
 		u32 desc_offset = 0;
 		/*
@@ -1943,6 +1965,7 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl)
 		 * * EDID_DETAIL_TIMING_DESC_BLCK_SZ[0x12] - Each detailed
 		 *   timing descriptor has block size of 18
 		 */
+		i = 0;
 		while (4 > i && 0 != edid_blk0[0x36+desc_offset]) {
 			hdmi_edid_detail_desc(edid_ctrl,
 				edid_blk0+0x36+desc_offset,
@@ -1966,13 +1989,21 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl)
 			desc_offset += 0x12;
 			++i;
 		}
-	} else if (1 == num_of_cea_blocks) {
+	}
+	/********
+	 *
+	 * Tony.Yang, 2018.04.28, the parser should parse the detailed timing section in both of blk0 and blk1.
+	 * 3) Parse detailed timing section in both of blk0 and blk1.
+	 *
+	 ********/
+	else if (1 == num_of_cea_blocks) {
 		u32 desc_offset = 0;
 
 		/*
 		 * Read from both block 0 and block 1
 		 * Read EDID block[0] as above
 		 */
+		i = 0;
 		while (4 > i && 0 != edid_blk0[0x36+desc_offset]) {
 			hdmi_edid_detail_desc(edid_ctrl,
 				edid_blk0+0x36+desc_offset,
@@ -2029,6 +2060,9 @@ static void hdmi_edid_get_display_mode(struct hdmi_edid_ctrl *edid_ctrl)
 			desc_offset += 0x12;
 			++i;
 		}
+	}
+	else {
+		DEV_ERR("%s: invalid blocks number: [%d]\n", __func__, num_of_cea_blocks);
 	}
 
 	std_blk = 0;
@@ -2195,13 +2229,6 @@ int hdmi_edid_parser(void *input)
 		DEV_DBG("HDMI DVI mode: %s\n",
 			edid_ctrl->sink_mode ? "no" : "yes");
 		goto bail;
-	}
-
-	/* Find out if CEA extension blocks exceeding max limit */
-	if (num_of_cea_blocks >= MAX_EDID_BLOCKS) {
-		DEV_WARN("%s: HDMI EDID exceeded max CEA blocks limit\n",
-				__func__);
-		num_of_cea_blocks = MAX_EDID_BLOCKS - 1;
 	}
 
 	/* check for valid CEA block */

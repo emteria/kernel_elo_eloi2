@@ -33,6 +33,8 @@
 #include "mdss_debug.h"
 #include "mdss_dsi_phy.h"
 #include "mdss_dba_utils.h"
+#include <soc/qcom/socinfo.h>//Leo Guo add for Puck HDMI issue
+
 
 #define XO_CLK_RATE	19200000
 #define CMDLINE_DSI_CTL_NUM_STRING_LEN 2
@@ -271,6 +273,7 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev,
 
 	return rc;
 }
+extern void sn65dsi86_dsi2edp_disable(void);//Leo Guo add
 
 static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 {
@@ -282,6 +285,8 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		ret = -EINVAL;
 		goto end;
 	}
+	if(strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi86_1080p")==0)
+		sn65dsi86_dsi2edp_disable();
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -294,7 +299,6 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
-
 	ret = msm_dss_enable_vreg(
 		ctrl_pdata->panel_power_data.vreg_config,
 		ctrl_pdata->panel_power_data.num_vreg, 0);
@@ -319,6 +323,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+
 	ret = msm_dss_enable_vreg(
 		ctrl_pdata->panel_power_data.vreg_config,
 		ctrl_pdata->panel_power_data.num_vreg, 1);
@@ -327,7 +332,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
 		return ret;
 	}
-
+    
 	/*
 	 * If continuous splash screen feature is enabled, then we need to
 	 * request all the GPIOs that have already been configured in the
@@ -869,7 +874,7 @@ static int mdss_dsi_cmd_flush(struct file *file, fl_owner_t id)
 	while (len >= sizeof(*dchdr)) {
 		dchdr = (struct dsi_ctrl_hdr *)bp;
 		dchdr->dlen = ntohs(dchdr->dlen);
-		if (dchdr->dlen > len || dchdr->dlen < 0) {
+		if (dchdr->dlen > len) {
 			pr_err("%s: dtsi cmd=%x error, len=%d\n",
 				__func__, dchdr->dtype, dchdr->dlen);
 			kfree(buf);
@@ -1316,6 +1321,11 @@ static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 			pinfo->mipi.pixel_packing, &(pinfo->mipi.dst_format));
 	return ret;
 }
+extern void sn65dsi86_dsi2edp_enable_early(void);
+extern void sn65dsi85_dsi2lvds_enable_early(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
+extern void sn65dsi85_dsi2lvds_enable_1st_init_CSR(void);
+extern void sn65dsi85_dsi2lvds_start_pll(void);
+extern void enable_lvds(int enable);
 
 int mdss_dsi_on(struct mdss_panel_data *pdata)
 {
@@ -1324,6 +1334,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	int cur_power_state;
+	PANEL_ID_TYPE qisda_panel_id=socinfo_get_panel_id();
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -1343,6 +1354,13 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	pinfo = &pdata->panel_info;
 	mipi = &pdata->panel_info.mipi;
 
+	/*OEM, 20180515, call bridge early setting function {*/
+	if(strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi86_1080p")==0)
+		sn65dsi86_dsi2edp_enable_early();
+	else if(! strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi85_720p") || !strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi85_1080p"))
+		sn65dsi85_dsi2lvds_enable_early(ctrl_pdata);
+	/*OEM, 20180515, call bridge early setting function }*/
+
 	if (mdss_dsi_is_panel_on_interactive(pdata)) {
 		/*
 		 * all interrupts are disabled at LK
@@ -1354,6 +1372,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		pr_debug("%s: panel already on\n", __func__);
 		goto end;
 	}
+
 
 	ret = mdss_dsi_panel_power_ctrl(pdata, MDSS_PANEL_POWER_ON);
 	if (ret) {
@@ -1408,10 +1427,8 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 			pr_debug("reset enable: pinctrl not enabled\n");
 		mdss_dsi_panel_reset(pdata, 1);
 	}
-
 	if (mipi->init_delay)
 		usleep_range(mipi->init_delay, mipi->init_delay);
-
 	if (mipi->force_clk_lane_hs) {
 		u32 tmp;
 
@@ -1419,6 +1436,19 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		tmp |= (1<<28);
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
 		wmb();
+	}
+	if((qisda_panel_id==HR215WU1_120)||(qisda_panel_id==TM101JDHP01_00))
+	{
+		enable_lvds(0);
+		mdelay(18);
+		enable_lvds(1);
+		msleep(90);
+	}
+	if((qisda_panel_id==HR215WU1_120)||(qisda_panel_id==TM101JDHP01_00))
+	{
+		msleep(50);
+		sn65dsi85_dsi2lvds_enable_1st_init_CSR();
+		sn65dsi85_dsi2lvds_start_pll();
 	}
 
 	if (pdata->panel_info.type == MIPI_CMD_PANEL)
@@ -1675,18 +1705,6 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 	pr_debug("%s-:\n", __func__);
 
 	return 0;
-}
-
-static irqreturn_t test_hw_vsync_handler(int irq, void *data)
-{
-	struct mdss_panel_data *pdata = (struct mdss_panel_data *)data;
-
-	pr_debug("HW VSYNC\n");
-	MDSS_XLOG(0xaaa, irq);
-	complete_all(&pdata->te_done);
-	if (pdata->next)
-		complete_all(&pdata->next->te_done);
-	return IRQ_HANDLED;
 }
 
 int mdss_dsi_cont_splash_on(struct mdss_panel_data *pdata)
@@ -2140,11 +2158,13 @@ error_pixel:
 error_byte:
 	return rc;
 }
-
+extern int recovery_mode_flag;
 static int mdss_dsi_check_params(struct mdss_dsi_ctrl_pdata *ctrl, void *arg)
 {
 	struct mdss_panel_info *var_pinfo, *pinfo;
 	int rc = 0;
+	static int first_time=1;//Leo Guo add for Puck HDMI issue
+	PROJECT_ID_TYPE pro_id=socinfo_get_project_id();
 
 	if (!ctrl || !arg)
 		return 0;
@@ -2168,7 +2188,15 @@ static int mdss_dsi_check_params(struct mdss_dsi_ctrl_pdata *ctrl, void *arg)
 		(var_pinfo->lcdc.v_pulse_width != pinfo->lcdc.v_pulse_width)
 		)
 		rc = 1;
-
+	if(pro_id==PROJECT_PUCK)//Leo Guo add for Puck HDMI issue
+	{
+		if(first_time)
+		{
+			if(recovery_mode_flag)
+				first_time=0;
+			return 1;
+		}
+	}
 	return rc;
 }
 
@@ -3070,8 +3098,6 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	struct device_node *dsi_pan_node = NULL;
 	const char *ctrl_name;
 	struct mdss_util_intf *util;
-	static int te_irq_registered;
-	struct mdss_panel_data *pdata;
 
 	if (!pdev || !pdev->dev.of_node) {
 		pr_err("%s: pdev not found for DSI controller\n", __func__);
@@ -3195,23 +3221,6 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 			goto error_shadow_clk_deinit;
 		}
 		disable_irq(gpio_to_irq(ctrl_pdata->disp_te_gpio));
-	}
-
-	pdata = &ctrl_pdata->panel_data;
-	init_completion(&pdata->te_done);
-	if (pdata->panel_info.type == MIPI_CMD_PANEL) {
-		if (!te_irq_registered) {
-			rc = devm_request_irq(&pdev->dev,
-				gpio_to_irq(pdata->panel_te_gpio),
-				test_hw_vsync_handler, IRQF_TRIGGER_FALLING,
-				"VSYNC_GPIO", &ctrl_pdata->panel_data);
-			if (rc) {
-				pr_err("%s: TE request_irq failed\n", __func__);
-				goto error_shadow_clk_deinit;
-			}
-			te_irq_registered = 1;
-			disable_irq_nosync(gpio_to_irq(pdata->panel_te_gpio));
-		}
 	}
 
 	rc = mdss_dsi_get_bridge_chip_params(pinfo, ctrl_pdata, pdev);
@@ -3947,7 +3956,6 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
-	struct mdss_panel_data *pdata = &ctrl_pdata->panel_data;
 
 	/*
 	 * If disp_en_gpio has been set previously (disp_en_gpio > 0)
@@ -3969,7 +3977,6 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
 		pr_err("%s:%d, TE gpio not specified\n",
 						__func__, __LINE__);
-	pdata->panel_te_gpio = ctrl_pdata->disp_te_gpio;
 
 	ctrl_pdata->bklt_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-bklight-en-gpio", 0);

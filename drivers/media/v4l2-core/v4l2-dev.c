@@ -31,6 +31,18 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
 
+/* ####### Debug ####### */
+//#define _V4L2_DEV_DEBUG_
+#ifdef _V4L2_DEV_DEBUG_
+#define __FILENAME__ \
+	(strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define _GPIO_KEYS_LOG(fmt, ...) \
+	printk("%s @@@ %s(@%d) " fmt "\n", __FILENAME__, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define _GPIO_KEYS_LOG(fmt, ...)
+#endif
+/* ####### Debug ####### */
+
 #define VIDEO_NUM_DEVICES	256
 #define VIDEO_NAME              "video4linux"
 
@@ -458,6 +470,9 @@ static int v4l2_open(struct inode *inode, struct file *filp)
 	if (vdev->debug)
 		printk(KERN_DEBUG "%s: open (%d)\n",
 			video_device_node_name(vdev), ret);
+	
+	_GPIO_KEYS_LOG("%s: open (%d)\n",
+			video_device_node_name(vdev), ret);
 	/* decrease the refcount in case of an error */
 	if (ret)
 		video_put(vdev);
@@ -475,7 +490,9 @@ static int v4l2_release(struct inode *inode, struct file *filp)
 	if (vdev->debug)
 		printk(KERN_DEBUG "%s: release\n",
 			video_device_node_name(vdev));
-
+	
+	_GPIO_KEYS_LOG("%s: release\n",
+			video_device_node_name(vdev));
 	/* decrease the refcount unconditionally since the release()
 	   return value is ignored. */
 	video_put(vdev);

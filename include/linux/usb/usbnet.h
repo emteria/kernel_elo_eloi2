@@ -27,6 +27,7 @@
 #define USBNET_IPA_SYS_PIPE_MAX_PKTS_DESC 200
 #define USBNET_IPA_SYS_PIPE_MIN_PKTS_DESC 5
 #define USBNET_IPA_SYS_PIPE_DNE_PKTS (USBNET_IPA_SYS_PIPE_MAX_PKTS_DESC*2)
+#define DUPLEX_SET_LENGTH 15  //OEM, 2017/12/14, export duplex control sysfs interface
 
 struct usbnet_ipa_stats {
 	/* RX Side */
@@ -232,6 +233,8 @@ extern int usbnet_write_cmd_nopm(struct usbnet *dev, u8 cmd, u8 reqtype,
 extern int usbnet_write_cmd_async(struct usbnet *dev, u8 cmd, u8 reqtype,
 		    u16 value, u16 index, const void *data, u16 size);
 
+extern void usbnet_create_ethtool_cmd(struct net_device *ndev,
+			int speed, int duplex, int autoneg, struct ethtool_cmd *cmd);  //OEM, 2017/12/14, export duplex control sysfs interface
 /* Drivers that reuse some of the standard USB CDC infrastructure
  * (notably, using multiple interfaces according to the CDC
  * union descriptor) get some helper code.

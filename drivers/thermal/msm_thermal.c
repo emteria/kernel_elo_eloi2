@@ -1010,9 +1010,13 @@ static void update_cpu_freq(int cpu)
 		trace_thermal_post_frequency_mit(cpu,
 			cpufreq_quick_get_max(cpu),
 			cpus[cpu].limited_min_freq);
+		/*pp,tony.l.cai,20170214,collapse the update_cpu_freq log{*/
 		if (ret)
-			pr_err("Unable to update policy for cpu:%d. err:%d\n",
+			pr_debug("Unable to update policy for cpu:%d. err:%d\n",
 				cpu, ret);
+		else
+			pr_debug("--cpu:%d update policy complete!--\n",cpu);
+		/*}pp,tony.l.cai,20170214,collapse the update_cpu_freq log*/
 	}
 }
 
@@ -4767,7 +4771,7 @@ static ssize_t __ref store_cc_enabled(struct kobject *kobj,
 		hotplug_init_cpu_offlined();
 		mutex_lock(&core_control_mutex);
 		update_offline_cores(cpus_offlined);
-		if (hotplug_enabled && hotplug_task) {
+		if (hotplug_enabled) {
 			for_each_possible_cpu(cpu) {
 				if (!(msm_thermal_info.core_control_mask &
 					BIT(cpus[cpu].cpu)))

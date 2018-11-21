@@ -50,7 +50,7 @@
 #include <linux/ipa_odu_bridge.h>
 #define DRIVER_VERSION		"22-Aug-2005"
 
-
+#include <linux/version.h>  //OEM, 2017/12/14, export duplex control sysfs interface
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -1568,7 +1568,8 @@ static void usbnet_bh (unsigned long param)
 		int	temp = dev->rxq.qlen;
 
 		if (temp < RX_QLEN(dev)) {
-			if (rx_alloc_submit(dev, GFP_KERNEL) == -ENOLINK)
+			/*carl.s.hua modify alloc flag from GFP_KERNEL to GFP_ATOMIC for timer call to avoid kernel assert*/
+			if (rx_alloc_submit(dev, GFP_ATOMIC) == -ENOLINK)
 				return;
 			if (temp != dev->rxq.qlen)
 				netif_dbg(dev, link, dev->net,
@@ -2055,6 +2056,149 @@ static void usbnet_ipa_ready_callback(void *user_data)
 	queue_work(usbnet_wq, &dev->odu_bridge_init);
 }
 
+/*OEM, 2017/12/14, export duplex control sysfs interface {*/
+void usbnet_create_ethtool_cmd(struct net_device *ndev,
+			      int speed, int duplex, int autoneg, struct ethtool_cmd *cmd)
+{
+	struct usbnet *udev = netdev_priv(ndev);
+	int cmd_advertising = 0;
+	cmd->port = PORT_MII;
+	cmd->cmd = ETHTOOL_SSET;
+	cmd->transceiver = XCVR_INTERNAL;
+	cmd->phy_address = udev->mii.phy_id;
+	if(autoneg == AUTONEG_ENABLE)
+	{
+		cmd->autoneg = AUTONEG_ENABLE;
+		cmd->speed = SPEED_10;
+		cmd_advertising = 63;
+		cmd->supported = 767;
+	}
+	else if(autoneg == AUTONEG_DISABLE)
+	{
+		cmd->autoneg = AUTONEG_ENABLE;
+		cmd->speed = speed;
+		cmd->duplex = duplex;
+		if (cmd->speed == SPEED_10 && cmd->duplex == DUPLEX_HALF)
+			cmd_advertising = ADVERTISED_10baseT_Half;
+		else if (cmd->speed == SPEED_10 &&
+			 cmd->duplex == DUPLEX_FULL)
+			cmd_advertising = ADVERTISED_10baseT_Full;
+		else if (cmd->speed == SPEED_100 &&
+			 cmd->duplex == DUPLEX_HALF)
+			cmd_advertising = ADVERTISED_100baseT_Half;
+		else if (cmd->speed == SPEED_100 &&
+			 cmd->duplex == DUPLEX_FULL)
+			cmd_advertising = ADVERTISED_100baseT_Full;
+		else if (cmd->speed == SPEED_1000 &&
+			 cmd->duplex == DUPLEX_HALF)
+			cmd_advertising = ADVERTISED_1000baseT_Half;
+		else if (cmd->speed == SPEED_1000 &&
+			 cmd->duplex == DUPLEX_FULL)
+			cmd_advertising = ADVERTISED_1000baseT_Full;
+	}
+	cmd->advertising = cmd_advertising;
+}
+
+static ssize_t usbnet_force_duplex_get(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct net_device *ndev = to_net_dev(dev);
+	char *setting;
+	if(ndev->netdev_ops->ndo_get_duplex == NULL)
+		return -EINVAL;
+	else
+		setting = ndev->netdev_ops->ndo_get_duplex();
+	return sprintf(buf, "%s\n", setting);
+}
+static ssize_t usbnet_force_duplex_set(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct net_device *ndev = to_net_dev(dev);
+	char setting[3][5] = {{0}, {0}, {0}};
+	int i=0,j=0,k=0;
+	int ret;
+	char temp;
+	int speed, duplex, autoneg;
+
+	if(buf == NULL || strlen(buf) > DUPLEX_SET_LENGTH)
+	{
+		printk("debug: wrong duplex paramter format.\n");
+		return -EINVAL;
+	}
+
+	printk("debug: duplex setting = %s", buf);
+	while((temp = buf[k]) != '\n' && k <= count)
+	{
+		if(temp != ',')
+		{
+			if(i>2)
+			{
+				printk("debug: too many parameters for duplex set.\n");
+				return -EINVAL;
+			}
+			setting[i][j++]=temp;
+		}
+		else
+		{
+			i++;
+			j=0;
+		}
+		k++;
+	}
+
+	if(!strcmp(setting[0], "10"))
+		speed = SPEED_10;
+	else if(!strcmp(setting[0], "100"))
+		speed = SPEED_100;
+	else if(!strcmp(setting[0], "1000"))
+		speed = SPEED_1000;
+	else if(!strcmp(setting[0], "on"))
+	{
+		autoneg = AUTONEG_ENABLE;
+		speed = -1;
+		duplex = -1;
+		goto SEND;
+	}
+	else
+	{
+		printk("debug: duplex setting speed parameter failed.\n");
+		return -EINVAL;
+	}
+
+	if(!strcmp(setting[1], "half"))
+		duplex = DUPLEX_HALF;
+	else if(!strcmp(setting[1], "full"))
+		duplex = DUPLEX_FULL;
+	else
+	{
+		printk("debug: duplex setting duplex parameter failed.\n");
+		return -EINVAL;
+	}
+
+	if(!strcmp(setting[2], "off"))
+		autoneg = AUTONEG_DISABLE;
+	else if(!strcmp(setting[2], "on"))
+		autoneg = AUTONEG_ENABLE;
+	else
+	{
+		printk("debug: duplex setting autoneg parameter failed.\n");
+		return -EINVAL;
+	}
+
+SEND:
+	if(ndev->netdev_ops->ndo_set_duplex == NULL)
+		return -EINVAL;
+	else
+		ret = ndev->netdev_ops->ndo_set_duplex(ndev, speed, duplex, autoneg, buf);
+	if(ret < 0)
+		return ret;
+	return count;
+}
+static struct device_attribute ethernet_duplex_set_test =
+	__ATTR(ethernet_duplex_set, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP, usbnet_force_duplex_get, usbnet_force_duplex_set);
+/*OEM, 2017/12/14, export duplex control sysfs interface }*/
+
 int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
@@ -2265,6 +2409,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	if (dev->driver_info->flags & FLAG_LINK_INTR)
 		usbnet_link_change(dev, 0, 0);
+
+	device_create_file(&(dev->net->dev), &ethernet_duplex_set_test); //OEM, 2017/12/14, export duplex control sysfs interface
 
 	return 0;
 

@@ -423,6 +423,7 @@ unlock:
 	return err ?: size;
 }
 
+/*20180521, CVE-2017-13215 {*/
 static int skcipher_recvmsg(struct kiocb *unused, struct socket *sock,
 			    struct msghdr *msg, size_t ignored, int flags)
 {
@@ -446,13 +447,6 @@ static int skcipher_recvmsg(struct kiocb *unused, struct socket *sock,
 		char __user *from = iov->iov_base;
 
 		while (seglen) {
-			sgl = list_first_entry(&ctx->tsgl,
-					       struct skcipher_sg_list, list);
-			sg = sgl->sg;
-
-			while (!sg->length)
-				sg++;
-
 			used = ctx->used;
 			if (!used) {
 				err = skcipher_wait_for_data(sk, flags);
@@ -473,6 +467,13 @@ static int skcipher_recvmsg(struct kiocb *unused, struct socket *sock,
 			err = -EINVAL;
 			if (!used)
 				goto free;
+
+			sgl = list_first_entry(&ctx->tsgl,
+					       struct skcipher_sg_list, list);
+			sg = sgl->sg;
+
+			while (!sg->length)
+				sg++;
 
 			ablkcipher_request_set_crypt(&ctx->req, sg,
 						     ctx->rsgl.sg, used,
@@ -505,6 +506,7 @@ unlock:
 
 	return copied ?: err;
 }
+/*20180521, CVE-2017-13215 }*/
 
 
 static unsigned int skcipher_poll(struct file *file, struct socket *sock,

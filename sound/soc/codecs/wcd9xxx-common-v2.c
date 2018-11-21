@@ -374,6 +374,11 @@ static void wcd_clsh_flyback_ctrl(struct snd_soc_codec *codec,
 	struct wcd9xxx_reg_val bulk_reg[2];
 	u8 vneg[] = {0x00, 0x40};
 
+	/*2018-2-9 Jack W Lu: fix codec noise issue, set WCD9XXX_FLYBACK_EN bit 2 disable {*/
+	snd_soc_update_bits(codec, WCD9XXX_FLYBACK_EN,
+					    0x4, 0x00);
+	/*2018-2-9 Jack W Lu: fix codec noise issue, set WCD9XXX_FLYBACK_EN bit 2 disable }*/
+
 	/* enable/disable flyback */
 	if ((enable && (++clsh_d->flyback_users == 1)) ||
 	   (!enable && (--clsh_d->flyback_users == 0))) {

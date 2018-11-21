@@ -1168,11 +1168,10 @@ static int ipxitf_ioctl(unsigned int cmd, void __user *arg)
 		sipx->sipx_network	= ipxif->if_netnum;
 		memcpy(sipx->sipx_node, ipxif->if_node,
 			sizeof(sipx->sipx_node));
-		rc = -EFAULT;
+		rc = 0;  // 2018/05/30, patch for CVE-2017-7487
 		if (copy_to_user(arg, &ifr, sizeof(ifr)))
-			break;
+			rc = -EFAULT;  // 2018/05/30, patch for CVE-2017-7487
 		ipxitf_put(ipxif);
-		rc = 0;
 		break;
 	}
 	case SIOCAIPXITFCRT:

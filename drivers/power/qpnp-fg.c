@@ -36,6 +36,17 @@
 #include <linux/alarmtimer.h>
 #include <linux/qpnp/qpnp-revid.h>
 
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#define QPNP_FAKE_BAT_INFO  //undefine me later
+
+#ifdef QPNP_FAKE_BAT_INFO
+#define FAKE_BAT_CAP  (100)  /*100%*/
+#define FAKE_BAT_VOLTAGE  (4300*1000)  /*4.3V*/
+#define FAKE_BAT_TEMP  (20*10)  /*20C*/
+#define FAKE_BAT_ID_RES  (100*1000)  /*100K*/
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
+
 /* Register offsets */
 
 /* Interrupt offsets */
@@ -310,7 +321,9 @@ static struct fg_mem_data fg_backup_regs[FG_BACKUP_MAX] = {
 	BACKUP(MAH_TO_SOC,	0x4A0,   0,      4,     -EINVAL),
 };
 
-static int fg_debug_mask;
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+static int fg_debug_mask = 0;//FG_POWER_SUPPLY | FG_STATUS;
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 module_param_named(
 	debug_mask, fg_debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -4476,7 +4489,13 @@ static int fg_power_get_property(struct power_supply *psy,
 			val->strval = chip->batt_type;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#ifdef QPNP_FAKE_BAT_INFO
+		val->intval = FAKE_BAT_CAP;
+#else
 		val->intval = get_prop_capacity(chip);
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_RAW:
 		val->intval = get_sram_prop_now(chip, FG_DATA_BATT_SOC);
@@ -4488,16 +4507,34 @@ static int fg_power_get_property(struct power_supply *psy,
 		val->intval = get_sram_prop_now(chip, FG_DATA_CURRENT);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#ifdef QPNP_FAKE_BAT_INFO
+		val->intval = FAKE_BAT_VOLTAGE;
+#else
 		val->intval = get_sram_prop_now(chip, FG_DATA_VOLTAGE);
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#ifdef QPNP_FAKE_BAT_INFO
+		val->intval = FAKE_BAT_VOLTAGE;
+#else
 		val->intval = get_sram_prop_now(chip, FG_DATA_OCV);
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
 		val->intval = chip->batt_max_voltage_uv;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#ifdef QPNP_FAKE_BAT_INFO
+		val->intval = FAKE_BAT_TEMP;
+#else
 		val->intval = get_sram_prop_now(chip, FG_DATA_BATT_TEMP);
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 		break;
 	case POWER_SUPPLY_PROP_COOL_TEMP:
 		val->intval = get_prop_jeita_temp(chip, FG_MEM_SOFT_COLD);
@@ -4518,7 +4555,13 @@ static int fg_power_get_property(struct power_supply *psy,
 		val->intval = chip->cyc_ctr.id;
 		break;
 	case POWER_SUPPLY_PROP_RESISTANCE_ID:
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. {*/
+#ifdef QPNP_FAKE_BAT_INFO
+		val->intval = FAKE_BAT_ID_RES;
+#else
 		val->intval = get_sram_prop_now(chip, FG_DATA_BATT_ID);
+#endif
+/*JeyZhou, 20161222, Temporarily use fake battery info to avoid shutdown. }*/
 		break;
 	case POWER_SUPPLY_PROP_UPDATE_NOW:
 		val->intval = 0;

@@ -286,6 +286,9 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 	struct usb_interface *usb_iface;
 	void *control_header;
 	int i, protocol;
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor {*/
+	int rest_bytes;
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor }*/
 
 	usb_iface = usb_ifnum_to_if(dev, ctrlif);
 	if (!usb_iface) {
@@ -312,6 +315,17 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 		return -EINVAL;
 	}
 
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor {*/
+	rest_bytes = (void *)(host_iface->extra + host_iface->extralen) -
+		control_header;
+
+	/* just to be sure -- this shouldn't hit at all */
+	if (rest_bytes <= 0) {
+		dev_err(&dev->dev, "invalid control header\n");
+		return -EINVAL;
+	}
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor }*/
+
 	switch (protocol) {
 	default:
 		dev_warn(&dev->dev,
@@ -322,10 +336,24 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 	case UAC_VERSION_1: {
 		struct uac1_ac_header_descriptor *h1 = control_header;
 
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor {*/
+		if (rest_bytes < sizeof(*h1)) {
+			dev_err(&dev->dev, "too short v1 buffer descriptor\n");
+			return -EINVAL;
+		}
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor }*/
+
 		if (!h1->bInCollection) {
 			dev_info(&dev->dev, "skipping empty audio interface (v1)\n");
 			return -EINVAL;
 		}
+
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor {*/
+		if (rest_bytes < h1->bLength) {
+			dev_err(&dev->dev, "invalid buffer length (v1)\n");
+			return -EINVAL;
+		}
+/*CVE-2017-16529 ALSA: usb-audio: Check out-of-bounds access by corrupted buffer descriptor }*/
 
 		if (h1->bLength < sizeof(*h1) + h1->bInCollection) {
 			dev_err(&dev->dev, "invalid UAC_HEADER (v1)\n");

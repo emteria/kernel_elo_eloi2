@@ -1,0 +1,67 @@
+/*
+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "apq8053.dtsi"
+#include "msm8953-mtp.dtsi"
+#include "apq8053-oem.dtsi"
+#include "apq8053-mtp-edp-hdmi.dtsi"//Leo Guo add to support all panel in one image
+
+/ {
+	model = "Qualcomm Technologies, Inc. APQ8053 MTP";
+	compatible = "qcom,apq8053-mtp", "qcom,apq8053", "qcom,mtp";
+	qcom,board-id= <0x00380108 0>;
+};
+
+&i2c_2 {
+	/* Parallel-charger configuration */
+	smb135x-charger@1c {
+		compatible = "qcom,smb1358-charger";
+		reg = <0x1c>;
+		qcom,parallel-en-pin-polarity = <1>;
+		qcom,parallel-charger;
+		qcom,float-voltage-mv = <4400>;
+		qcom,recharge-mv = <100>;
+	};
+};
+
+&pmi8950_fg {
+	/* use external rsense for parallel charging */
+	qcom,ext-sense-type;
+};
+/*Leo Guo add for Puck to support HPD for DP panel*/
+&i2c_3 {
+	sn65dsi86@2d {
+			status = "disabled";
+	};
+};
+
+&i2c_5 {
+	status = "disabled";
+};
+
+/*OEM, 20170605, Terry.Yan, add for external IO */
+&soc {
+	oem-extio{
+		compatible = "oem,extio";
+		pinctrl-names = "default";
+		pinctrl-0 = <&extio_in_default &extio_out_default>;
+
+		extio1-1v8-in = <&tlmm 140 0x0>;
+		extio2-1v8-in = <&tlmm 141 0x0>;
+		extio3-out-en = <&tlmm 139 0x0>;
+		extio-in-debounce = <100>;
+		status = "okay";
+	};
+};

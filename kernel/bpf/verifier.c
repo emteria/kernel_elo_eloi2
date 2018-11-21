@@ -315,6 +315,7 @@ static const char *const bpf_jmp_string[] = {
 	[BPF_EXIT >> 4] = "exit",
 };
 
+/*20180521, for CVE-2017-9150 {*/
 static void print_bpf_insn(const struct bpf_verifier_env *env,
 			   const struct bpf_insn *insn)
 {
@@ -422,6 +423,7 @@ static void print_bpf_insn(const struct bpf_verifier_env *env,
 		verbose("(%02x) %s\n", insn->code, bpf_class_string[class]);
 	}
 }
+/*20180521, for CVE-2017-9150 }*/
 
 static int pop_stack(struct verifier_env *env, int *prev_insn_idx)
 {
@@ -1545,7 +1547,7 @@ static int do_check(struct verifier_env *env)
 
 		if (log_level) {
 			verbose("%d: ", insn_idx);
-			print_bpf_insn(env, insn);
+			print_bpf_insn(env, insn);//20180521, for CVE-2017-9150
 		}
 
 		if (class == BPF_ALU || class == BPF_ALU64) {

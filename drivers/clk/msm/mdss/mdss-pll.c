@@ -268,6 +268,9 @@ static int mdss_pll_probe(struct platform_device *pdev)
 
 		if (label && !strcmp(label, "center-spread"))
 			pll_res->ssc_center = true;
+
+		/*Elo ask this to check ssc-mode setting information*/
+		pr_info("%s: label=[%s] by [qcom,dsi-pll-ssc-mode]\n", __func__, label);
 	}
 
 	pll_base_reg = platform_get_resource_byname(pdev,

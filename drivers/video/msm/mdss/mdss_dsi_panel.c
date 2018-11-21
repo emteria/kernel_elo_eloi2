@@ -22,9 +22,9 @@
 #include <linux/qpnp/pwm.h>
 #include <linux/err.h>
 #include <linux/string.h>
-
 #include "mdss_dsi.h"
 #include "mdss_dba_utils.h"
+#include <soc/qcom/socinfo.h>
 
 #define DT_CMD_HDR 6
 #define MIN_REFRESH_RATE 48
@@ -33,6 +33,8 @@
 #define VSYNC_DELAY msecs_to_jiffies(17)
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
+struct mutex lock_for_set_brightness;//Leo Guo add for led en shut down timing issue
+
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -87,6 +89,15 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		ctrl->pwm_enabled = 0;
 		return;
 	}
+
+	/*OEM, 20180806, workaround for 21.5 bklt issue {*/
+	#define PROJECT_215_BL_MIN_LEVEL   (275)
+	if( socinfo_get_project_id() == PROJECT_AAIO2_STD_215)
+	{
+		pr_debug("%s: adjust level\n", __func__);
+		level = PROJECT_215_BL_MIN_LEVEL + ((ctrl->bklt_max - PROJECT_215_BL_MIN_LEVEL) * level)/ctrl->bklt_max;
+	}
+	/*OEM, 20180806, workaround for 21.5 bklt issue }*/
 
 	duty = level * ctrl->pwm_period;
 	duty /= ctrl->bklt_max;
@@ -292,7 +303,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			__func__, __LINE__);
 		return rc;
 	}
-
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
@@ -640,6 +650,21 @@ static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 			(!pdata->panel_info.send_pps_before_switch))
 		mdss_dsi_panel_dsc_pps_send(ctrl_pdata, &pdata->panel_info);
 }
+//Leo Guo modify following for edp panel timing
+extern int sn65dsi86_enabled;
+extern int backlight_en;
+extern int led_en_lvds;
+extern int led_en_edp;
+
+static int backlight_enabled=1;
+void set_pwm_for_lvds_panel(struct mdss_dsi_ctrl_pdata *ctrl,u32 level)
+{
+	pr_info("set_pwm_for_lvds_panel!!!\n");
+	ctrl->pwm_enabled=1;
+	mdss_dsi_panel_bklt_pwm(ctrl, level);
+	backlight_enabled=0;
+
+}
 
 static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 							u32 bl_level)
@@ -647,9 +672,43 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_dsi_ctrl_pdata *sctrl = NULL;
 
+	PANEL_ID_TYPE qisda_panel_id=socinfo_get_panel_id();
+
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return;
+	}
+	if(strcmp(pdata->panel_info.panel_name,"dsi_adv7533_1080p")==0)
+		return ;
+	mutex_lock(&lock_for_set_brightness);//Leo Guo add for led en shut down timing issue
+
+	pr_debug("mdss_dsi_panel_bl_ctrl,level is %d\n",bl_level);
+
+	if((bl_level==0)&&backlight_enabled)
+	{
+		if (gpio_is_valid(led_en_edp))
+			gpio_set_value(led_en_edp, 0);
+		if (gpio_is_valid(led_en_lvds))
+			gpio_set_value(led_en_lvds, 0);
+		if(qisda_panel_id!=TM101JDHP01_00)
+		{
+			msleep(100);
+		}
+
+	}
+	else if((bl_level>0)&&(backlight_enabled==0))
+	{
+		if (gpio_is_valid(backlight_en))
+		{
+			gpio_set_value(backlight_en, 1);
+			msleep(200);
+		}
+	}
+	else if((bl_level==0)&&(backlight_enabled==0))
+	{
+		mutex_unlock(&lock_for_set_brightness);//Leo Guo add for led en shut down timing issue
+		return;
+
 	}
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
@@ -700,7 +759,27 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			__func__);
 		break;
 	}
+	if((bl_level==0)&&backlight_enabled)
+	{
+		msleep(60);
+		if (gpio_is_valid(backlight_en))
+			gpio_set_value(backlight_en, 0);
+		backlight_enabled=0;
+
+	}
+	else if(backlight_enabled==0)
+	{
+		msleep(60);
+		if (gpio_is_valid(led_en_edp))
+			gpio_set_value(led_en_edp, 1);
+		if (gpio_is_valid(led_en_lvds))
+			gpio_set_value(led_en_lvds, 1);
+		backlight_enabled=1;
+	}
+	mutex_unlock(&lock_for_set_brightness);//Leo Guo add for led en shut down timing issue
 }
+extern void sn65dsi86_dsi2edp_enable_lately(void);
+extern void sn65dsi85_dsi2lvds_enable_2nd_start_pll(void);
 
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
@@ -780,7 +859,10 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 		msleep(vsync_period);
 		mdss_dba_utils_hdcp_enable(pinfo->dba_data, true);
 	}
-
+	if(strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi86_1080p")==0)
+		sn65dsi86_dsi2edp_enable_lately();
+	else
+		sn65dsi85_dsi2lvds_enable_2nd_start_pll();
 end:
 	pr_debug("%s:-\n", __func__);
 	return 0;
@@ -2638,6 +2720,8 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->low_power_config = mdss_dsi_panel_low_power_config;
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
+
+	mutex_init(&lock_for_set_brightness);//Leo Guo add for led en shut down timing issue
 
 	return 0;
 }

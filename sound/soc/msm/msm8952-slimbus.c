@@ -36,6 +36,7 @@
 #include "../codecs/wcd9335.h"
 #include "../codecs/wcd-mbhc-v2.h"
 #include "../codecs/wsa881x.h"
+#include <linux/delay.h>
 
 #define DRV_NAME "msm8952-slimbus-wcd"
 
@@ -290,6 +291,12 @@ struct msm8952_codec {
 struct msm8952_asoc_mach_data {
 	int ext_pa;
 	int us_euro_gpio;
+/*2016-12-11 Jack W Lu: Add spk AMP control {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	int spkr_amp_en_gpio;//H for enable
+	int spkr_amp_mute_gpio;//Low for mute
+#endif
+/*2016-12-11 Jack W Lu: Add spk AMP control }*/
 	struct delayed_work hs_detect_dwork;
 	struct snd_soc_codec *codec;
 	struct msm8952_codec msm8952_codec_fn;
@@ -418,6 +425,74 @@ static int msm8952_set_spk(struct snd_kcontrol *kcontrol,
 	msm8952_ext_control(codec);
 	return 1;
 }
+
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+static int delayCounts = 13;
+module_param(delayCounts, int, S_IRUGO | S_IWUSR | S_IWGRP);
+static struct snd_soc_card *snd_card_for_ext_pa = NULL;
+static void audio_unmute_routine(struct work_struct *ws)
+{
+	int delay_ms = delayCounts * 1000;
+	struct msm8952_asoc_mach_data *pdata = snd_soc_card_get_drvdata(snd_card_for_ext_pa);
+	pr_debug("%s delay %i ms to 'un-mute' AMP\n", __func__, delayCounts);
+	usleep_range(delay_ms, delay_ms);
+	gpio_direction_output(pdata->spkr_amp_mute_gpio, 1);
+	pr_debug("%s ---- spkr_amp_mute_gpio ON\n", __func__);
+}
+static DECLARE_DELAYED_WORK(audio_unmute_work, audio_unmute_routine);
+static struct workqueue_struct *audio_unmute_workqueue = NULL;
+
+void msm_ext_spk_power_amp_on(void)
+{
+	int res = 0;
+	if((snd_card_for_ext_pa == NULL)||(audio_unmute_workqueue == NULL))
+	{
+		pr_err("%s !!!! POINT is NULL!!!! \n", __func__);
+		return;
+	}
+	res = queue_delayed_work(audio_unmute_workqueue, &audio_unmute_work, 0);
+	pr_debug("%s: res = %i\n", __func__, res);
+}
+
+void msm_ext_spk_power_amp_off(void)
+{
+	struct msm8952_asoc_mach_data *pdata = NULL;
+	if(snd_card_for_ext_pa == NULL)
+	{
+		pr_err("%s !!!! POINT is NULL!!!! \n", __func__);
+		return;
+	}
+	pdata = snd_soc_card_get_drvdata(snd_card_for_ext_pa);
+	pr_debug("%s: cancel_delayed_work(&audio_unmute_work)\n", __func__);
+	cancel_delayed_work(&audio_unmute_work);
+
+	gpio_direction_output(pdata->spkr_amp_mute_gpio, 0);
+	pr_debug("%s ---- spkr_amp_mute_gpio OFF\n", __func__);
+}
+
+static int msm8952_spk_amp_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *k, int event)
+{
+	pr_debug("%s() %x\n", __func__, SND_SOC_DAPM_EVENT_ON(event));
+
+	//for debug
+	if(delayCounts < 2)
+		return 0;
+
+	if (SND_SOC_DAPM_EVENT_ON(event))
+	{
+//		pr_debug("%s() should be powered on after SND_SOC_DAPM_POST_PMU \n", __func__);
+//		msm_ext_spk_power_amp_on();
+	}
+	else
+	{
+		msm_ext_spk_power_amp_off();
+	}
+	return 0;
+}
+#endif
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue }*/
 
 
 static int msm8952_enable_codec_mclk(struct snd_soc_codec *codec, int enable,
@@ -2076,10 +2151,19 @@ static const struct snd_soc_dapm_widget msm8952_tasha_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY_S("MCLK", -1,  SND_SOC_NOPM, 0, 0,
 	msm8952_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
 	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
-	SND_SOC_DAPM_SPK("Lineout_3 amp", NULL),
 	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_3 amp", msm8952_spk_amp_event),
+	SND_SOC_DAPM_SPK("Lineout_4 amp", msm8952_spk_amp_event),
+#else
+	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_3 amp", NULL),
 	SND_SOC_DAPM_SPK("Lineout_4 amp", NULL),
+#endif
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue }*/
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
@@ -2104,6 +2188,12 @@ static struct snd_soc_dapm_route wcd9335_audio_paths[] = {
 	{"MIC BIAS2", NULL, "MCLK"},
 	{"MIC BIAS3", NULL, "MCLK"},
 	{"MIC BIAS4", NULL, "MCLK"},
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	{"Lineout_3 amp", NULL, "LINEOUT3"},
+	{"Lineout_4 amp", NULL, "LINEOUT4"},
+#endif
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue }*/
 };
 
 static int msm8952_codec_event_cb(struct snd_soc_codec *codec,
@@ -2391,7 +2481,9 @@ static int is_us_eu_switch_gpio_support(struct platform_device *pdev,
 		struct msm8952_asoc_mach_data *pdata)
 {
 	int ret;
-
+/*2017-03-30 Jack W Lu: remove headset type check {*/
+	return 0;
+/*2017-03-30 Jack W Lu: remove headset type check }*/
 	pr_debug("%s\n", __func__);
 
 	/* check if US-EU GPIO is supported */
@@ -2517,6 +2609,7 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 	int num_strings = 0;
 	int ret, i;
 	struct resource *muxsel;
+	pr_err("msm8952_asoc_machine_probe enter\n");
 
 	pdata = devm_kzalloc(&pdev->dev,
 			sizeof(struct msm8952_asoc_mach_data), GFP_KERNEL);
@@ -2609,15 +2702,21 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 			"qcom,audio-routing");
 	if (ret)
 		goto err;
+	dev_err(&pdev->dev, "snd_soc_of_parse_audio_routing OK (%d)\n", ret);
 	ret = msm8952_populate_dai_link_component_of_node(card);
 	if (ret) {
 		ret = -EPROBE_DEFER;
 		goto err;
 	}
+	dev_err(&pdev->dev, "msm8952_populate_dai_link_component_of_node OK (%d)\n", ret);
 
-	ret = msm8952_init_wsa_dev(pdev, card);
-	if (ret)
-		goto err;
+/*2016-12-11 Jack W Lu: remove wsa spk AMP init {*/
+	if(0){
+		ret = msm8952_init_wsa_dev(pdev, card);
+		if (ret)
+			goto err;
+	}
+/*2016-12-11 Jack W Lu: remove wsa spk AMP init }*/
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
@@ -2627,6 +2726,75 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
+
+	dev_err(&pdev->dev, "snd_soc_register_card OK (%d)\n", ret);
+
+/*2017-11-29 Jack W Lu: change audio PA control flow for power on noise {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	//for spkr_amp_mute_gpio
+	pdata->spkr_amp_mute_gpio = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,spk-amp-mute-gpio", 0);
+	if (pdata->spkr_amp_mute_gpio < 0) {
+		pr_err("%s: %s property not found %d\n",
+			__func__, "spk-amp-mute-gpio", pdata->spkr_amp_mute_gpio);
+	}
+	if (gpio_is_valid(pdata->spkr_amp_mute_gpio)) {
+		pr_err("%s: spkr_amp_mute_gpio request %d\n", __func__,
+			pdata->spkr_amp_mute_gpio);
+		ret = gpio_request(pdata->spkr_amp_mute_gpio, "spkr_amp_mute_gpio");
+		if (ret) {
+			dev_err(&pdev->dev,
+				"%s: spkr_amp_mute_gpio = %d request failed, ret:%d\n",
+				__func__, pdata->spkr_amp_mute_gpio, ret);
+			goto err;
+		}
+		gpio_direction_output(pdata->spkr_amp_mute_gpio, 0);//set mute first
+		gpio_export(pdata->spkr_amp_mute_gpio, false);
+		printk("spkr_amp_mute_gpio set LOW OK\n");
+	}
+	else
+		printk("spkr_amp_mute_gpio is bad ==%d !\n", pdata->spkr_amp_mute_gpio);
+
+	//for spkr_amp_en_gpio
+	pdata->spkr_amp_en_gpio = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,spk-amp-enable-gpio", 0);
+	if (pdata->spkr_amp_en_gpio < 0) {
+		pr_err("%s: %s property not found %d\n",
+			__func__, "spk-amp-enable-gpio", pdata->spkr_amp_en_gpio);
+	}
+	if (gpio_is_valid(pdata->spkr_amp_en_gpio)) {
+		pr_err("%s: spkr_amp_en_gpio request %d\n", __func__,
+			pdata->spkr_amp_en_gpio);
+		ret = gpio_request(pdata->spkr_amp_en_gpio, "spkr_amp_en_gpio");
+		if (ret) {
+			dev_err(&pdev->dev,
+				"%s: spkr_amp_en_gpio = %d request failed, ret:%d\n",
+				__func__, pdata->spkr_amp_en_gpio, ret);
+			goto err;
+		}
+		gpio_direction_output(pdata->spkr_amp_en_gpio, 1);// always on for PP current
+		gpio_export(pdata->spkr_amp_en_gpio, false);
+		printk("spkr_amp_en_gpio set High OK\n");
+	}
+	else
+		printk("spkr_amp_en_gpio is bad ==%d !\n", pdata->spkr_amp_en_gpio);
+#endif
+/*2017-11-29 Jack W Lu: change audio PA control flow for power on noise }*/
+
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	snd_card_for_ext_pa = card;
+	if(audio_unmute_workqueue == NULL)
+	{
+		audio_unmute_workqueue = create_workqueue("audio_unmute_wq");
+		if(audio_unmute_workqueue != NULL)
+		{
+			pr_err("%s: audio_unmute_workqueue; create success\n", __func__);
+		}
+	}
+#endif
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue }*/
+
 	num_strings = of_property_count_strings(pdev->dev.of_node,
 						ext_pa);
 	if (num_strings < 0) {
@@ -2668,14 +2836,34 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	dev_err(&pdev->dev, "msm8952_asoc_machine_probe pass!\n");
+
 	return 0;
 err:
 	if (pdata->us_euro_gpio > 0) {
-		dev_dbg(&pdev->dev, "%s free us_euro gpio %d\n",
+		pr_err("%s free us_euro gpio %d\n",
 			__func__, pdata->us_euro_gpio);
 		gpio_free(pdata->us_euro_gpio);
 		pdata->us_euro_gpio = 0;
 	}
+
+/*2016-12-11 Jack W Lu: Add spk AMP control {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	if (pdata->spkr_amp_en_gpio > 0) {
+		pr_err("%s free spkr_amp_en_gpio %d\n",
+			__func__, pdata->spkr_amp_en_gpio);
+		gpio_free(pdata->spkr_amp_en_gpio);
+		pdata->spkr_amp_en_gpio = 0;
+	}
+	if (pdata->spkr_amp_mute_gpio > 0) {
+		pr_err("%s free spkr_amp_mute_gpio %d\n",
+			__func__, pdata->spkr_amp_mute_gpio);
+		gpio_free(pdata->spkr_amp_mute_gpio);
+		pdata->spkr_amp_mute_gpio = 0;
+	}
+#endif
+/*2016-12-11 Jack W Lu: Add spk AMP control }*/
+
 	if (pdata->vaddr_gpio_mux_spkr_ctl)
 		iounmap(pdata->vaddr_gpio_mux_spkr_ctl);
 	if (pdata->vaddr_gpio_mux_mic_ctl)
@@ -2686,6 +2874,7 @@ err:
 		iounmap(pdata->vaddr_gpio_mux_quin_ctl);
 	cancel_delayed_work_sync(&pdata->hs_detect_dwork);
 	devm_kfree(&pdev->dev, pdata);
+	dev_err(&pdev->dev, "msm8952_asoc_machine_probe failed == %d!\n", ret);
 	return ret;
 }
 
@@ -2695,11 +2884,39 @@ static int msm8952_asoc_machine_remove(struct platform_device *pdev)
 	struct msm8952_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 
 	if (pdata->us_euro_gpio > 0) {
-		dev_dbg(&pdev->dev, "%s free us_euro gpio %d\n",
+		pr_err("%s free us_euro gpio %d\n",
 			__func__, pdata->us_euro_gpio);
 		gpio_free(pdata->us_euro_gpio);
 		pdata->us_euro_gpio = 0;
 	}
+
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	if(audio_unmute_workqueue != NULL)
+	{
+		destroy_workqueue(audio_unmute_workqueue);
+		pr_err("%s: audio_unmute_workqueue; destroy success\n", __func__);
+		audio_unmute_workqueue = NULL;
+	}
+#endif
+/*20170221 Jack W Lu: Add PA control flow to fix pop noise issue }*/
+
+/*2016-12-11 Jack W Lu: Add spk AMP control {*/
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	if (pdata->spkr_amp_en_gpio > 0) {
+		pr_err("%s free spkr_amp_en_gpio %d\n",
+			__func__, pdata->spkr_amp_en_gpio);
+		gpio_free(pdata->spkr_amp_en_gpio);
+		pdata->spkr_amp_en_gpio = 0;
+	}
+	if (pdata->spkr_amp_mute_gpio > 0) {
+		pr_err("%s free spkr_amp_mute_gpio %d\n",
+			__func__, pdata->spkr_amp_mute_gpio);
+		gpio_free(pdata->spkr_amp_mute_gpio);
+		pdata->spkr_amp_mute_gpio = 0;
+	}
+#endif
+/*2016-12-11 Jack W Lu: Add spk AMP control }*/
 	if (pdata->vaddr_gpio_mux_spkr_ctl)
 		iounmap(pdata->vaddr_gpio_mux_spkr_ctl);
 	if (pdata->vaddr_gpio_mux_mic_ctl)
@@ -2715,6 +2932,44 @@ static int msm8952_asoc_machine_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/*2017-06-23 Jack W Lu: fix issue: po sound by reboot flow {*/
+static void msm8952_asoc_machine_shutdown(struct platform_device *pdev)
+{
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	struct msm8952_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+	printk("msm8952_asoc_machine_shutdown!!\n");
+
+#ifdef PP_SUPPORT_SPK_AMP_APA2606
+	if(audio_unmute_workqueue != NULL)
+	{
+		destroy_workqueue(audio_unmute_workqueue);
+		pr_err("%s: audio_unmute_workqueue; destroy success\n", __func__);
+		audio_unmute_workqueue = NULL;
+	}
+
+	if (pdata->spkr_amp_mute_gpio > 0) {
+		pr_err("%s free spkr_amp_mute_gpio %d\n",
+			__func__, pdata->spkr_amp_mute_gpio);
+		gpio_direction_output(pdata->spkr_amp_mute_gpio, 0);//set mute first
+		printk("audio set mute first!!!\n");
+		gpio_free(pdata->spkr_amp_mute_gpio);
+		pdata->spkr_amp_mute_gpio = 0;
+	}
+	msleep(100);
+	if (pdata->spkr_amp_en_gpio > 0) {
+		pr_err("%s free spkr_amp_en_gpio %d\n",
+			__func__, pdata->spkr_amp_en_gpio);
+		gpio_direction_output(pdata->spkr_amp_en_gpio, 0);// always on for PP current
+		printk("audio set power off!!!\n");
+		gpio_free(pdata->spkr_amp_en_gpio);
+		pdata->spkr_amp_en_gpio = 0;
+	}
+#endif
+	printk("msm8952_asoc_machine_shutdown finish!!\n");
+	return;
+}
+/*2017-06-23 Jack W Lu: fix issue: po sound by reboot flow }*/
+
 static const struct of_device_id msm8952_asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,msm8952-audio-slim-codec", },
 	{},
@@ -2729,6 +2984,9 @@ static struct platform_driver msm8952_asoc_machine_driver = {
 	},
 	.probe = msm8952_asoc_machine_probe,
 	.remove = msm8952_asoc_machine_remove,
+/*2017-06-23 Jack W Lu: fix issue: po sound by reboot flow {*/
+	.shutdown = msm8952_asoc_machine_shutdown,
+/*2017-06-23 Jack W Lu: fix issue: po sound by reboot flow }*/
 };
 
 static int __init msm8952_slim_machine_init(void)

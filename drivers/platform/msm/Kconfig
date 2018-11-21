@@ -309,6 +309,11 @@ config BW_MONITOR
 	 it by registering the bus bandwidth as a sensor in
 	 thermal core framework.
 
+#OEM, 20170925, define FACTORY_IMAGE config for factory image
+config FACTORY_IMAGE
+	bool "Factory image platform driver"
+	default n
+
 source "drivers/platform/msm/spmi/Kconfig"
 
 endmenu

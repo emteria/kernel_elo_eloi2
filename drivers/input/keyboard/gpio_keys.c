@@ -54,6 +54,18 @@ struct gpio_keys_drvdata {
 	struct gpio_button_data data[0];
 };
 
+/* ####### Debug ####### */
+//#define _GPIO_KEYS_DEBUG_
+#ifdef _GPIO_KEYS_DEBUG_
+#define __FILENAME__ \
+	(strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define _GPIO_KEYS_LOG(fmt, ...) \
+	printk("%s @@@ %s(@%d) " fmt "\n", __FILENAME__, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define _GPIO_KEYS_LOG(fmt, ...)
+#endif
+/* ####### Debug ####### */
+
 static struct device *global_dev;
 static struct syscore_ops gpio_keys_syscore_pm_ops;
 
@@ -347,6 +359,7 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	} else {
 		input_event(input, type, button->code, !!state);
 	}
+	_GPIO_KEYS_LOG("code = 0x%x , state = %d", button->code, !!state);
 	input_sync(input);
 }
 
@@ -354,26 +367,28 @@ static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
 	struct gpio_button_data *bdata =
 		container_of(work, struct gpio_button_data, work);
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	gpio_keys_gpio_report_event(bdata);
 
 	if (bdata->button->wakeup)
 		pm_relax(bdata->input->dev.parent);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
 {
 	struct gpio_button_data *bdata = (struct gpio_button_data *)_data;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	schedule_work(&bdata->work);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
 {
 	struct gpio_button_data *bdata = dev_id;
-
+	pr_debug("---now interrupt gpio:%d-----\n",bdata->button->gpio);
 	BUG_ON(irq != bdata->irq);
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (bdata->button->wakeup)
 		pm_stay_awake(bdata->input->dev.parent);
 	if (bdata->timer_debounce)
@@ -381,7 +396,7 @@ static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
 			jiffies + msecs_to_jiffies(bdata->timer_debounce));
 	else
 		schedule_work(&bdata->work);
-
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return IRQ_HANDLED;
 }
 
@@ -390,7 +405,7 @@ static void gpio_keys_irq_timer(unsigned long _data)
 	struct gpio_button_data *bdata = (struct gpio_button_data *)_data;
 	struct input_dev *input = bdata->input;
 	unsigned long flags;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	spin_lock_irqsave(&bdata->lock, flags);
 	if (bdata->key_pressed) {
 		input_event(input, EV_KEY, bdata->button->code, 0);
@@ -398,6 +413,7 @@ static void gpio_keys_irq_timer(unsigned long _data)
 		bdata->key_pressed = false;
 	}
 	spin_unlock_irqrestore(&bdata->lock, flags);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static irqreturn_t gpio_keys_irq_isr(int irq, void *dev_id)
@@ -406,8 +422,9 @@ static irqreturn_t gpio_keys_irq_isr(int irq, void *dev_id)
 	const struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned long flags;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	BUG_ON(irq != bdata->irq);
+	_GPIO_KEYS_LOG("code = 0x%x", button->code);
 
 	spin_lock_irqsave(&bdata->lock, flags);
 
@@ -432,17 +449,19 @@ static irqreturn_t gpio_keys_irq_isr(int irq, void *dev_id)
 			jiffies + msecs_to_jiffies(bdata->timer_debounce));
 out:
 	spin_unlock_irqrestore(&bdata->lock, flags);
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return IRQ_HANDLED;
 }
 
 static void gpio_keys_quiesce_key(void *data)
 {
 	struct gpio_button_data *bdata = data;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (bdata->timer_debounce)
 		del_timer_sync(&bdata->timer);
 
 	cancel_work_sync(&bdata->work);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static int gpio_keys_setup_key(struct platform_device *pdev,
@@ -481,6 +500,7 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 		}
 
 		irq = gpio_to_irq(button->gpio);
+		_GPIO_KEYS_LOG("irq=%d gpio=%d", irq, button->gpio);
 		if (irq < 0) {
 			error = irq;
 			dev_err(dev,
@@ -553,13 +573,14 @@ static void gpio_keys_report_state(struct gpio_keys_drvdata *ddata)
 {
 	struct input_dev *input = ddata->input;
 	int i;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	for (i = 0; i < ddata->pdata->nbuttons; i++) {
 		struct gpio_button_data *bdata = &ddata->data[i];
 		if (gpio_is_valid(bdata->button->gpio))
 			gpio_keys_gpio_report_event(bdata);
 	}
 	input_sync(input);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static int gpio_keys_pinctrl_configure(struct gpio_keys_drvdata *ddata,
@@ -567,7 +588,7 @@ static int gpio_keys_pinctrl_configure(struct gpio_keys_drvdata *ddata,
 {
 	struct pinctrl_state *set_state;
 	int retval;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (active) {
 		set_state =
 			pinctrl_lookup_state(ddata->key_pinctrl,
@@ -587,13 +608,14 @@ static int gpio_keys_pinctrl_configure(struct gpio_keys_drvdata *ddata,
 			return PTR_ERR(set_state);
 		}
 	}
+
 	retval = pinctrl_select_state(ddata->key_pinctrl, set_state);
 	if (retval) {
 		dev_err(&ddata->input->dev,
 				"cannot set ts pinctrl active state\n");
 		return retval;
 	}
-
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return 0;
 }
 
@@ -602,7 +624,7 @@ static int gpio_keys_open(struct input_dev *input)
 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
 	const struct gpio_keys_platform_data *pdata = ddata->pdata;
 	int error;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (pdata->enable) {
 		error = pdata->enable(input->dev.parent);
 		if (error)
@@ -611,7 +633,7 @@ static int gpio_keys_open(struct input_dev *input)
 
 	/* Report current state of buttons that are connected to GPIOs */
 	gpio_keys_report_state(ddata);
-
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return 0;
 }
 
@@ -619,9 +641,10 @@ static void gpio_keys_close(struct input_dev *input)
 {
 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
 	const struct gpio_keys_platform_data *pdata = ddata->pdata;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (pdata->disable)
 		pdata->disable(input->dev.parent);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 /*
@@ -662,6 +685,16 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 	pdata->rep = !!of_get_property(node, "autorepeat", NULL);
 	pdata->name = of_get_property(node, "input-name", NULL);
 	pdata->use_syscore = of_property_read_bool(node, "use-syscore");
+
+	_GPIO_KEYS_LOG("      	\n\
+		name 	  = %s,	\n\
+		type 	  = %s,	\n\
+		full_name = %s,	\n\
+		_flags 	  = %lu",
+		node->name,
+		node->type,
+		node->full_name,
+		node->_flags);
 
 	i = 0;
 	for_each_child_of_node(node, pp) {
@@ -705,6 +738,28 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 		if (of_property_read_u32(pp, "debounce-interval",
 					&button->debounce_interval))
 			button->debounce_interval = 5;
+
+		_GPIO_KEYS_LOG("      	\n\
+			code 	= 0x%x,	\n\
+			gpio 	= %d,	\n\
+			desc 	= %s,	\n\
+			type 	= %d,	\n\
+			wakeup 	= %d,	\n\
+			value 	= %d,	\n\
+			irq 	= %d,	\n\
+			active_low  = %d,\n\
+			can_disable = %d,\n\
+			debounce_interval = %d",
+			button->code,
+			button->gpio,
+			button->desc,
+			button->type,
+			button->wakeup,
+			button->value,
+			button->irq,
+			button->active_low,
+			button->can_disable,
+			button->debounce_interval);
 	}
 
 	if (pdata->nbuttons == 0)
@@ -745,6 +800,18 @@ static int gpio_keys_probe(struct platform_device *pdev)
 		if (IS_ERR(pdata))
 			return PTR_ERR(pdata);
 	}
+
+		_GPIO_KEYS_LOG("      	\n\
+			nbuttons 	= %d,	\n\
+			rep 	 	= %u,	\n\
+			name 	 	= %s,	\n\
+			poll_interval 	= %u,	\n\
+			use_syscore 	= %d",
+			pdata->nbuttons,
+			pdata->rep,
+			pdata->name,
+			pdata->poll_interval,
+			pdata->use_syscore);
 
 	size = sizeof(struct gpio_keys_drvdata) +
 			pdata->nbuttons * sizeof(struct gpio_button_data);
@@ -792,7 +859,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 		pr_debug("Target does not use pinctrl\n");
 		ddata->key_pinctrl = NULL;
 	}
-
+_GPIO_KEYS_LOG("%p", ddata->key_pinctrl );
 	if (ddata->key_pinctrl) {
 		error = gpio_keys_pinctrl_configure(ddata, true);
 		if (error) {
@@ -855,11 +922,12 @@ err_setup_key:
 
 static int gpio_keys_remove(struct platform_device *pdev)
 {
+	_GPIO_KEYS_LOG(" @@@ ");
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 	unregister_syscore_ops(&gpio_keys_syscore_pm_ops);
 
 	device_init_wakeup(&pdev->dev, 0);
-
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return 0;
 }
 
@@ -871,7 +939,7 @@ static void gpio_keys_syscore_resume(void)
 	struct gpio_button_data *bdata = NULL;
 	int error = 0;
 	int i;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (ddata->key_pinctrl) {
 		error = gpio_keys_pinctrl_configure(ddata, true);
 		if (error) {
@@ -897,6 +965,7 @@ static void gpio_keys_syscore_resume(void)
 		return;
 
 	gpio_keys_report_state(ddata);
+	_GPIO_KEYS_LOG(" ~~~ ");
 }
 
 static int gpio_keys_suspend(struct device *dev)
@@ -904,7 +973,7 @@ static int gpio_keys_suspend(struct device *dev)
 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
 	struct input_dev *input = ddata->input;
 	int i, ret;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (ddata->key_pinctrl) {
 		ret = gpio_keys_pinctrl_configure(ddata, false);
 		if (ret) {
@@ -925,7 +994,7 @@ static int gpio_keys_suspend(struct device *dev)
 			gpio_keys_close(input);
 		mutex_unlock(&input->mutex);
 	}
-
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return 0;
 }
 
@@ -935,7 +1004,7 @@ static int gpio_keys_resume(struct device *dev)
 	struct input_dev *input = ddata->input;
 	int error = 0;
 	int i;
-
+	_GPIO_KEYS_LOG(" @@@ ");
 	if (ddata->pdata->use_syscore == true) {
 		dev_dbg(global_dev, "Using syscore resume, no need of this resume.\n");
 		return 0;
@@ -966,6 +1035,7 @@ static int gpio_keys_resume(struct device *dev)
 		return error;
 
 	gpio_keys_report_state(ddata);
+	_GPIO_KEYS_LOG(" ~~~ ");
 	return 0;
 }
 

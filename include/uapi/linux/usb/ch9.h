@@ -705,6 +705,9 @@ struct usb_interface_assoc_descriptor {
 	__u8  iFunction;
 } __attribute__ ((packed));
 
+/*CVE-2017-16531 USB: fix out-of-bounds in usb_set_configuration {*/
+#define USB_DT_INTERFACE_ASSOCIATION_SIZE    8
+/*CVE-2017-16531 USB: fix out-of-bounds in usb_set_configuration }*/
 
 /*-------------------------------------------------------------------------*/
 

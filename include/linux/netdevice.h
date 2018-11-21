@@ -1167,6 +1167,8 @@ struct net_device_ops {
 	netdev_features_t	(*ndo_features_check) (struct sk_buff *skb,
 						       struct net_device *dev,
 						       netdev_features_t features);
+	int			(*ndo_set_duplex)(struct net_device *dev, int speed, int duplex, int autoneg, const char *buf);  //OEM, 2017/12/14, export duplex control sysfs interface
+	char*		(*ndo_get_duplex)(void);  //OEM, 2017/12/14, export duplex control sysfs interface
 };
 
 /**

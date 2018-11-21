@@ -406,6 +406,8 @@ struct i2c_msm_clk_div_fld {
  * divider values as per HW Designers
  */
 static struct i2c_msm_clk_div_fld i2c_msm_clk_div_map[] = {
+	{KHz(38), 250, 250},//Add for IDS monitor
+	{KHz(50), 248, 124},//Leo Guo add for DDCCI
 	{KHz(100), 124, 62},
 	{KHz(400),  28, 14},
 	{KHz(1000),  8,  5},

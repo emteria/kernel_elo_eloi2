@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "apq8053-mtp-edp-only.dtsi"//Leo Guo add to support all panel in one image
+
+&soc {
+	gpio-accessory{
+		compatible = "gpio-accessory";
+		pinctrl-names = "gpio_accessory_active", "gpio_accessory_suspend";
+		pinctrl-0 = <&nbcr_txd_gpio_active &nbcr_beeper_gpio_active &hbcr_beeper_gpio_active
+				&cd_sense_cpu_active &cd_detect_active>;
+		pinctrl-1 = <&nbcr_txd_gpio_suspend &nbcr_beeper_gpio_suspend &hbcr_beeper_gpio_suspend
+ 				&cd_sense_cpu_suspend &cd_detect_suspend>;
+
+		/* Cash-Drawer GPIO */
+		cd-solenoid-en = <&tlmm 25 0x0>;
+		cd-sense-drv = <&tlmm 26 0x0>;
+		cd-detect = <&tlmm 27 0x0>;
+		qcom,cd_detect-vadc = <&pm8953_vadc>;
+		/* Cash-Drawer GPIO */
+
+		/* Barcode reader GPIO */
+		nbcr-txd-gpio = <&tlmm 35 0x0>;
+		nbcr-beeper-gpio = <&tlmm 34 0x0>;
+		nbcr-trigger-gpio = <&tlmm 33 0x0>;
+		hbcr-beeper-gpio = <&tlmm 130 0x0>;
+		hbcr-trigger-gpio = <&tlmm 131 0x0>;
+		/* Barcode reader GPIO */
+
+		/* enable printer 7.5v GPIO */
+		pp-power-en = <&tlmm 29 0x0>;
+		/* enable printer 7.5v GPIO */
+		status = "okay";
+	};
+};
+
+&pm8953_vadc {
+	chan@11 {
+		status ="disabled";
+	};
+
+	/*pp,tony.l.cai,20170214,adc pin reserved for cd_detect{*/
+	chan@21 {
+		label = "cd_detect";
+		reg = <0x21>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <1>; //1/3
+		qcom,calibration-type = "absolute";
+		qcom,scale-function = <0>;
+		qcom,hw-settle-time = <1>; //1: Setting a delay of 100us is recommended for MPP channels.
+		qcom,fast-avg-setup = <0>;
+	};
+	/*}pp,tony.l.cai,20170214,adc pin reserved for cd_detect*/
+};

@@ -45,7 +45,7 @@
 #include <linux/usb.h>
 #include <linux/input/mt.h>
 #include <linux/string.h>
-
+#include "hid-sis_ctrl.h"
 
 MODULE_AUTHOR("Stephane Chatty <chatty@enac.fr>");
 MODULE_AUTHOR("Benjamin Tissoires <benjamin.tissoires@gmail.com>");
@@ -156,6 +156,23 @@ static void mt_post_parse(struct mt_device *td);
 
 #define MT_USB_DEVICE(v, p)	HID_DEVICE(BUS_USB, HID_GROUP_MULTITOUCH, v, p)
 #define MT_BT_DEVICE(v, p)	HID_DEVICE(BUS_BLUETOOTH, HID_GROUP_MULTITOUCH, v, p)
+
+/*add sis debug message*/
+#define HID_MT_DBG_POINT 0
+#if HID_MT_DBG_POINT
+#define DBG_POINT(fmt, arg...) printk( fmt, ##arg )
+#else
+#define DBG_POINT(...)
+#endif // HID_MT_DBG_POINT
+
+/*enable  map debug message*/
+#define HID_MT_DBG_MAP_INIT 1
+//#define HID_MT_DBG_MAP_INIT 0
+#if HID_MT_DBG_MAP_INIT
+#define DBG_MAP(fmt, arg...) printk( fmt, ##arg )
+#else
+#define DBG_MAP(...)
+#endif // HID_MT_DBG_MAP_INIT
 
 /*
  * these device-dependent functions determine what slot corresponds
@@ -393,6 +410,8 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	else
 		return 0;
 
+	DBG_MAP ("%s: usage->hid = %x\n", __FUNCTION__, usage->hid);
+
 	if (usage->usage_index)
 		prev_usage = &field->usage[usage->usage_index - 1];
 
@@ -521,6 +540,8 @@ static int mt_touch_input_mapped(struct hid_device *hdev, struct hid_input *hi,
 		struct hid_field *field, struct hid_usage *usage,
 		unsigned long **bit, int *max)
 {
+	DBG_MAP ("%s: usage->hid = %x\n", __FUNCTION__, usage->hid);
+
 	if (usage->type == EV_KEY || usage->type == EV_ABS)
 		set_bit(usage->type, hi->input->evbit);
 
@@ -556,10 +577,14 @@ static void mt_complete_slot(struct mt_device *td, struct input_dev *input)
 	    td->num_received >= td->num_expected)
 		return;
 
+	DBG_POINT("MT_event: td->num_expected=%d, td->num_received=%d, td->curvalid=%d\n", td->num_expected, td->num_received, td->curvalid);
+
 	if (td->curvalid || (td->mtclass.quirks & MT_QUIRK_ALWAYS_VALID)) {
 		int slotnum = mt_compute_slot(td, input);
 		struct mt_slot *s = &td->curdata;
 		struct input_mt *mt = input->mt;
+
+		DBG_POINT("MT_event before sending : slot=%d, touch state = %02X, id=%02X, x=%d, y=%d\n", slotnum, s->touch_state, s->contactid, s->x, s->y);
 
 		if (slotnum < 0 || slotnum >= td->maxcontacts)
 			return;
@@ -592,6 +617,9 @@ static void mt_complete_slot(struct mt_device *td, struct input_dev *input)
 			input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, major);
 			input_event(input, EV_ABS, ABS_MT_TOUCH_MINOR, minor);
 		}
+
+	DBG_POINT("MT_event after sending: slot=%d, touch state = %02X, id=%02X, x=%d, y=%d\n", slotnum, s->touch_state, s->contactid, s->x, s->y);
+
 	}
 
 	td->num_received++;
@@ -1034,6 +1062,21 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	if (ret != 0)
 		return ret;
 
+	//SiS set noget for not init reports
+	if (hdev->vendor == USB_VENDOR_ID_SIS_TOUCH)
+	{
+	hdev->quirks |= HID_QUIRK_NOGET;
+	printk(KERN_INFO "sis:sis-probe: quirk = %x\n", hdev->quirks);
+	//SiS FW update
+	#ifdef CONFIG_HID_SIS_CTRL
+	ret = sis_setup_chardev(hdev);
+	if(ret)
+	{
+	printk( KERN_INFO "sis_setup_chardev fail\n");
+	}
+	#endif //CONFIG_HID_SIS_CTRL
+	}
+
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 	if (ret)
 		return ret;
@@ -1072,6 +1115,14 @@ static int mt_resume(struct hid_device *hdev)
 
 static void mt_remove(struct hid_device *hdev)
 {
+	//SiS FW update
+	#ifdef CONFIG_HID_SIS_CTRL
+	if (hdev->vendor == USB_VENDOR_ID_SIS_TOUCH)
+	{
+	sis_deinit_chardev();
+	}
+	#endif //CONFIG_HID_SIS_CTRL
+
 	sysfs_remove_group(&hdev->dev.kobj, &mt_attribute_group);
 	hid_hw_stop(hdev);
 }
@@ -1350,6 +1401,18 @@ static const struct hid_device_id mt_devices[] = {
 	{ .driver_data = MT_CLS_NSMU,
 		MT_USB_DEVICE(USB_VENDOR_ID_XIROKU,
 			USB_DEVICE_ID_XIROKU_CSR2) },
+	/* SiS device */
+	{ .driver_data = MT_CLS_DEFAULT,
+	HID_USB_DEVICE(USB_VENDOR_ID_SIS_TOUCH,
+	USB_DEVICE_ID_SIS817_TOUCH) },
+	{ .driver_data = MT_CLS_DEFAULT,
+	HID_USB_DEVICE(USB_VENDOR_ID_SIS_TOUCH,
+	USB_DEVICE_ID_SISF817_TOUCH) },
+	/* Add SiS new PID below */
+	{ .driver_data = MT_CLS_DEFAULT,
+		HID_USB_DEVICE(USB_VENDOR_ID_SIS_TOUCH,
+		USB_DEVICE_ID_SIS12a3_TOUCH) },
+	/* SiS device end */
 
 	/* Generic MT device */
 	{ HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH, HID_ANY_ID, HID_ANY_ID) },

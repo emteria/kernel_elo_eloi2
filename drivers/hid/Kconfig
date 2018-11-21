@@ -507,6 +507,12 @@ config HID_MULTITOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called hid-multitouch.
 
+config HID_SIS_CTRL
+	tristate "SiS Touch Device Controller"
+	depends on HID_MULTITOUCH
+	---help---
+	Support for SiS Touch devices update FW.
+
 config HID_NTRIG
 	tristate "N-Trig touch screen"
 	depends on USB_HID

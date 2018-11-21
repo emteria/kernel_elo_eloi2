@@ -468,9 +468,11 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 		newsk->sk_backlog_rcv = dccp_v4_do_rcv;
 		newnp->pktoptions  = NULL;
 		newnp->opt	   = NULL;
+/* 2018/05/30, patch for CVE-2017-9076 {*/
 		newnp->ipv6_mc_list = NULL;
 		newnp->ipv6_ac_list = NULL;
 		newnp->ipv6_fl_list = NULL;
+/* 2018/05/30, patch for CVE-2017-9076 }*/
 		newnp->mcast_oif   = inet6_iif(skb);
 		newnp->mcast_hops  = ipv6_hdr(skb)->hop_limit;
 
@@ -546,9 +548,13 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 	/* Clone RX bits */
 	newnp->rxopt.all = np->rxopt.all;
 
+/* 2018/05/30, patch for CVE-2017-9076 {*/
 	newnp->ipv6_mc_list = NULL;
 	newnp->ipv6_ac_list = NULL;
 	newnp->ipv6_fl_list = NULL;
+/* 2018/05/30, patch for CVE-2017-9076 }*/
+
+	/* Clone pktoptions received with SYN */
 	newnp->pktoptions = NULL;
 	if (ireq->pktopts != NULL) {
 		newnp->pktoptions = skb_clone(ireq->pktopts, GFP_ATOMIC);

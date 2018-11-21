@@ -811,8 +811,11 @@ static const char * const sec_mi2s_mclk_a_groups[] = {
 static const char * const qdss_cti_trig_out_b1_groups[] = {
 	"gpio25",
 };
+static const char * const cd_sensor_groups[] = {
+    "gpio26", "gpio27", // Josh modified: replace gpio-26 & 27 with unused gpio-20 & 21
+};
 static const char * const cam_mclk_groups[] = {
-	"gpio26", "gpio27", "gpio28", "gpio128",
+	"gpio20", "gpio21", "gpio28", "gpio128", // Josh modified: replace gpio-26 & 27 with unused gpio-20 & 21
 };
 static const char * const dac_calib3_groups[] = {
 	"gpio28",

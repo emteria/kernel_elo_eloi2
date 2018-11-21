@@ -19,6 +19,10 @@
 #include <linux/mfd/wcd9xxx/wcd9xxx-slimslave.h>
 #include "wcd-mbhc-v2.h"
 
+/*2016-12-11 Jack W Lu: Add spk AMP control {*/
+#define PP_SUPPORT_SPK_AMP_APA2606
+/*2016-12-11 Jack W Lu: Add spk AMP control }*/
+
 #define TASHA_REG_VAL(reg, val)      {reg, 0, val}
 
 #define TASHA_REGISTER_START_OFFSET  0x800

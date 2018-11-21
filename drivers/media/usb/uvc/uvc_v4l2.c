@@ -31,6 +31,18 @@
 
 #include "uvcvideo.h"
 
+/* ####### Debug ####### */
+//#define _UVC_V4L2_DEBUG_
+#ifdef _UVC_V4L2_DEBUG_
+#define __FILENAME__ \
+	(strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define _GPIO_KEYS_LOG(fmt, ...) \
+	printk("%s @@@ %s(@%d) " fmt "\n", __FILENAME__, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define _GPIO_KEYS_LOG(fmt, ...)
+#endif
+/* ####### Debug ####### */
+
 /* ------------------------------------------------------------------------
  * UVC ioctls
  */
@@ -482,14 +494,21 @@ static int uvc_v4l2_open(struct file *file)
 	int ret = 0;
 
 	uvc_trace(UVC_TRACE_CALLS, "uvc_v4l2_open\n");
+	_GPIO_KEYS_LOG("uvc_v4l2_open ...\n");
 	stream = video_drvdata(file);
 
 	if (stream->dev->state & UVC_DEV_DISCONNECTED)
+	{
+		_GPIO_KEYS_LOG("uvc_v4l2_open ENODEV - 19 - No such device...\n");
 		return -ENODEV;
+	}
 
 	ret = usb_autopm_get_interface(stream->dev->intf);
 	if (ret < 0)
+	{
+		_GPIO_KEYS_LOG("uvc_v4l2_open  %d ...\n", ret);
 		return ret;
+	}
 
 	/* Create the device handle. */
 	handle = kzalloc(sizeof *handle, GFP_KERNEL);
@@ -505,6 +524,7 @@ static int uvc_v4l2_open(struct file *file)
 			mutex_unlock(&stream->dev->lock);
 			usb_autopm_put_interface(stream->dev->intf);
 			kfree(handle);
+			_GPIO_KEYS_LOG("uvc_v4l2_open  %d ...\n", ret);
 			return ret;
 		}
 	}
@@ -528,6 +548,8 @@ static int uvc_v4l2_release(struct file *file)
 	struct uvc_streaming *stream = handle->stream;
 
 	uvc_trace(UVC_TRACE_CALLS, "uvc_v4l2_release\n");
+	_GPIO_KEYS_LOG("uvc_v4l2_release ...\n");
+
 
 	/* Only free resources if this is a privileged handle. */
 	if (uvc_has_privileges(handle)) {

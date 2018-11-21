@@ -1,0 +1,100 @@
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+//Leo Guo add this file to support all panel in one image
+#include "dsi-sn65dsi86-1080p.dtsi"
+#include "dsi-adv7533-1080p.dtsi"
+
+&i2c_3 {
+	sn65dsi86@2d {
+			compatible = "sn65dsi86_dsi2edp";
+			mipi_edp_en-gpio = <&tlmm 53 0>;
+			mipi_edp_rst-gpio =<&tlmm 62 0>;
+			panel_en-gpio = <&tlmm 54 0>;
+			backlight_en-gpio = <&tlmm 56 0>;
+			led_en-gpio = <&tlmm 55 0>;
+			reg = <0x2D>;
+	};
+	adv7533@39 {
+			compatible = "adv7533";
+			reg = <0x39>;
+			instance_id = <0>;
+			adi,video-mode = <3>; /* 3 = 1080p */
+			adi,main-addr = <0x39>;
+			adi,cec-dsi-addr = <0x3C>;
+			adi,enable-audio;
+			pinctrl-names = "pmx_adv7533_active",
+						"pmx_adv7533_suspend";
+                   pinctrl-0 = <&adv7533_int_active &adv7533_switch_active>;
+                   pinctrl-1 = <&adv7533_int_suspend &adv7533_switch_suspend>;
+			adi,irq-gpio = <&tlmm 51 0x2002>;
+			adi,switch-gpio = <&tlmm 60 0x01>;
+			hpd-5v-en-supply = <&p5v_arm>;
+			qcom,supply-names = "hpd-5v-en";
+			qcom,min-voltage-level = <0>;
+			qcom,max-voltage-level = <0>;
+			qcom,enable-load = <0>;
+			qcom,disable-load = <0>;
+	};
+};
+&i2c_1 {
+	status = "okay";
+	/* DDCCI configuration */
+	ddcci_i2c@6e {
+		compatible = "ddcci_i2c";
+		reg = <0x6e>;
+		i2c_switch-gpio =<&tlmm 21 0>;
+	};
+};
+
+
+&dsi_sn65dsi86_1080p {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+&mdss_dsi {
+	hw-config = "dual_dsi";
+};
+
+&mdss_dsi0 {
+	status = "okay";
+	qcom,dsi-pref-prim-pan = <&dsi_sn65dsi86_1080p>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+};
+
+&mdss_dsi1 {
+	status = "okay";
+	qcom,dsi-pref-prim-pan = <&dsi_adv7533_1080p>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active>;
+	pinctrl-1 = <&mdss_dsi_suspend>;
+	qcom,bridge-index = <0>;
+	qcom,pluggable;
+};
+
+&dsi_adv7533_1080p {
+	qcom,mdss-dsi-panel-timings-phy-v2 = [24 1f 08 09 05 03 04 a0
+		24 1f 08 09 05 03 04 a0
+		24 1f 08 09 05 03 04 a0
+		24 1f 08 09 05 03 04 a0
+		24 1b 08 09 05 03 04 a0];
+};
+
+&soc {
+	mdss_dsi0_pll: qcom,mdss_dsi_pll@994400 {
+		qcom,dsi-pll-ssc-en;
+		qcom,dsi-pll-ssc-mode = "down-spread";
+	};
+	mdss_dsi1_pll: qcom,mdss_dsi_pll@996400 {
+		qcom,dsi-pll-ssc-en;
+		qcom,dsi-pll-ssc-mode = "center-spread";
+		qcom,ssc-ppm=<1000>;
+	};
+};

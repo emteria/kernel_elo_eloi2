@@ -58,7 +58,8 @@
 #define MSG_ID_RDI2_UPDATE_ACK          51
 #define MSG_ID_PIX0_UPDATE_ACK          52
 #define MSG_ID_PREV_STOP_ACK            53
-#define MSG_ID_STATS_BE                 54
+//#define MSG_ID_STATS_BE                 54
+#define MSG_ID_OUTPUT_TERTIARY3         54
 
 
 /* ISP command IDs */
@@ -225,8 +226,13 @@
 #define VFE_CMD_COLORXFORM_ENC_UPDATE                   160
 #define VFE_CMD_COLORXFORM_VIEW_UPDATE                  161
 #define VFE_CMD_TEST_GEN_CFG                            162
-#define VFE_CMD_STATS_BE_START                          163
-#define VFE_CMD_STATS_BE_STOP                           164
+//#define VFE_CMD_STATS_BE_START                          163
+//#define VFE_CMD_STATS_BE_STOP                           164
+#define VFE_CMD_SELECT_RDI                              163
+#define VFE_CMD_SET_STATS_VER                           164
+#define VFE_CMD_RGB_ALL_CFG                             165
+#define VFE_CMD_RGB_ALL_UPDATE                          166
+#define VFE_CMD_MAX                                     167
 struct msm_isp_cmd {
 	int32_t  id;
 	uint16_t length;
@@ -334,6 +340,13 @@ struct msm_vpe_clock_rate {
 #define VFE_OUTPUTS_THUMB_AND_JPEG      BIT(10)
 #define VFE_OUTPUTS_RDI0                BIT(11)
 #define VFE_OUTPUTS_RDI1                BIT(12)
+#define VFE_OUTPUTS_RDI2                BIT(13)
+
+#define	VFE_RDI_COMPOSITE				(1 << 0)
+#define	VFE_RDI_NON_COMPOSITE			(1 << 1)
+
+#define VFE_STATS_TYPE_LEGACY		0
+#define VFE_STATS_TYPE_BAYER		(1 << 2)
 
 struct msm_frame_info {
 	uint32_t inst_handle;

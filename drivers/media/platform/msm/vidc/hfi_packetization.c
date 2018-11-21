@@ -2355,6 +2355,14 @@ static int create_3x_pkt_cmd_session_set_property(
 		pkt->size += sizeof(u32) + sizeof(struct hfi_enable);
 		break;
 	}
+#if 0//CVE-2017-8281
+	/* Deprecated param on Venus 3xx */
+	case HAL_PARAM_VDEC_CONTINUE_DATA_TRANSFER:
+	{
+		rc = -ENOTSUPP;
+		break;
+	}
+#endif
 	case HAL_PARAM_BUFFER_SIZE_MINIMUM:
 	{
 		struct hfi_buffer_size_minimum *hfi;
