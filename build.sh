@@ -1,5 +1,5 @@
 #
-# https://source.codeaurora.org/quic/la/kernel/msm-3.10/log/?h=LA.BR.1.2.9_rb1.23
+# https://source.codeaurora.org/quic/la/kernel/msm-3.18/log/?h=LA.BR.5.6
 #
 
 ##############################################################################
@@ -7,7 +7,7 @@
 ##############################################################################
 
 SHOW_HELP=false
-GCC_ARGS="-C . O=out ARCH=arm64 SUBARCH=arm64 CROSS_COMPILE=$(pwd)/../../../prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-"
+GCC_ARGS="-C . O=out ARCH=arm64 SUBARCH=arm64 CROSS_COMPILE=$(pwd)/../../prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-"
 
 BUILD_MENUCONFIG=false
 BUILD_CLEAN=false
