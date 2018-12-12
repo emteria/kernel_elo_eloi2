@@ -29,13 +29,8 @@ function compile()
   fi
 
   # generate a clean new config
-  #ARCH=arm scripts/kconfig/merge_config.sh arch/arm/configs/bcm2709_defconfig kernel/configs/android-base.config kernel/configs/android-recommended.config
-  #mv .config out/.config
-  #rm .config*
-
-  # copy the device config
-  rm -rf out/.config
-  make $GCC_ARGS msmcortex_defconfig
+  export OEM_HEADER_FILE_PATH=/mnt/android/PlatformElo/kernel/msm-3.18/elo/oem_header/
+  make $GCC_ARGS elo_defconfig
 
   # check if the user wishes to run menuconfig
   if [ "$BUILD_MENUCONFIG" = true ] ; then
