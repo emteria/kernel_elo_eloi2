@@ -29,7 +29,7 @@ function compile()
   fi
 
   # generate a clean new config
-  export OEM_HEADER_FILE_PATH=/mnt/android/PlatformElo/kernel/msm-3.18/elo/oem_header/
+  export OEM_HEADER_FILE_PATH=$(pwd)/elo/oem_header/
   make $GCC_ARGS elo_defconfig
 
   # check if the user wishes to run menuconfig
@@ -45,7 +45,7 @@ function compile()
 # show usage message to the user
 function show_help()
 {
-  echo "Working with jfltexx kernel for Galaxy S4"
+  echo "Working with msm kernel for Elo I-Series 2.0"
   echo "Usage: ./build.sh <options>"
   echo "Following options are available:"
   echo "  --clean Use this option to remove outdated precompiled files"
