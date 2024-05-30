@@ -19,7 +19,8 @@
 };
 
 &pm8953_typec {
-	status = "disabled";
+  qcom,role-reversal-supported;
+	status = "ok";
 };
 
 &pmi632_pon {
@@ -60,6 +61,18 @@
 			bias-high-impedance;
 		};
 	};
+	pwm_out {
+		pwm_out_default: pwm_out_default {
+		pins = "gpio6";
+	    function = "func1";
+		bias_disable;
+		power_source=<0>;
+		output_low;		
+		output-enable;
+		qcom,drive-strength = <3>;
+		drive-push-pull;
+};
+};
 };
 
 &pmi632_qg {
@@ -67,6 +80,7 @@
 };
 
 &pmi632_charger {
+	qcom,battery-data = <&mtp_batterydata>;
 	qcom,battery-data = <&mtp_batterydata>;
 };
 
@@ -391,5 +405,67 @@
 				  pins = "gpio61";
 			  };
 		  };
+		  
 	};
 };
+
+
+#include "msm8953-mdss-panels.dtsi"
+&mdss_dsi0 {
+ lab-supply = <&lcdb_ldo_vreg>;
+ ibb-supply = <&lcdb_ncp_vreg>;
+///delete-property/ vdd-supply;
+
+ qcom,dsi-pref-prim-pan = <&dsi_truly_1280_800_vid>;
+ /*qcom,platform-bklight-en-gpio = <&pm8953_gpios 4 0>;*/
+ pinctrl-names = "mdss_default", "mdss_sleep";
+ //pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+ //pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+ pinctrl-0 = <&mdss_dsi_active &mdss_te_active &pwm_out_default>;
+ pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend &pwm_out_default>;
+ /*qcom,platform-te-gpio = <&tlmm 24 0>;*/
+ qcom,platform-reset-gpio = <&tlmm 61 0>;
+ //qcom,ext-vdd-gpio = <&tlmm 140 0>;
+ qcom,platform-enable-gpio = <&tlmm 140 0>;
+};
+
+&mdss_dsi1 {
+ status = "disabled";
+};
+
+&i2c_3 {
+	status = "ok";
+	focaltech@38{ 
+			compatible = "focaltech,fts";	
+			reg = <0x38>;  					
+			vdd-supply = <&pm8953_l10>;
+      vcc_i2c-supply = <&pm8953_l6>;
+			interrupt-parent = <&tlmm>;				
+			interrupts = <13 0x02>;
+			focaltech,reset-gpio = <&tlmm 64 0x01>; 
+			focaltech,irq-gpio = <&tlmm 65 0x02>; 	
+			focaltech,max-touch-number = <10>;			
+			focaltech,display-coords =  <0 0 800 1280>;	 
+			
+			pinctrl-names = "pmx_ts_active","pmx_ts_suspend","pmx_ts_release";
+			pinctrl-0 = <&ts_int_active &ts_reset_active>;
+			pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+			pinctrl-2 = <&ts_release>;
+
+			focaltech,have-key;
+			focaltech,key-number = <3>;	
+			focaltech,keys = <139 102 158>; 	
+			focaltech,key-x-coords = <200 600 800>;
+			focaltech,key-y-coords = <2000 2000 2000>; 
+	};
+};
+
+&soc {
+		pmi632_pwm_out: pmi632_pwm_out {
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&pwm_out_default>;
+		pinctrl-1 = <&pwm_out_default>;
+		};
+};
+	

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -323,6 +323,12 @@
 			qcom,hw-connector-mitigation;
 			qcom,connector-internal-pull-kohm = <100>;
 
+			qcom,vbus-gpio = <&tlmm 128 GPIO_ACTIVE_HIGH>;
+			qcom,en-hub-gpio = <&tlmm 48 GPIO_ACTIVE_HIGH>;
+			qcom,otg-sw-gpio = <&tlmm 139 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&typec_ssmux_config>;
+
 			qcom,thermal-mitigation
 				= <3000000 2500000 2000000 1500000
 					1000000 500000>;
@@ -591,6 +597,14 @@
 				qcom,ramp-pattern-repeat;
 				qcom,lpg-sdam-base = <0x64>;
 			};
+			lpg@4 {
+				qcom,lpg-chan-id = <4>;
+				qcom,ramp-step-ms = <200>;
+				qcom,ramp-low-index = <0>;
+				qcom,ramp-high-index = <19>;
+				qcom,ramp-pattern-repeat;
+				qcom,lpg-sdam-base = <0x72>;
+			};	
 		};
 
 		pmi632_rgb: qcom,leds@d000 {
@@ -723,6 +737,11 @@
 				qcom,led-name = "led:switch_0";
 				qcom,led-mask = <3>;
 				qcom,default-led-trigger = "switch0_trigger";
+				/*
+				pinctrl-names = "led_enable", "led_disable";
+				pinctrl-0 = <&flash_led_rear_en>;
+				pinctrl-1 = <&flash_led_rear_dis>;
+				*/
 			};
 
 			pmi632_switch1: qcom,led_switch_1 {
@@ -740,11 +759,82 @@
 	led_flash0: qcom,camera-flash {
 		cell-index = <0>;
 		compatible = "qcom,camera-flash";
-		qcom,flash-type = <1>;
-		qcom,flash-source = <&pmi632_flash0 &pmi632_flash1>;
-		qcom,torch-source = <&pmi632_torch0 &pmi632_torch1>;
-		qcom,switch-source = <&pmi632_switch0>;
+		qcom,flash-type = <2>;
+		qcom,flash-source = <&rear_flash>;
+		qcom,torch-source = <&rear_torch>;
+		/*qcom,switch-source = <&pmi632_switch0>;*/
 	};
+	leds {
+			cell-index = <0>;
+			compatible = "gpio-leds";
+			rear_flash:led@1 {
+				label = "sdm450:rear:flash";
+				gpios = <&tlmm 60 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "rear_flash";
+				default-state = "off";
+				use-pwm = "false";
+				qcom,max-current = <1500>;
+				qcom,id = <1>;
+				qcom,current-ma = <1000>;
+				qcom,duration-ms = <1280>;
+				qcom,ires-ua = <12500>;
+				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-vol-hi-lo-win-mv = <100>;
+			};
+
+			rear_torch:led@2 {
+				label = "sdm450:rear:torch";
+				gpios = <&pmi632_gpios 6 GPIO_ACTIVE_HIGH>;
+				use-pwm = "true";
+				pwms = <&pmi632_pwm 3 1000000>;
+				torch-pwm-frequency-min = <100>;  /*pwm frequency:100HZ*/
+				torch-pwm-frequency-max = <1000>; /*pwm frequency:1kHZ*/
+				torch-pwm-frequency-default = <1000>; /*unit:hz,default pwm frequency:1KHZ*/
+				torch-min-level= <1>;
+				torch-max-level= <4095>;
+				torch-brightness-max-level=<255>;
+				torch-default-level=<128>;/*pwm duty value*/
+				linux,default-trigger = "rear_torch";
+				default-state = "off";
+				qcom,max-current = <1500>;
+				qcom,id = <1>;
+				qcom,current-ma = <1000>;
+				qcom,duration-ms = <1280>;
+				qcom,ires-ua = <12500>;
+				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-vol-hi-lo-win-mv = <100>;
+			};
+
+			rear_irflash:led@3 {
+				label = "sdm450:rear:irflash";
+				gpios = <&tlmm 63 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "rear_irflash";
+				default-state = "off";
+				use-pwm = "false";
+				qcom,max-current = <1500>;
+				qcom,id = <1>;
+				qcom,current-ma = <1000>;
+				qcom,duration-ms = <1280>;
+				qcom,ires-ua = <12500>;
+				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-vol-hi-lo-win-mv = <100>;
+			};
+
+			rear_irtorch:led@4 {
+				label = "sdm450:rear:irtorch";
+				gpios = <&pmi632_gpios 2 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "rear_irtorch";
+				default-state = "off";
+				qcom,max-current = <1500>;
+				qcom,id = <1>;
+				qcom,current-ma = <1000>;
+				qcom,duration-ms = <1280>;
+				qcom,ires-ua = <12500>;
+				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-vol-hi-lo-win-mv = <100>;
+			};
+
+		};
 };
 
 &thermal_zones {
@@ -753,7 +843,6 @@
 		polling-delay = <0>;
 		thermal-governor = "step_wise";
 		thermal-sensors = <&bcl_sensor 0>;
-		wake-capable-sensor;
 
 		trips {
 			pmi632_ibat_lvl0: ibat-lvl0 {
@@ -769,7 +858,6 @@
 		polling-delay = <0>;
 		thermal-governor = "step_wise";
 		thermal-sensors = <&bcl_sensor 1>;
-		wake-capable-sensor;
 
 		trips {
 			ibat-lvl1 {
@@ -785,7 +873,6 @@
 		polling-delay = <0>;
 		thermal-governor = "low_limits_cap";
 		thermal-sensors = <&bcl_sensor 2>;
-		wake-capable-sensor;
 		tracks-low;
 
 		trips {
@@ -802,7 +889,6 @@
 		polling-delay = <0>;
 		thermal-governor = "low_limits_cap";
 		thermal-sensors = <&bcl_sensor 3>;
-		wake-capable-sensor;
 		tracks-low;
 
 		trips {
@@ -819,7 +905,6 @@
 		polling-delay = <0>;
 		thermal-governor = "low_limits_cap";
 		thermal-sensors = <&bcl_sensor 4>;
-		wake-capable-sensor;
 		tracks-low;
 
 		trips {
@@ -836,7 +921,6 @@
 		polling-delay = <0>;
 		thermal-governor = "low_limits_cap";
 		thermal-sensors = <&bcl_soc>;
-		wake-capable-sensor;
 		tracks-low;
 
 		trips {
@@ -853,7 +937,6 @@
 		polling-delay = <0>;
 		thermal-governor = "step_wise";
 		thermal-sensors = <&pmi632_tz>;
-		wake-capable-sensor;
 
 		trips {
 			pmi632_tz_trip0: pmi632-trip0 {

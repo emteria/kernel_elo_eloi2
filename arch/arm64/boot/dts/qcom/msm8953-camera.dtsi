@@ -328,12 +328,6 @@
 		max-clk-turbo = <465000000>;
 	};
 
-	qcom,adsp {
-		status = "disabled";
-		compatible = "adsp-shmem-device";
-		memory-region = <&adsp_shmem_device_mem>;
-	};
-
 	qcom,vfe {
 		compatible = "qcom,vfe";
 		num_child = <2>;
@@ -484,17 +478,17 @@
 						"CCI_I2C_DATA1",
 						"CCI_I2C_CLK1";
 		i2c_freq_100Khz: qcom,i2c_standard_mode {
-			status = "disabled";
+			status = "ok";
 		};
 		i2c_freq_400Khz: qcom,i2c_fast_mode {
-			status = "disabled";
+			status = "ok";
 		};
 		i2c_freq_custom: qcom,i2c_custom_mode {
-			status = "disabled";
+			status = "ok";
 		};
 
 		i2c_freq_1Mhz: qcom,i2c_fast_plus_mode {
-			status = "disabled";
+			status = "ok";
 		};
 
 	};
@@ -521,7 +515,7 @@
 	qcom,hw-thd-dat = <13>;
 	qcom,hw-thd-sta = <18>;
 	qcom,hw-tbuf = <32>;
-	qcom,hw-scl-stretch-en = <0>;
+	qcom,hw-scl-stretch-en = <1>;
 	qcom,hw-trdhld = <6>;
 	qcom,hw-tsp = <3>;
 	status = "ok";
