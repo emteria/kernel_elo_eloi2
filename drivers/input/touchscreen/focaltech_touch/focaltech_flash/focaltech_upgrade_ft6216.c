@@ -17,7 +17,7 @@
 
 /*****************************************************************************
 *
-* File Name: focaltech_upgrade_ft8716.c
+* File Name: focaltech_upgrade_ft6216.c
 *
 * Author: Focaltech Driver Team
 *
@@ -36,21 +36,21 @@
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
-u8 pb_file_ft8716[] = {
-#include "../include/pramboot/FT8716_Pramboot_V1.0_20180427.i"
+u8 pb_file_ft6216[] = {
+#include "../include/pramboot/FT6216_Pramboot_V0.1_20180418.i"
 };
 
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
 /************************************************************************
-* Name: fts_ft8716_upgrade
+* Name: fts_ft6216_upgrade
 * Brief:
 * Input:
 * Output:
 * Return: return 0 if success, otherwise return error code
 ***********************************************************************/
-static int fts_ft8716_upgrade(u8 *buf, u32 len)
+static int fts_ft6216_upgrade(u8 *buf, u32 len)
 {
     int ret = 0;
     u32 start_addr = 0;
@@ -92,7 +92,7 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
     }
 
     /* write app */
-    start_addr = upgrade_func_ft8716.appoff;
+    start_addr = upgrade_func_ft6216.appoff;
     ecc_in_host = fts_flash_write_buf(start_addr, buf, len, 1);
     if (ecc_in_host < 0 ) {
         FTS_ERROR("lcd initial code write fail");
@@ -130,14 +130,14 @@ fw_reset:
     return -EIO;
 }
 
-struct upgrade_func upgrade_func_ft8716 = {
-    .ctype = {0x05, 0x0A, 0x0C},
+struct upgrade_func upgrade_func_ft6216 = {
+    .ctype = {0x84},
     .fwveroff = 0x010E,
-    .fwcfgoff = 0x0000,
-    .appoff = 0x1000,
+    .fwcfgoff = 0xFFB0,
+    .appoff = 0x0000,
     .pramboot_supported = true,
-    .pramboot = pb_file_ft8716,
-    .pb_length = sizeof(pb_file_ft8716),
+    .pramboot = pb_file_ft6216,
+    .pb_length = sizeof(pb_file_ft6216),
     .hid_supported = false,
-    .upgrade = fts_ft8716_upgrade,
+    .upgrade = fts_ft6216_upgrade,
 };

@@ -17,7 +17,7 @@
 
 /*****************************************************************************
 *
-* File Name: focaltech_upgrade_ft8716.c
+* File Name: focaltech_upgrade_ft7251.c
 *
 * Author: Focaltech Driver Team
 *
@@ -36,21 +36,15 @@
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
-u8 pb_file_ft8716[] = {
-#include "../include/pramboot/FT8716_Pramboot_V1.0_20180427.i"
+u8 pb_file_ft7251[] = {
+#include "../include/pramboot/FT7251_Pramboot_V1.0_20180612.i"
 };
 
 /*****************************************************************************
-* Static function prototypes
+* Private constant and macro definitions using #define
 *****************************************************************************/
-/************************************************************************
-* Name: fts_ft8716_upgrade
-* Brief:
-* Input:
-* Output:
-* Return: return 0 if success, otherwise return error code
-***********************************************************************/
-static int fts_ft8716_upgrade(u8 *buf, u32 len)
+
+static int fts_ft7251_upgrade_mode(enum FW_FLASH_MODE mode, u8 *buf, u32 len)
 {
     int ret = 0;
     u32 start_addr = 0;
@@ -59,13 +53,8 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
     int ecc_in_host = 0;
     int ecc_in_tp = 0;
 
-    if (NULL == buf) {
-        FTS_ERROR("fw buf is null");
-        return -EINVAL;
-    }
-
-    if ((len < FTS_MIN_LEN) || (len > FTS_MAX_LEN_APP)) {
-        FTS_ERROR("fw buffer len(%x) fail", len);
+    if ((NULL == buf) || (len < FTS_MIN_LEN)) {
+        FTS_ERROR("buffer/len(%x) is invalid", len);
         return -EINVAL;
     }
 
@@ -78,6 +67,15 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
 
     cmd[0] = FTS_CMD_FLASH_MODE;
     cmd[1] = FLASH_MODE_UPGRADE_VALUE;
+    if (upgrade_func_ft7251.appoff_handle_in_ic) {
+        start_addr = 0; /* offset handle in pramboot */
+    } else {
+        start_addr = upgrade_func_ft7251.appoff;
+    }
+    if (FLASH_MODE_PARAM == mode) {
+        cmd[1] = FLASH_MODE_PARAM_VALUE;
+    }
+    FTS_INFO("flash mode:0x%02x, start addr=0x%04x", cmd[1], start_addr);
     ret = fts_write(cmd, 2);
     if (ret < 0) {
         FTS_ERROR("upgrade mode(09) cmd write fail");
@@ -92,7 +90,6 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
     }
 
     /* write app */
-    start_addr = upgrade_func_ft8716.appoff;
     ecc_in_host = fts_flash_write_buf(start_addr, buf, len, 1);
     if (ecc_in_host < 0 ) {
         FTS_ERROR("lcd initial code write fail");
@@ -122,22 +119,58 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
     return 0;
 
 fw_reset:
-    FTS_INFO("upgrade fail, reset to normal boot");
-    ret = fts_fwupg_reset_in_boot();
-    if (ret < 0) {
-        FTS_ERROR("reset to normal boot fail");
-    }
     return -EIO;
 }
 
-struct upgrade_func upgrade_func_ft8716 = {
-    .ctype = {0x05, 0x0A, 0x0C},
-    .fwveroff = 0x010E,
-    .fwcfgoff = 0x0000,
-    .appoff = 0x1000,
+/************************************************************************
+* Name: fts_ft7251_upgrade
+* Brief:
+* Input:
+* Output:
+* Return: return 0 if success, otherwise return error code
+***********************************************************************/
+static int fts_ft7251_upgrade(u8 *buf, u32 len)
+{
+    int ret = 0;
+    u8 *tmpbuf = NULL;
+    u32 app_len = 0;
+
+    FTS_INFO("fw app upgrade...");
+    if (NULL == buf) {
+        FTS_ERROR("fw buf is null");
+        return -EINVAL;
+    }
+
+    if ((len < FTS_MIN_LEN) || (len > FTS_MAX_LEN_FILE)) {
+        FTS_ERROR("fw buffer len(%x) fail", len);
+        return -EINVAL;
+    }
+
+    app_len = len - upgrade_func_ft7251.appoff;
+    tmpbuf = buf + upgrade_func_ft7251.appoff;
+    ret = fts_ft7251_upgrade_mode(FLASH_MODE_APP, tmpbuf, app_len);
+    if (ret < 0) {
+        FTS_INFO("fw upgrade fail,reset to normal boot");
+        if (fts_fwupg_reset_in_boot() < 0) {
+            FTS_ERROR("reset to normal boot fail");
+        }
+        return ret;
+    }
+
+    return 0;
+}
+
+struct upgrade_func upgrade_func_ft7251 = {
+    .ctype = {0x12, 0x13},
+    .fwveroff = 0x210E,
+    .fwcfgoff = 0x1000,
+    .appoff = 0x2000,
+    .new_return_value_from_ic = true,
+    .appoff_handle_in_ic = true,
     .pramboot_supported = true,
-    .pramboot = pb_file_ft8716,
-    .pb_length = sizeof(pb_file_ft8716),
+    .pramboot = pb_file_ft7251,
+    .pb_length = sizeof(pb_file_ft7251),
+    .pram_ecc_check_mode = ECC_CHECK_MODE_CRC16,
     .hid_supported = false,
-    .upgrade = fts_ft8716_upgrade,
+    .upgrade = fts_ft7251_upgrade,
 };

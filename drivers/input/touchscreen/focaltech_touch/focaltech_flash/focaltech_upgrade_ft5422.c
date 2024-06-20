@@ -17,7 +17,7 @@
 
 /*****************************************************************************
 *
-* File Name: focaltech_upgrade_ft8716.c
+* File Name: focaltech_upgrade_ft5422.c
 *
 * Author: Focaltech Driver Team
 *
@@ -34,28 +34,31 @@
 #include "../focaltech_flash.h"
 
 /*****************************************************************************
-* Global variable or extern global variabls/functions
-*****************************************************************************/
-u8 pb_file_ft8716[] = {
-#include "../include/pramboot/FT8716_Pramboot_V1.0_20180427.i"
-};
-
-/*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
+static int fts_ft5422_init(u8 *buf, u32 len)
+{
+    if ((!buf) || (len < FTS_MIN_LEN)) {
+        FTS_ERROR("upg is null/fw length fail");
+        return -EINVAL;
+    }
+
+    upgrade_func_ft5422.fwveroff = len - 2;
+    return 0;
+}
+
 /************************************************************************
-* Name: fts_ft8716_upgrade
+* Name: fts_ft5422_upgrade
 * Brief:
 * Input:
 * Output:
 * Return: return 0 if success, otherwise return error code
 ***********************************************************************/
-static int fts_ft8716_upgrade(u8 *buf, u32 len)
+static int fts_ft5422_upgrade(u8 *buf, u32 len)
 {
     int ret = 0;
     u32 start_addr = 0;
     u8 cmd[4] = { 0 };
-    u32 delay = 0;
     int ecc_in_host = 0;
     int ecc_in_tp = 0;
 
@@ -64,7 +67,7 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
         return -EINVAL;
     }
 
-    if ((len < FTS_MIN_LEN) || (len > FTS_MAX_LEN_APP)) {
+    if ((len < FTS_MIN_LEN) || (len > (60 * 1024))) {
         FTS_ERROR("fw buffer len(%x) fail", len);
         return -EINVAL;
     }
@@ -84,15 +87,24 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
         goto fw_reset;
     }
 
-    delay = FTS_ERASE_SECTOR_DELAY * (len / FTS_MAX_LEN_SECTOR);
-    ret = fts_fwupg_erase(delay);
+    cmd[0] = FTS_CMD_DATA_LEN;
+    cmd[1] = BYTE_OFF_16(len);
+    cmd[2] = BYTE_OFF_8(len);
+    cmd[3] = BYTE_OFF_0(len);
+    ret = fts_write(cmd, FTS_CMD_DATA_LEN_LEN);
+    if (ret < 0) {
+        FTS_ERROR("data len cmd write fail");
+        goto fw_reset;
+    }
+
+    ret = fts_fwupg_erase(FTS_REASE_APP_DELAY);
     if (ret < 0) {
         FTS_ERROR("erase cmd write fail");
         goto fw_reset;
     }
 
     /* write app */
-    start_addr = upgrade_func_ft8716.appoff;
+    start_addr = upgrade_func_ft5422.appoff;
     ecc_in_host = fts_flash_write_buf(start_addr, buf, len, 1);
     if (ecc_in_host < 0 ) {
         FTS_ERROR("lcd initial code write fail");
@@ -118,7 +130,7 @@ static int fts_ft8716_upgrade(u8 *buf, u32 len)
         FTS_ERROR("reset to normal boot fail");
     }
 
-    msleep(400);
+    msleep(200);
     return 0;
 
 fw_reset:
@@ -130,14 +142,13 @@ fw_reset:
     return -EIO;
 }
 
-struct upgrade_func upgrade_func_ft8716 = {
-    .ctype = {0x05, 0x0A, 0x0C},
-    .fwveroff = 0x010E,
-    .fwcfgoff = 0x0000,
-    .appoff = 0x1000,
-    .pramboot_supported = true,
-    .pramboot = pb_file_ft8716,
-    .pb_length = sizeof(pb_file_ft8716),
-    .hid_supported = false,
-    .upgrade = fts_ft8716_upgrade,
+struct upgrade_func upgrade_func_ft5422 = {
+    .ctype = {0x02},
+    .fwveroff = 0x0000,
+    .fwcfgoff = 0xD780,
+    .appoff = 0x0000,
+    .pramboot_supported = false,
+    .hid_supported = true,
+    .init = fts_ft5422_init,
+    .upgrade = fts_ft5422_upgrade,
 };
