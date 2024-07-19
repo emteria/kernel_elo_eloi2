@@ -59,6 +59,8 @@
 #define TYPEC_PSY_NAME		"typec"
 #define DUAL_ROLE_DESC_NAME	"otg_default"
 
+struct qpnp_typec_chip *g_chip=NULL;
+
 enum cc_line_state {
 	CC_1,
 	CC_2,
@@ -961,7 +963,7 @@ static int qpnp_typec_probe(struct platform_device *pdev)
 		pr_err("failed to request irqs rc=%d\n", rc);
 		goto unregister_psy;
 	}
-
+    g_chip=chip;
 	pr_info("TypeC successfully probed state=%d CC-line-state=%d\n",
 			chip->typec_state, chip->cc_line_state);
 	return 0;
@@ -993,6 +995,19 @@ static int qpnp_typec_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+int Set_Typec_State(int state)
+{
+	if((g_chip!=NULL)&&(g_chip->dr_inst))
+	{
+		g_chip->typec_state=state;
+		dual_role_instance_changed(g_chip->dr_inst);
+		return 0;
+	}
+	else return -EINVAL;
+	
+}
+
 
 static const struct of_device_id qpnp_typec_match_table[] = {
 	{ .compatible = QPNP_TYPEC_DEV_NAME },

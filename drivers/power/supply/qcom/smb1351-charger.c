@@ -1234,6 +1234,7 @@ static int smb1351_get_prop_batt_temp(struct smb1351_charger *chip)
 	int rc = 0;
 	struct qpnp_vadc_result results;
 
+return 20;
 	if (chip->bms_psy) {
 		power_supply_get_property(chip->bms_psy,
 				POWER_SUPPLY_PROP_TEMP, &ret);

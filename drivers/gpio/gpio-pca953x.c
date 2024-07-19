@@ -22,6 +22,7 @@
 #include <linux/of_platform.h>
 #include <linux/acpi.h>
 #include <linux/regulator/consumer.h>
+#include <linux/delay.h>
 
 #define PCA953X_INPUT		0
 #define PCA953X_OUTPUT		1
@@ -132,6 +133,7 @@ struct pca953x_chip {
 	const char *const *names;
 	unsigned long driver_data;
 	struct regulator *regulator;
+	int version;
 
 	const struct pca953x_reg_config *regs;
 
@@ -729,6 +731,215 @@ out:
 	return ret;
 }
 
+static ssize_t version_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int lo, hi;
+
+	lo = i2c_smbus_read_byte_data(chip->client, 0x72);
+	hi = i2c_smbus_read_byte_data(chip->client, 0x73);
+
+	if (lo < 0 || hi < 0) {
+		dev_err(&chip->client->dev, "failed reading version register\n");
+		return -1;
+	}
+	return sprintf(buf, "%d (%s)\n", (lo & 0xff), hi ? "development" : "stable");
+}
+
+static ssize_t adc0_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int lo, hi;
+
+	lo = i2c_smbus_read_byte_data(chip->client, 0x70);
+	hi = i2c_smbus_read_byte_data(chip->client, 0x71);
+
+	if (lo < 0 || hi < 0) {
+		dev_err(&chip->client->dev, "failed reading ADC register\n");
+			return -1;
+	}
+	return sprintf(buf, "%d\n", ((hi & 0xff) << 8) | (lo & 0xff));
+}
+
+static ssize_t adc0_store(struct device *pdev, struct device_attribute *attr, const char *buff, size_t size)
+{
+	int ret;
+
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	ret = i2c_smbus_write_byte_data(chip->client, 0x70, 0);
+	if (ret < 0) {
+		dev_err(&chip->client->dev, "failed writing ADC register\n");
+		return -1;
+	}
+	return size;
+}
+
+static ssize_t adc1_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int lo, hi;
+
+	lo = i2c_smbus_read_byte_data(chip->client, 0x78);
+	hi = i2c_smbus_read_byte_data(chip->client, 0x79);
+
+	if (lo < 0 || hi < 0) {
+		dev_err(&chip->client->dev, "failed reading ADC register\n");
+			return -1;
+	}
+	return sprintf(buf, "%d\n", ((hi & 0xff) << 8) | (lo & 0xff));
+}
+
+static ssize_t adc1_store(struct device *pdev, struct device_attribute *attr, const char *buff, size_t size)
+{
+	int ret;
+
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	ret = i2c_smbus_write_byte_data(chip->client, 0x78, 0);
+	if (ret < 0) {
+		dev_err(&chip->client->dev, "failed writing ADC register\n");
+		return -1;
+	}
+	return size;
+}
+
+static ssize_t adc2_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int lo, hi;
+
+	lo = i2c_smbus_read_byte_data(chip->client, 0x7a);
+	hi = i2c_smbus_read_byte_data(chip->client, 0x7b);
+
+	if (lo < 0 || hi < 0) {
+		dev_err(&chip->client->dev, "failed reading ADC register\n");
+			return -1;
+	}
+	return sprintf(buf, "%d\n", ((hi & 0xff) << 8) | (lo & 0xff));
+}
+
+static ssize_t adc2_store(struct device *pdev, struct device_attribute *attr, const char *buff, size_t size)
+{
+	int ret;
+
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	ret = i2c_smbus_write_byte_data(chip->client, 0x7a, 0);
+	if (ret < 0) {
+		dev_err(&chip->client->dev, "failed writing ADC register\n");
+		return -1;
+	}
+	return size;
+}
+
+static ssize_t adc3_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int lo, hi;
+
+	lo = i2c_smbus_read_byte_data(chip->client, 0x7c);
+	hi = i2c_smbus_read_byte_data(chip->client, 0x7d);
+
+	if (lo < 0 || hi < 0) {
+		dev_err(&chip->client->dev, "failed reading ADC register\n");
+			return -1;
+	}
+	return sprintf(buf, "%d\n", ((hi & 0xff) << 8) | (lo & 0xff));
+}
+
+static ssize_t adc3_store(struct device *pdev, struct device_attribute *attr, const char *buff, size_t size)
+{
+	int ret;
+
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	ret = i2c_smbus_write_byte_data(chip->client, 0x7c, 0);
+	if (ret < 0) {
+		dev_err(&chip->client->dev, "failed writing ADC register\n");
+		return -1;
+	}
+	return size;
+}
+
+static ssize_t datum_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+	int datum;
+
+	datum = i2c_smbus_read_byte_data(chip->client, 0x74);
+
+	if (datum < 0) {
+		dev_err(&chip->client->dev, "failed reading DATUM register\n");
+		return -1;
+	}
+	return sprintf(buf, "%d\n", datum);
+}
+
+static ssize_t datum_store(struct device *pdev, struct device_attribute *attr, const char *buff, size_t size)
+{
+	int ret;
+	u8 datum;
+
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	if (!kstrtou8(buff, 10, &datum)) {
+		ret = i2c_smbus_write_byte_data(chip->client, 0x74, datum);
+		if (ret < 0) {
+			dev_err(&chip->client->dev, "failed writing DATUM register\n");
+			return -1;
+		}
+	} else {
+		dev_err(&chip->client->dev, "unable to parse %s\n", buff);
+		return -1;
+	}
+	return size;
+}
+
+/* warning! need write-all permission so overriding check */
+#undef VERIFY_OCTAL_PERMISSIONS
+#define VERIFY_OCTAL_PERMISSIONS(perms) (perms)
+static DEVICE_ATTR(version, 0444, version_show, NULL);
+static DEVICE_ATTR(adc0, 0666, adc0_show, adc0_store);
+static DEVICE_ATTR(adc1, 0666, adc1_show, adc1_store);
+static DEVICE_ATTR(adc2, 0666, adc2_show, adc2_store);
+static DEVICE_ATTR(adc3, 0666, adc3_show, adc3_store);
+static DEVICE_ATTR(datum, 0666, datum_show, datum_store);
+
+static int pca953x_suspend(struct device *pdev)
+{
+	int ret;
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	if (chip->version > 4) {
+		dev_info(&chip->client->dev, "suspending\n");
+
+		ret = i2c_smbus_write_byte_data(chip->client, 0x76, 1);
+		if (ret < 0) {
+			dev_err(&chip->client->dev, "failed writing SUSPEND register\n");
+			return -1;
+		}
+	} else
+		dev_info(&chip->client->dev, "suspend not supported\n");
+	return 0;
+}
+
+static int pca953x_resume(struct device *pdev)
+{
+	struct pca953x_chip *chip = dev_get_drvdata(pdev);
+
+	if (chip->version > 4) {
+		dev_info(&chip->client->dev, "resuming\n");
+
+		/* this will fail but will wake up the chip */
+		i2c_smbus_write_byte_data(chip->client, 0x76, 0);
+	}
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(pca953x_pm_ops, pca953x_suspend, pca953x_resume);
+
 static const struct of_device_id pca953x_dt_ids[];
 
 static int pca953x_probe(struct i2c_client *client,
@@ -740,6 +951,7 @@ static int pca953x_probe(struct i2c_client *client,
 	int ret;
 	u32 invert = 0;
 	struct regulator *reg;
+	int version;
 
 	chip = devm_kzalloc(&client->dev,
 			sizeof(struct pca953x_chip), GFP_KERNEL);
@@ -818,6 +1030,10 @@ static int pca953x_probe(struct i2c_client *client,
 	 */
 	pca953x_setup_gpio(chip, chip->driver_data & PCA_GPIO_MASK);
 
+	/* send the "go" command if the STM8 has a bootloader inside */
+	i2c_smbus_write_byte_data(chip->client, 0xf2, 0);
+	msleep(10);
+
 	if (chip->gpio_chip.ngpio <= 8) {
 		chip->write_regs = pca953x_write_regs_8;
 		chip->read_regs = pca953x_read_regs_8;
@@ -855,6 +1071,19 @@ static int pca953x_probe(struct i2c_client *client,
 	}
 
 	i2c_set_clientdata(client, chip);
+
+	device_create_file(&client->dev, &dev_attr_version);
+	device_create_file(&client->dev, &dev_attr_adc0);
+	device_create_file(&client->dev, &dev_attr_adc1);
+	device_create_file(&client->dev, &dev_attr_adc2);
+	device_create_file(&client->dev, &dev_attr_adc3);
+	device_create_file(&client->dev, &dev_attr_datum);
+	dev_set_drvdata(&client->dev, chip);
+
+	chip->version = i2c_smbus_read_byte_data(chip->client, 0x72);
+	version = i2c_smbus_read_byte_data(chip->client, 0x73);
+	dev_info(&chip->client->dev, "version %d (%s)\n", (chip->version & 0xff), version ? "development" : "stable");
+
 	return 0;
 
 err_exit:
@@ -867,6 +1096,13 @@ static int pca953x_remove(struct i2c_client *client)
 	struct pca953x_platform_data *pdata = dev_get_platdata(&client->dev);
 	struct pca953x_chip *chip = i2c_get_clientdata(client);
 	int ret;
+
+	device_remove_file(&client->dev, &dev_attr_version);
+	device_remove_file(&client->dev, &dev_attr_adc0);
+	device_remove_file(&client->dev, &dev_attr_adc1);
+	device_remove_file(&client->dev, &dev_attr_adc2);
+	device_remove_file(&client->dev, &dev_attr_adc3);
+	device_remove_file(&client->dev, &dev_attr_datum);
 
 	if (pdata && pdata->teardown) {
 		ret = pdata->teardown(client, chip->gpio_chip.base,
@@ -927,6 +1163,7 @@ static struct i2c_driver pca953x_driver = {
 		.name	= "pca953x",
 		.of_match_table = pca953x_dt_ids,
 		.acpi_match_table = ACPI_PTR(pca953x_acpi_ids),
+		.pm = &pca953x_pm_ops,
 	},
 	.probe		= pca953x_probe,
 	.remove		= pca953x_remove,
