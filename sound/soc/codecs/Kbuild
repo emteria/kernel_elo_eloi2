@@ -79,7 +79,11 @@ tas2560_calib-objs = tas2560-calib.o
 obj-y += tas2560_calib.o
 endif
 
-ifeq ($(CONFIG_GINNA_DTB), y)
+# IKS:
+# after removing OCEAN_DBT from the kernel config for FAP20 compilation fails
+# this happens because there is somewhere a dependency to this folder, which expects that one of the codecs is included
+# following files are added to the compilation unconditionally to avoid this error, in future we need a better fix
+#ifeq ($(CONFIG_GINNA_DTB), y)
 snd_smartpa_aw882xx-objs = aw882xx.o
 obj-y += snd_smartpa_aw882xx.o
-endif
+#endif
