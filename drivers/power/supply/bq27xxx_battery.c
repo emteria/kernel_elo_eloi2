@@ -736,9 +736,12 @@ void bq27xxx_battery_update(struct bq27xxx_device_info *di)
 	bool has_ci_flag = di->chip == BQ27000 || di->chip == BQ27010;
 	bool has_singe_flag = di->chip == BQ27000 || di->chip == BQ27010;
 
-	cache.flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, has_singe_flag);
-	if ((cache.flags & 0xff) == 0xff)
-		cache.flags = -1; /* read error */
+	if (di->inserted) {
+		cache.flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, has_singe_flag);
+		if ((cache.flags & 0xff) == 0xff)
+			cache.flags = -1; /* read error */
+	} else
+		cache.flags = -1;
 	if (cache.flags >= 0) {
 		cache.temperature = bq27xxx_battery_read_temperature(di);
 		if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
@@ -931,7 +934,7 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 	}
 	mutex_unlock(&di->lock);
 
-	if (psp != POWER_SUPPLY_PROP_PRESENT && di->cache.flags < 0)
+	if (psp != POWER_SUPPLY_PROP_PRESENT && (di->cache.flags < 0 || (!di->inserted)))
 		return -ENODEV;
 
 	switch (psp) {
@@ -942,7 +945,7 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 		ret = bq27xxx_battery_voltage(di, val);
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
-		val->intval = di->cache.flags < 0 ? 0 : 1;
+		val->intval = (di->cache.flags < 0) || (!di->inserted) ? 0 : 1;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		ret = bq27xxx_battery_current(di, val);
@@ -1031,10 +1034,7 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 
 	di->bat = power_supply_register_no_ws(di->dev, psy_desc, &psy_cfg);
 	if (IS_ERR(di->bat)) {
-		if (PTR_ERR(di->bat) == -EPROBE_DEFER)
-			dev_dbg(di->dev, "failed to register battery, deferring probe\n");
-		else
-			dev_err(di->dev, "failed to register battery\n");
+		dev_err(di->dev, "failed to register battery\n");
 		return PTR_ERR(di->bat);
 	}
 

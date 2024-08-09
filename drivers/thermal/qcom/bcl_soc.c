@@ -37,7 +37,6 @@ struct bcl_device {
 	bool					irq_enabled;
 	struct thermal_zone_device		*tz_dev;
 	struct thermal_zone_of_device_ops	ops;
-	bool					bcl_not_mitigate_cpu_enalbe;
 };
 
 static struct bcl_device *bcl_perph;
@@ -70,20 +69,8 @@ static int bcl_read_soc(void *data, int *val)
 
 	*val = 100;
 	if (!batt_psy)
-		batt_psy = power_supply_get_by_name("battery");
+		batt_psy = power_supply_get_by_name("bq27510-battery");
 	if (batt_psy) {
-		if (bcl_perph->bcl_not_mitigate_cpu_enalbe) {
-			err = power_supply_get_property(batt_psy,
-				POWER_SUPPLY_PROP_CHARGE_RATE, &ret);
-			if (err)
-				pr_err("charge rate read error:%d\n", err);
-			else if (ret.intval ==
-					POWER_SUPPLY_CHARGE_RATE_TURBO) {
-				pr_debug("turbo charge connected\n");
-				return err;
-			}
-		}
-
 		err = power_supply_get_property(batt_psy,
 				POWER_SUPPLY_PROP_CAPACITY, &ret);
 		if (err) {
@@ -125,7 +112,7 @@ static int battery_supply_callback(struct notifier_block *nb,
 {
 	struct power_supply *psy = data;
 
-	if (strcmp(psy->desc->name, "battery"))
+	if (strcmp(psy->desc->name, "bq27510-battery"))
 		return NOTIFY_OK;
 	schedule_work(&bcl_perph->soc_eval_work);
 
@@ -173,13 +160,6 @@ static int bcl_soc_probe(struct platform_device *pdev)
 		bcl_perph->tz_dev = NULL;
 		goto bcl_soc_probe_exit;
 	}
-
-	if (of_property_read_bool(pdev->dev.of_node,
-		"qcom,bcl-not-mitigate-cpu"))
-		bcl_perph->bcl_not_mitigate_cpu_enalbe = true;
-	else
-		bcl_perph->bcl_not_mitigate_cpu_enalbe = false;
-
 	thermal_zone_device_update(bcl_perph->tz_dev, THERMAL_DEVICE_UP);
 	schedule_work(&bcl_perph->soc_eval_work);
 

@@ -62,6 +62,8 @@ struct bq27xxx_device_info {
 	struct list_head list;
 	struct mutex lock;
 	u8 *regs;
+	struct dentry *debug_root;
+	int inserted;
 };
 
 void bq27xxx_battery_update(struct bq27xxx_device_info *di);

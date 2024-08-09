@@ -14,7 +14,6 @@
  * GNU General Public License for more details.
  *
  */
-
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/power_supply.h>
@@ -24,6 +23,8 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/usb/phy.h>
+#include <linux/debugfs.h>
+#include <linux/workqueue.h>
 
 #include <linux/acpi.h>
 #include <linux/of.h>
@@ -32,6 +33,7 @@
 #define BQ25890_IRQ_PIN			"bq25890_irq"
 
 #define BQ25890_ID			3
+#define BQ25892_ID			0
 
 enum bq25890_fields {
 	F_EN_HIZ, F_EN_ILIM, F_IILIM,				     /* Reg00 */
@@ -104,6 +106,10 @@ struct bq25890_device {
 	struct bq25890_state state;
 
 	struct mutex lock; /* protect state data */
+	struct dentry *debug_root;
+	u32 peek_poke_address;
+#define WORK_DELAY 1000 /* in ms */
+	struct delayed_work work;
 };
 
 static const struct regmap_range bq25890_readonly_reg_ranges[] = {
@@ -118,6 +124,7 @@ static const struct regmap_access_table bq25890_writeable_regs = {
 
 static const struct regmap_range bq25890_volatile_reg_ranges[] = {
 	regmap_reg_range(0x00, 0x00),
+	regmap_reg_range(0x02, 0x02),
 	regmap_reg_range(0x09, 0x09),
 	regmap_reg_range(0x0b, 0x0c),
 	regmap_reg_range(0x0e, 0x14),
@@ -181,7 +188,7 @@ static const struct reg_field bq25890_reg_fields[] = {
 	[F_CHG_TMR]		= REG_FIELD(0x07, 1, 2),
 	[F_JEITA_ISET]		= REG_FIELD(0x07, 0, 0),
 	/* REG08 */
-	[F_BATCMP]		= REG_FIELD(0x08, 6, 7),
+	[F_BATCMP]		= REG_FIELD(0x08, 5, 7),
 	[F_VCLAMP]		= REG_FIELD(0x08, 2, 4),
 	[F_TREG]		= REG_FIELD(0x08, 0, 1),
 	/* REG09 */
@@ -464,6 +471,7 @@ static int bq25890_get_chip_state(struct bq25890_device *bq,
 				  struct bq25890_state *state)
 {
 	int i, ret;
+	u8 ntc_fault, wd_fault;
 
 	struct {
 		enum bq25890_fields id;
@@ -474,7 +482,9 @@ static int bq25890_get_chip_state(struct bq25890_device *bq,
 		{F_VSYS_STAT,	&state->vsys_status},
 		{F_BOOST_FAULT, &state->boost_fault},
 		{F_BAT_FAULT,	&state->bat_fault},
-		{F_CHG_FAULT,	&state->chrg_fault}
+		{F_CHG_FAULT,	&state->chrg_fault},
+		{F_NTC_FAULT,	&ntc_fault},
+		{F_WD_FAULT,	&wd_fault}
 	};
 
 	for (i = 0; i < ARRAY_SIZE(state_fields); i++) {
@@ -485,9 +495,11 @@ static int bq25890_get_chip_state(struct bq25890_device *bq,
 		*state_fields[i].data = ret;
 	}
 
-	dev_dbg(bq->dev, "S:CHG/PG/VSYS=%d/%d/%d, F:CHG/BOOST/BAT=%d/%d/%d\n",
+	dev_dbg(bq->dev, "%s: S:CHG/PG/VSYS=%d/%d/%d, F:CHG/BOOST/BAT/NTC/WD=%d/%d/%d/%d/%d\n",
+		bq->chip_id == BQ25890_ID ? "bq25890" : "bq25892",
 		state->chrg_status, state->online, state->vsys_status,
-		state->chrg_fault, state->boost_fault, state->bat_fault);
+		state->chrg_fault, state->boost_fault, state->bat_fault,
+		ntc_fault, wd_fault);
 
 	return 0;
 }
@@ -537,14 +549,12 @@ error:
 	dev_err(bq->dev, "Error communicating with the chip.\n");
 }
 
-static irqreturn_t bq25890_irq_handler_thread(int irq, void *private)
+static void bq25890_work(struct work_struct *data)
 {
-	struct bq25890_device *bq = private;
-	int ret;
+	struct bq25890_device *bq = container_of(data, struct bq25890_device, work.work);
 	struct bq25890_state state;
 
-	ret = bq25890_get_chip_state(bq, &state);
-	if (ret < 0)
+	if (bq25890_get_chip_state(bq, &state) < 0)
 		goto handled;
 
 	if (!bq25890_state_changed(bq, &state))
@@ -559,6 +569,13 @@ static irqreturn_t bq25890_irq_handler_thread(int irq, void *private)
 	power_supply_changed(bq->charger);
 
 handled:
+	schedule_delayed_work(&bq->work, msecs_to_jiffies(WORK_DELAY));
+}
+
+static irqreturn_t bq25890_irq_handler_thread(int irq, void *private)
+{
+	struct bq25890_device *bq = private;
+	schedule_delayed_work(&bq->work, 0);
 	return IRQ_HANDLED;
 }
 
@@ -611,23 +628,67 @@ static int bq25890_hw_init(struct bq25890_device *bq)
 	if (ret < 0)
 		return ret;
 
+#define BQ25890_FIELD_WRITE_ERR_RET(r, v) do { ret = bq25890_field_write(bq, r, v); if (ret < 0) return ret; } while (0)
+
 	/* disable watchdog */
-	ret = bq25890_field_write(bq, F_WD, 0);
-	if (ret < 0)
-		return ret;
+	BQ25890_FIELD_WRITE_ERR_RET(F_WD, 0);
 
 	/* initialize currents/voltages and other parameters */
-	for (i = 0; i < ARRAY_SIZE(init_data); i++) {
-		ret = bq25890_field_write(bq, init_data[i].id,
-					  init_data[i].value);
-		if (ret < 0)
-			return ret;
-	}
+	for (i = 0; i < ARRAY_SIZE(init_data); i++)
+		BQ25890_FIELD_WRITE_ERR_RET(init_data[i].id, init_data[i].value);
 
-	/* Configure ADC for continuous conversions. This does not enable it. */
-	ret = bq25890_field_write(bq, F_CONV_RATE, 1);
-	if (ret < 0)
-		return ret;
+	/* Enable continuous ADC */
+	BQ25890_FIELD_WRITE_ERR_RET(F_CONV_RATE, 1);
+
+	/* ID2MP specific init */
+	BQ25890_FIELD_WRITE_ERR_RET(F_EN_HIZ, (bq->chip_id == BQ25890_ID) ? 0x00 : 0x01);
+// F_EN_ILIM already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_IILIM, (bq->chip_id == BQ25890_ID) ? 0x2e : 0x16);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BHOT, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BCOLD, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_VINDPM_OFS, (bq->chip_id == BQ25890_ID) ? 0x08 : 0x0a);
+	BQ25890_FIELD_WRITE_ERR_RET(F_CONV_START, 0x00);
+// F_CONV_RATE already initialized
+// F_BOOSTF already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_ICO_EN, (bq->chip_id == BQ25890_ID) ? 0x01 : 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_HVDCP_EN, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_MAXC_EN, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_FORCE_DPM, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_AUTO_DPDM_EN, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BAT_LOAD_EN, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_WD_RST, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_OTG_CFG, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_CHG_CFG, 0x01);
+// F_SYSVMIN already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_PUMPX_EN, 0x00);
+// F_ICHG already initialized
+// F_IPRECHG already initialized
+// F_ITERM already initialized
+// F_VREG already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_BATLOWV, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_VRECHG, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_TERM_EN, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_STAT_DIS, 0x00);
+// F_WD already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_TMR_EN, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_CHG_TMR, 0x02);
+	BQ25890_FIELD_WRITE_ERR_RET(F_JEITA_ISET, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BATCMP, (bq->chip_id == BQ25890_ID) ? 0x02 : 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_VCLAMP, (bq->chip_id == BQ25890_ID) ? 0x02 : 0x00);
+// F_TREG already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_FORCE_ICO, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_TMR2X_EN, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BATFET_DIS, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_JEITA_VSET, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BATFET_DLY, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_BATFET_RST_EN, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_PUMPX_UP, 0x00);
+	BQ25890_FIELD_WRITE_ERR_RET(F_PUMPX_DN, 0x00);
+// F_BOOSTV already initialized
+// F_BOOSTI already initialized
+	BQ25890_FIELD_WRITE_ERR_RET(F_FORCE_VINDPM, 0x01);
+	BQ25890_FIELD_WRITE_ERR_RET(F_VINDPM, 0x54);
+#undef BQ25890_FIELD_WRITE_ERR_RET
 
 	ret = bq25890_get_chip_state(bq, &state);
 	if (ret < 0)
@@ -653,12 +714,20 @@ static enum power_supply_property bq25890_power_supply_props[] = {
 };
 
 static char *bq25890_charger_supplied_to[] = {
-	"main-battery",
+	"bq27510-battery",
 };
 
 static const struct power_supply_desc bq25890_power_supply_desc = {
 	.name = "bq25890-charger",
-	.type = POWER_SUPPLY_TYPE_USB,
+	.type = POWER_SUPPLY_TYPE_MAINS,
+	.properties = bq25890_power_supply_props,
+	.num_properties = ARRAY_SIZE(bq25890_power_supply_props),
+	.get_property = bq25890_power_supply_get_property,
+};
+
+static const struct power_supply_desc bq25892_power_supply_desc = {
+	.name = "bq25892-charger",
+	.type = POWER_SUPPLY_TYPE_MAINS,
 	.properties = bq25890_power_supply_props,
 	.num_properties = ARRAY_SIZE(bq25890_power_supply_props),
 	.get_property = bq25890_power_supply_get_property,
@@ -667,12 +736,17 @@ static const struct power_supply_desc bq25890_power_supply_desc = {
 static int bq25890_power_supply_init(struct bq25890_device *bq)
 {
 	struct power_supply_config psy_cfg = { .drv_data = bq, };
+	const struct power_supply_desc *desc;
 
 	psy_cfg.supplied_to = bq25890_charger_supplied_to;
 	psy_cfg.num_supplicants = ARRAY_SIZE(bq25890_charger_supplied_to);
 
-	bq->charger = power_supply_register(bq->dev, &bq25890_power_supply_desc,
-					    &psy_cfg);
+	if (bq->chip_id == BQ25890_ID)
+		desc = &bq25890_power_supply_desc;
+	else
+		desc = &bq25892_power_supply_desc;
+
+	bq->charger = power_supply_register(bq->dev, desc, &psy_cfg);
 
 	return PTR_ERR_OR_ZERO(bq->charger);
 }
@@ -718,6 +792,163 @@ static int bq25890_usb_notifier(struct notifier_block *nb, unsigned long val,
 
 	return NOTIFY_OK;
 }
+
+static int get_reg(void *data, u64 *val)
+{
+        struct bq25890_device *bq = data;
+        int reg;
+
+	reg = i2c_smbus_read_byte_data(bq->client, bq->peek_poke_address);
+        if (reg < 0) {
+                dev_err(bq->dev,
+                        "Couldn't read reg %x rc = %d\n",
+                        bq->peek_poke_address, reg);
+                return -EAGAIN;
+        }
+        *val = reg;
+        return 0;
+}
+
+static int set_reg(void *data, u64 val)
+{
+        struct bq25890_device *bq = data;
+        int rc;
+        u8 temp;
+
+        temp = (u8) val;
+	rc = i2c_smbus_write_byte_data(bq->client, bq->peek_poke_address, temp);
+        if (rc < 0) {
+                dev_err(bq->dev,
+                        "Couldn't write 0x%02x to 0x%02x rc= %d\n",
+                        bq->peek_poke_address, temp, rc);
+                return -EAGAIN;
+        }
+        return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(poke_poke_debug_ops, get_reg, set_reg, "0x%02llx\n");
+
+static int bq_show_registers(struct seq_file *m, void *data)
+{
+	struct bq25890_device *bq = m->private;
+	int reg;
+	u8 addr;
+
+	for (addr = 0; addr < 0x15; addr++) {
+		reg = i2c_smbus_read_byte_data(bq->client, addr);
+		if (reg >= 0)
+			seq_printf(m, "0x%02x = 0x%02x\n", addr, reg);
+	}
+
+	return 0;
+}
+
+static int bq_debugfs_open(struct inode *inode, struct file *file)
+{
+        struct bq25890_device *bq = inode->i_private;
+
+        return single_open(file, bq_show_registers, bq);
+}
+
+static const struct file_operations bq_debugfs_ops = {
+	.owner		= THIS_MODULE,
+	.open		= bq_debugfs_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static ssize_t bq25890_enable_chg(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct bq25890_device *bq = dev_get_drvdata(dev);
+	int ret;
+
+	dev_info(bq->dev, "enable charge\n");
+
+	ret = bq25890_field_write(bq, F_CHG_CFG, 1);
+	if (ret < 0)
+		return ret;
+
+	if (bq->chip_id == BQ25892_ID) {
+		msleep(2000);
+		ret = bq25890_field_write(bq, F_EN_HIZ, 0);
+		if (ret < 0)
+			return ret;
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(enable_chg, S_IWUSR, NULL, bq25890_enable_chg);
+
+static ssize_t bq25890_disable_chg(struct device *dev, struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct bq25890_device *bq = dev_get_drvdata(dev);
+	int ret;
+
+	dev_info(bq->dev, "disable charge\n");
+
+	ret = bq25890_field_write(bq, F_CHG_CFG, 0);
+	if (ret < 0)
+		return ret;
+
+	if (bq->chip_id == BQ25892_ID) {
+		msleep(2000);
+		ret = bq25890_field_write(bq, F_EN_HIZ, 1);
+		if (ret < 0)
+			return ret;
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(disable_chg, S_IWUSR, NULL, bq25890_disable_chg);
+
+static ssize_t bq25890_battery_type(struct device *dev, struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct bq25890_device *bq = dev_get_drvdata(dev);
+	int ret;
+	int val = 0;
+
+	if (kstrtoint(buf, 0, &val) != 0)
+                return -EINVAL;
+
+	dev_info(bq->dev, "set battery type to %d\n", val);
+
+#define BQ25890_FIELD_WRITE_ERR_RET(r, v) do { ret = bq25890_field_write(bq, r, v); if (ret < 0) return ret; } while (0)
+	if (val == 0 || val == 8) {
+		BQ25890_FIELD_WRITE_ERR_RET(F_VREG, (bq->chip_id == BQ25890_ID) ? 0x17 : 0x16);
+		BQ25890_FIELD_WRITE_ERR_RET(F_BATCMP, (bq->chip_id == BQ25890_ID) ? 0x02 : 0x00);
+		BQ25890_FIELD_WRITE_ERR_RET(F_VCLAMP, (bq->chip_id == BQ25890_ID) ? 0x02 : 0x00);
+	} else if (val == 12) {
+		BQ25890_FIELD_WRITE_ERR_RET(F_VREG, (bq->chip_id == BQ25890_ID) ? 0x20 : 0x1F);
+		BQ25890_FIELD_WRITE_ERR_RET(F_BATCMP, (bq->chip_id == BQ25890_ID) ? 0x01 : 0x00);
+		BQ25890_FIELD_WRITE_ERR_RET(F_VCLAMP, (bq->chip_id == BQ25890_ID) ? 0x01 : 0x00);
+	} else if (val == 16) {
+		BQ25890_FIELD_WRITE_ERR_RET(F_VREG, (bq->chip_id == BQ25890_ID) ? 0x20 : 0x1F);
+		BQ25890_FIELD_WRITE_ERR_RET(F_BATCMP, (bq->chip_id == BQ25890_ID) ? 0x01 : 0x00);
+		BQ25890_FIELD_WRITE_ERR_RET(F_VCLAMP, (bq->chip_id == BQ25890_ID) ? 0x01 : 0x00);
+	} else
+		return -EINVAL;
+#undef BQ25890_FIELD_WRITE_ERR_RET
+
+	return count;
+}
+
+static DEVICE_ATTR(battery_type, S_IWUSR, NULL, bq25890_battery_type);
+
+static struct attribute *bq25890_sysfs_attributes[] = {
+	&dev_attr_enable_chg.attr,
+	&dev_attr_disable_chg.attr,
+	&dev_attr_battery_type.attr,
+	NULL,
+};
+
+static const struct attribute_group bq25890_sysfs_attr_group = {
+	.attrs = bq25890_sysfs_attributes,
+};
 
 static int bq25890_irq_probe(struct bq25890_device *bq)
 {
@@ -800,6 +1031,7 @@ static int bq25890_probe(struct i2c_client *client,
 	struct bq25890_device *bq;
 	int ret;
 	int i;
+	struct dentry *ent;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
 		dev_err(dev, "No support for SMBUS_BYTE_DATA\n");
@@ -840,7 +1072,7 @@ static int bq25890_probe(struct i2c_client *client,
 		return bq->chip_id;
 	}
 
-	if (bq->chip_id != BQ25890_ID) {
+	if (bq->chip_id != BQ25890_ID && bq->chip_id != BQ25892_ID) {
 		dev_err(dev, "Chip with ID=%d, not supported!\n", bq->chip_id);
 		return -ENODEV;
 	}
@@ -879,7 +1111,7 @@ static int bq25890_probe(struct i2c_client *client,
 
 	ret = devm_request_threaded_irq(dev, client->irq, NULL,
 					bq25890_irq_handler_thread,
-					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+					IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_SHARED,
 					BQ25890_IRQ_PIN, bq);
 	if (ret)
 		goto irq_fail;
@@ -890,8 +1122,33 @@ static int bq25890_probe(struct i2c_client *client,
 		goto irq_fail;
 	}
 
+	bq->debug_root = debugfs_create_dir(bq->chip_id == BQ25890_ID ? "bq25890" : "bq25892", NULL);
+	if (!bq->debug_root) {
+		dev_err(dev, "Failed to create debugfs directory\n");
+		goto irq_fail;
+	}
+
+	ent = debugfs_create_file("registers", S_IFREG | S_IRUGO, bq->debug_root, bq, &bq_debugfs_ops);
+	if (!ent)
+		dev_err(dev, "Couldn't create registers debug file\n");
+	ent = debugfs_create_x32("address", S_IFREG | S_IWUSR | S_IRUGO, bq->debug_root, &(bq->peek_poke_address));
+	if (!ent)
+		dev_err(dev, "Couldn't create address debug file\n");
+	ent = debugfs_create_file("data", S_IFREG | S_IWUSR | S_IRUGO, bq->debug_root, bq, &poke_poke_debug_ops);
+	if (!ent)
+		dev_err(dev, "Couldn't create data debug file\n");
+
+	ret = sysfs_create_group(&dev->kobj, &bq25890_sysfs_attr_group);
+	if (ret)
+		goto sysfs_fail;
+
+	INIT_DELAYED_WORK(&bq->work, bq25890_work);
+	schedule_delayed_work(&bq->work, msecs_to_jiffies(WORK_DELAY));
+
 	return 0;
 
+sysfs_fail:
+	debugfs_remove_recursive(bq->debug_root);
 irq_fail:
 	if (!IS_ERR_OR_NULL(bq->usb_phy))
 		usb_unregister_notifier(bq->usb_phy, &bq->usb_nb);
@@ -903,7 +1160,13 @@ static int bq25890_remove(struct i2c_client *client)
 {
 	struct bq25890_device *bq = i2c_get_clientdata(client);
 
+	sysfs_remove_group(&bq->dev->kobj, &bq25890_sysfs_attr_group);
+
+	debugfs_remove_recursive(bq->debug_root);
+
 	power_supply_unregister(bq->charger);
+
+	cancel_delayed_work_sync(&bq->work);
 
 	if (!IS_ERR_OR_NULL(bq->usb_phy))
 		usb_unregister_notifier(bq->usb_phy, &bq->usb_nb);
@@ -923,7 +1186,7 @@ static int bq25890_suspend(struct device *dev)
 	 * If charger is removed, while in suspend, make sure ADC is diabled
 	 * since it consumes slightly more power.
 	 */
-	return bq25890_field_write(bq, F_CONV_START, 0);
+	return bq25890_field_write(bq, F_CONV_RATE, 0);
 }
 
 static int bq25890_resume(struct device *dev)
@@ -942,7 +1205,7 @@ static int bq25890_resume(struct device *dev)
 
 	/* Re-enable ADC only if charger is plugged in. */
 	if (state.online) {
-		ret = bq25890_field_write(bq, F_CONV_START, 1);
+		ret = bq25890_field_write(bq, F_CONV_RATE, 1);
 		if (ret < 0)
 			return ret;
 	}
@@ -966,6 +1229,7 @@ MODULE_DEVICE_TABLE(i2c, bq25890_i2c_ids);
 
 static const struct of_device_id bq25890_of_match[] = {
 	{ .compatible = "ti,bq25890", },
+	{ .compatible = "ti,bq25892", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, bq25890_of_match);
