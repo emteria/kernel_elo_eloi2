@@ -598,7 +598,7 @@ static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
 	return __arm_v7s_unmap(data, iova, size, lvl + 1, ptep);
 }
 
-static int arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+static size_t arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
 			 size_t size)
 {
 	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);

@@ -22,6 +22,7 @@
 #include <linux/msm-bus.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <soc/qcom/hvc.h>
 
 #include "governor.h"
 #include "devfreq_spdm.h"
@@ -246,7 +247,6 @@ no_pdata:
 	return ret;
 }
 
-#ifdef CONFIG_MSM_HVC
 int __spdm_hyp_call(struct spdm_args *args, int num_args)
 {
 	struct hvc_desc desc = { { 0 } };
@@ -266,7 +266,6 @@ int __spdm_hyp_call(struct spdm_args *args, int num_args)
 			desc.ret[0], desc.ret[1]);
 	return status;
 }
-#endif
 
 int __spdm_scm_call(struct spdm_args *args, int num_args)
 {

@@ -208,6 +208,9 @@
  * Add new clients in the end of the list and update IPA_CLIENT_MAX
  */
 enum ipa_client_type {
+	IPA_CLIENT_PROD = 0,
+	IPA_CLIENT_CONS = 1,
+
 	IPA_CLIENT_HSIC1_PROD			= 0,
 	IPA_CLIENT_HSIC1_CONS			= 1,
 
