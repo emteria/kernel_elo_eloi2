@@ -1643,7 +1643,7 @@ static int msm_slim_qmi_send_select_inst_req(struct msm_slim_ctrl *dev,
 }
 
 static void slim_qmi_resp_cb(struct qmi_handle *handle, unsigned int msg_id,
-			     void *msg, void *resp_cb_data, int stat)
+			     void *msg, void *resp_cb_data)
 {
 	struct slimbus_power_resp_msg_v01 *resp = msg;
 	struct msm_slim_ctrl *dev = resp_cb_data;
