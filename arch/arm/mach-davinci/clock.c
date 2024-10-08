@@ -33,15 +33,30 @@ static DEFINE_SPINLOCK(clockfw_lock);
 
 static void __clk_enable(struct clk *clk)
 {
+	pr_debug("Clocks: enabling clock %s\n", clk->name);
+
 	if (clk->parent)
+	{
+		pr_debug("Clocks: enabling clock's parent\n");
 		__clk_enable(clk->parent);
+	}
+
 	if (clk->usecount++ == 0) {
+		pr_debug("Clocks: inside if block for %s\n", clk->name);
 		if (clk->flags & CLK_PSC)
+		{
+			pr_debug("Clocks: davinci code\n");
 			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
 					   true, clk->flags);
+		}
 		else if (clk->clk_enable)
+		{
+			pr_debug("Clocks: enabling actual clock now\n")
 			clk->clk_enable(clk);
+		}
 	}
+
+	pr_debug("Clocks: enabling complete\n");
 }
 
 static void __clk_disable(struct clk *clk)
@@ -99,8 +114,12 @@ int clk_enable(struct clk *clk)
 
 	if (!clk)
 		return 0;
-	else if (IS_ERR(clk))
+	
+	if (IS_ERR(clk))
+	{
+		pr_debug("Clocks: clock %s is invalid!\n", clk->name);
 		return -EINVAL;
+	}
 
 	spin_lock_irqsave(&clockfw_lock, flags);
 	__clk_enable(clk);

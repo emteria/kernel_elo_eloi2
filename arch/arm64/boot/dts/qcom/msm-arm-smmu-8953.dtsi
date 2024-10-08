@@ -20,84 +20,43 @@
 		qcom,tz-device-id = "GPU";
 		reg = <0x1c40000 0x10000>;
 		#iommu-cells = <1>;
-		#global-interrupts = <0>;
-		interrupts =  <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 232 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
+		#global-interrupts = <1>;
+		interrupts = <GIC_SPI 199 IRQ_TYPE_NONE>,
+		             <GIC_SPI 225 IRQ_TYPE_NONE>,
+		             <GIC_SPI 232 IRQ_TYPE_NONE>,
+		             <GIC_SPI 233 IRQ_TYPE_NONE>,
+		             <GIC_SPI 234 IRQ_TYPE_NONE>;
 		qcom,dynamic;
 		qcom,use-3-lvl-tables;
 		qcom,enable-static-cb;
 		qcom,enable-smmu-halt;
 		qcom,skip-init;
+		qcom,no-smr-check;
+		qcom,register-save;
 		vdd-supply = <&gdsc_oxili_cx>;
-		qcom,regulator-names = "vdd";
 		clocks = <&clock_gcc_gfx clk_gcc_oxili_ahb_clk>,
 			<&clock_gcc_gfx clk_gcc_bimc_gfx_clk>;
 		clock-names = "gpu_ahb_clk", "gcc_bimc_gfx_clk";
-	};
-
-	/* A test device to test the SMMU operation */
-	kgsl_iommu_test_device0 {
-		status = "disabled";
-		compatible = "iommu-debug-test";
-		/* The SID should be valid one to get the proper
-		 *SMR,S2CR indices.
-		 */
-		iommus = <&kgsl_smmu 0x0>;
+                #clock-cells = <1>;
 	};
 
 	apps_iommu: qcom,iommu@1e00000 {
 		status = "okay";
 		compatible = "qcom,qsmmu-v500";
-		reg = <0x1e00000 0x40000>,
-			<0x1ee2000 0x20>;
-		reg-names = "base", "tcu-base";
-		#iommu-cells = <2>;
-		qcom,tz-device-id = "APPS";
-		qcom,skip-init;
-		qcom,enable-static-cb;
-		qcom,use-3-lvl-tables;
-		qcom,disable-atos;
-		#global-interrupts = <0>;
 		#size-cells = <1>;
 		#address-cells = <1>;
 		ranges;
-		interrupts = <GIC_SPI 253 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 254 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 255 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-				<GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0x1e00000 0x40000>;
+		reg-names = "iommu_base";
+                #iommu-cells = <2>;
+		interrupts = <0 41 0>, <0 38 0>;
+		interrupt-names = "global_cfg_NS_irq", "global_cfg_S_irq";
+		label = "apps_iommu";
+		qcom,iommu-secure-id = <17>;
 		clocks = <&clock_gcc clk_gcc_smmu_cfg_clk>,
 			  <&clock_gcc clk_gcc_apss_tcu_async_clk>;
 		clock-names = "iface_clk", "core_clk";
+		qcom,cb-base-offset = <0x20000>;
 
                 adsp_elf: qcom,iommu-ctx@1e20000 {
                         compatible = "qcom,msm-smmu-v2-ctx";
