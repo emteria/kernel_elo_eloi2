@@ -246,8 +246,8 @@ struct msm_mdp_interface {
 				do_div(out, 2 * max_bright);\
 				} while (0)
 #define MDSS_BL_TO_BRIGHT(out, v, bl_max, max_bright) do {\
-				out = (2 * ((v) * (max_bright)) + (bl_max));\
-				do_div(out, 2 * bl_max);\
+				out = ((v) * (max_bright));\
+				do_div(out, bl_max);\
 				} while (0)
 
 struct mdss_fb_file_info {
@@ -321,7 +321,6 @@ struct msm_fb_data_type {
 	u32 bl_level_scaled;
 	struct mutex bl_lock;
 	struct mutex mdss_sysfs_lock;
-	struct mutex param_lock;
 	bool ipc_resume;
 
 	struct platform_device *pdev;

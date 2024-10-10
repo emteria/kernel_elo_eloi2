@@ -830,7 +830,6 @@ static int mdss_mdp_video_ctx_stop(struct mdss_mdp_ctl *ctl,
 	u32 frame_rate = 0;
 
 	mutex_lock(&ctl->offlock);
-	mutex_lock(&ctl->mfd->param_lock);
 	if (ctx->timegen_en) {
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK, NULL,
 			CTL_INTF_EVENT_FLAG_DEFAULT);
@@ -865,7 +864,6 @@ static int mdss_mdp_video_ctx_stop(struct mdss_mdp_ctl *ctl,
 
 	ctx->ref_cnt--;
 end:
-	mutex_unlock(&ctl->mfd->param_lock);
 	mutex_unlock(&ctl->offlock);
 	return rc;
 }
@@ -1206,7 +1204,16 @@ static int mdss_mdp_video_vfp_fps_update(struct mdss_mdp_video_ctx *ctx,
 	new_vsync_period_f0 = (vsync_period * hsync_period);
 
 	mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
+			current_vsync_period_f0 | 0x800000);
+	if (new_vsync_period_f0 & 0x800000) {
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
 			new_vsync_period_f0);
+	} else {
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
+			new_vsync_period_f0 | 0x800000);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
+			new_vsync_period_f0 & 0x7fffff);
+	}
 
 	pr_debug("if:%d vtotal:%d htotal:%d f0:0x%x nw_f0:0x%x\n",
 		ctx->intf_num, vsync_period, hsync_period,
@@ -1337,7 +1344,6 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl, int new_fps)
 	}
 
 	mutex_lock(&ctl->offlock);
-	mutex_lock(&ctl->mfd->param_lock);
 	pdata = ctl->panel_data;
 	if (pdata == NULL) {
 		pr_err("%s: Invalid panel data\n", __func__);
@@ -1426,11 +1432,6 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl, int new_fps)
 			}
 
 			/*
-			 * Make sure controller setting committed
-			 */
-			wmb();
-
-			/*
 			 * MDP INTF registers support DB on targets
 			 * starting from MDP v1.5.
 			 */
@@ -1472,7 +1473,6 @@ exit_dfps:
 
 end:
 	MDSS_XLOG(ctl->num, new_fps, XLOG_FUNC_EXIT);
-	mutex_unlock(&ctl->mfd->param_lock);
 	mutex_unlock(&ctl->offlock);
 	return rc;
 }
@@ -1743,9 +1743,7 @@ static void mdss_mdp_fetch_start_config(struct mdss_mdp_video_ctx *ctx,
 	h_total = mdss_panel_get_htotal(pinfo, true);
 
 	fetch_start = (v_total - pinfo->prg_fet) * h_total + 1;
-
-	fetch_enable = mdp_video_read(ctx, MDSS_MDP_REG_INTF_CONFIG);
-	fetch_enable |= BIT(31);
+	fetch_enable = BIT(31);
 
 	if (pinfo->dynamic_fps && (pinfo->dfps_update ==
 			DFPS_IMMEDIATE_CLK_UPDATE_MODE))
