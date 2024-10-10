@@ -369,9 +369,7 @@ int clk_enable(struct clk *clk)
 		return 0;
 	if (IS_ERR(clk))
 		return -EINVAL;
-
 	name = clk->dbg_name;
-	pr_err("enabling clock %s\n", name);
 
 	spin_lock_irqsave(&clk->lock, flags);
 	WARN(!clk->prepare_count,
@@ -382,26 +380,19 @@ int clk_enable(struct clk *clk)
 		ret = clk_enable(parent);
 		if (ret)
 			goto err_enable_parent;
-
 		ret = clk_enable(clk->depends);
 		if (ret)
 			goto err_enable_depends;
 
 		trace_clock_enable(name, 1, smp_processor_id());
-
 		if (clk->ops->enable)
-		{
 			ret = clk->ops->enable(clk);
-		}
-
 		if (ret)
 			goto err_enable_clock;
 	}
-
 	clk->count++;
 	spin_unlock_irqrestore(&clk->lock, flags);
 
-    pr_err("clock enabling succeeded for %s\n", name);
 	return 0;
 
 err_enable_clock:
@@ -410,8 +401,6 @@ err_enable_depends:
 	clk_disable(parent);
 err_enable_parent:
 	spin_unlock_irqrestore(&clk->lock, flags);
-
-	pr_err("clock enabling failed for %s\n", name);
 	return ret;
 }
 EXPORT_SYMBOL(clk_enable);
@@ -1385,9 +1374,9 @@ static int __init clock_late_init(void)
 	int ret = 0;
 
 	pr_info("%s: Removing enables held for handed-off clocks\n", __func__);
+
 	mutex_lock(&msm_clock_init_lock);
 
-	pr_info("%s: Looping #1\n", __func__);
 	list_for_each_entry_safe(initdata, initdata_temp,
 					&initdata_list, list) {
 		ret = initdata->late_init();
@@ -1396,28 +1385,22 @@ static int __init clock_late_init(void)
 				initdata);
 	}
 
-	pr_info("%s: Looping #2\n", __func__);
 	list_for_each_entry_safe(h, h_temp, &handoff_list, list) {
 		clk_disable_unprepare(h->clk);
 		list_del(&h->list);
 		kfree(h);
 	}
 
-	pr_info("%s: Looping #3\n", __func__);
 	list_for_each_entry_safe(v, v_temp, &handoff_vdd_list, list) {
 		unvote_vdd_level(v->vdd_class, v->vdd_class->num_levels - 1);
 		list_del(&v->list);
 		kfree(v);
 	}
 
-
-	pr_info("%s: Unlocking mutex\n", __func__);
 	mutex_unlock(&msm_clock_init_lock);
 
-	pr_info("%s: Finishing\n", __func__);
 	return ret;
 }
 /* clock_late_init should run only after all deferred probing
  * (excluding DLKM probes) has completed.
  */
-late_initcall_sync(clock_late_init);

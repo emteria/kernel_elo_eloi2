@@ -1025,13 +1025,14 @@ static int __init clock_cpu_lpm_get_latency(void)
 	if (!ofnode)
 		return 0;
 
-	rc = lpm_get_latency(&perf_clk.latency_lvl,
-			&perf_clk.cpu_latency_no_l2_pc_us);
+    rc = -1;
+//	rc = lpm_get_latency(&perf_clk.latency_lvl,
+//			&perf_clk.cpu_latency_no_l2_pc_us);
 	if (rc < 0)
 		pr_err("Failed to get the L2 PC value for perf\n");
 
-	rc = lpm_get_latency(&pwr_clk.latency_lvl,
-			&pwr_clk.cpu_latency_no_l2_pc_us);
+//	rc = lpm_get_latency(&pwr_clk.latency_lvl,
+//			&pwr_clk.cpu_latency_no_l2_pc_us);
 	if (rc < 0)
 		pr_err("Failed to get the L2 PC value for pwr\n");
 
