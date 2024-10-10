@@ -31,6 +31,7 @@
 		qcom,enable-smmu-halt;
 		qcom,skip-init;
 		vdd-supply = <&gdsc_oxili_cx>;
+		qcom,regulator-names = "vdd";
 		clocks = <&clock_gcc_gfx clk_gcc_oxili_ahb_clk>,
 			<&clock_gcc_gfx clk_gcc_bimc_gfx_clk>;
 		clock-names = "gpu_ahb_clk", "gcc_bimc_gfx_clk";
