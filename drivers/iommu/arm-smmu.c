@@ -924,9 +924,7 @@ static int arm_smmu_enable_clocks(struct arm_smmu_power_resources *pwr)
 {
 	int i, ret = 0;
 
-    dev_err(pwr->dev, "===> total of %d clocks to enable\n", pwr->num_clocks);
 	for (i = 0; i < pwr->num_clocks; ++i) {
-		dev_err(pwr->dev, "===> enabling clock %d\n", i);
 		ret = clk_enable(pwr->clocks[i]);
 		if (ret) {
 			dev_err(pwr->dev, "Couldn't enable clock #%d\n", i);
@@ -1018,7 +1016,6 @@ static int arm_smmu_power_on_atomic(struct arm_smmu_power_resources *pwr)
 	int ret = 0;
 	unsigned long flags;
 
-	dev_err(pwr->dev, "===> before spin_lock_irqsave\n");
 	spin_lock_irqsave(&pwr->clock_refs_lock, flags);
 	if (pwr->clock_refs_count > 0) {
 		pwr->clock_refs_count++;
@@ -1026,7 +1023,6 @@ static int arm_smmu_power_on_atomic(struct arm_smmu_power_resources *pwr)
 		return 0;
 	}
 
-	dev_err(pwr->dev, "===> before arm_smmu_enable_clocks\n");
 	ret = arm_smmu_enable_clocks(pwr);
 	if (!ret)
 		pwr->clock_refs_count = 1;
@@ -1119,23 +1115,14 @@ static int arm_smmu_power_on(struct arm_smmu_power_resources *pwr)
 {
 	int ret;
 
-    dev_err(pwr->dev, "===> before arm_smmu_power_on_slow for %s\n", dev_name(pwr->dev));
 	ret = arm_smmu_power_on_slow(pwr);
 	if (ret)
-	{
-		dev_err(pwr->dev, "===> arm_smmu_power_on_slow failed\n");
 		return ret;
-	}
 
-    dev_err(pwr->dev, "===> before arm_smmu_power_on_atomic for %s\n", dev_name(pwr->dev));
 	ret = arm_smmu_power_on_atomic(pwr);
 	if (ret)
-	{
-		dev_err(pwr->dev, "===> arm_smmu_power_on_atomic failed\n");
 		goto out_disable;
-	}
 
-    dev_err(pwr->dev, "===> arm_smmu_power_on successful for %s\n", dev_name(pwr->dev));
 	return 0;
 
 out_disable:
