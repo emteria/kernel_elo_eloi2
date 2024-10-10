@@ -379,22 +379,18 @@ int clk_enable(struct clk *clk)
 	if (clk->count == 0) {
 		parent = clk->parent;
 
-		pr_err("enabling clock's parent\n");
 		ret = clk_enable(parent);
 		if (ret)
 			goto err_enable_parent;
 
-		pr_err("enabling clock's dependents\n");
 		ret = clk_enable(clk->depends);
 		if (ret)
 			goto err_enable_depends;
 
-		pr_err("Tracing clock enablement\n");
 		trace_clock_enable(name, 1, smp_processor_id());
 
 		if (clk->ops->enable)
 		{
-			pr_err("enable real clock\n");
 			ret = clk->ops->enable(clk);
 		}
 
@@ -402,7 +398,6 @@ int clk_enable(struct clk *clk)
 			goto err_enable_clock;
 	}
 
-	pr_err("increase clock ref count\n");
 	clk->count++;
 	spin_unlock_irqrestore(&clk->lock, flags);
 
