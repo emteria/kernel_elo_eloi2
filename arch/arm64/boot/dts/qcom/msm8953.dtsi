@@ -737,12 +737,6 @@
 		};
 	};
 
-	rpm_bus: qcom,rpm-smd {
-		compatible = "qcom,rpm-smd";
-		rpm-channel-name = "rpm_requests";
-		rpm-channel-type = <15>; /* SMD_APPS_RPM */
-	};
-
 	qcom,ipc-spinlock@1905000 {
 		compatible = "qcom,ipc-spinlock-sfpb";
 		reg = <0x1905000 0x8000>;
@@ -831,6 +825,12 @@
 			0xb1b80b8 0xb0880b8 0xb0980b8 0xb0a80b8 0xb0b80b8>;
 	};
 
+	rpm_bus: qcom,rpm-smd {
+		compatible = "qcom,rpm-smd";
+		rpm-channel-name = "rpm_requests";
+		rpm-channel-type = <15>; /* SMD_APPS_RPM */
+	};
+
 	qcom,msm-rtb {
 		compatible = "qcom,msm-rtb";
 		qcom,rtb-size = <0x100000>;
@@ -872,93 +872,86 @@
 
 	jtag_mm0: jtagmm@619c000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x619c000 0x1000>,
-		      <0x6190000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x619c000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU0>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm1: jtagmm@619d000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x619d000 0x1000>,
-		      <0x6192000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x619d000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU1>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm2: jtagmm@619e000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x619e000 0x1000>,
-		      <0x6194000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x619e000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU2>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm3: jtagmm@619f000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x619f000 0x1000>,
-		      <0x6196000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x619f000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU3>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm4: jtagmm@61bc000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x61bc000 0x1000>,
-		      <0x61b0000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x61bc000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU4>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm5: jtagmm@61bd000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x61bd000 0x1000>,
-		      <0x61b2000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x61bd000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU5>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm6: jtagmm@61be000 {
 		compatible = "qcom,jtagv8-mm";
-		reg = <0x61be000 0x1000>,
-		      <0x61b4000 0x1000>;
-		reg-names = "etm-base", "debug-base";
+		reg = <0x61be000 0x1000>;
+		reg-names = "etm-base";
 
 		qcom,coresight-jtagmm-cpu = <&CPU6>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
+		clock-names = "core_clk";
 	};
 
 	jtag_mm7: jtagmm@61bf000 {
@@ -971,33 +964,7 @@
 
 		clocks = <&clock_gcc clk_qdss_clk>,
 			 <&clock_gcc clk_qdss_a_clk>;
-		clock-names = "core_clk", "core_a_clk";
-	};
-
-	ipa_hw: qcom,ipa@07900000 {
-		compatible = "qcom,ipa";
-		reg = <0x07900000 0x4effc>, <0x07904000 0x26934>;
-		reg-names = "ipa-base", "bam-base";
-		interrupts = <0 228 0>,
-				<0 230 0>;
-		interrupt-names = "ipa-irq", "bam-irq";
-		qcom,ipa-hw-ver = <6>; /* IPA core version = IPAv2.6L */
-		qcom,ipa-hw-mode = <0>; /* IPA hw type = Normal */
-		qcom,wan-rx-ring-size = <192>; /* IPA WAN-rx-ring-size*/
-		qcom,lan-rx-ring-size = <192>; /* IPA LAN-rx-ring-size*/
 		clock-names = "core_clk";
-		clocks = <&clock_gcc clk_ipa_clk>;
-		qcom,ee = <0>;
-		qcom,use-ipa-tethering-bridge;
-		qcom,modem-cfg-emb-pipe-flt;
-		qcom,msm-bus,name = "ipa";
-		qcom,msm-bus,num-cases = <3>;
-		qcom,msm-bus,num-paths = <1>;
-		qcom,msm-bus,vectors-KBps =
-		<90 512 0 0>, /* No BIMC vote (ab=0 Mbps, ib=0 Mbps ~ 0MHZ) */
-		<90 512 100000 800000>, /* SVS (ab=100, ib=800 ~ 50MHz) */
-		<90 512 100000 1200000>; /* PERF (ab=100, ib=1200 ~ 75MHz) */
-		qcom,bus-vector-names = "MIN", "SVS", "PERF";
 	};
 
 	qcom,rmnet-ipa {
@@ -1306,6 +1273,32 @@
 
 		qcom,large-address-bus;
 		status = "disabled";
+	};
+
+	ipa_hw: qcom,ipa@07900000 {
+		compatible = "qcom,ipa";
+		reg = <0x07900000 0x4effc>, <0x07904000 0x26934>;
+		reg-names = "ipa-base", "bam-base";
+		interrupts = <0 228 0>,
+				<0 230 0>;
+		interrupt-names = "ipa-irq", "bam-irq";
+		qcom,ipa-hw-ver = <6>; /* IPA core version = IPAv2.6L */
+		qcom,ipa-hw-mode = <0>; /* IPA hw type = Normal */
+		qcom,wan-rx-ring-size = <192>; /* IPA WAN-rx-ring-size*/
+		qcom,lan-rx-ring-size = <192>; /* IPA LAN-rx-ring-size*/
+		clock-names = "core_clk";
+		clocks = <&clock_gcc clk_ipa_clk>;
+		qcom,ee = <0>;
+		qcom,use-ipa-tethering-bridge;
+		qcom,modem-cfg-emb-pipe-flt;
+		qcom,msm-bus,name = "ipa";
+		qcom,msm-bus,num-cases = <3>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+		<90 512 0 0>, /* No BIMC vote (ab=0 Mbps, ib=0 Mbps ~ 0MHZ) */
+		<90 512 100000 800000>, /* SVS (ab=100, ib=800 ~ 50MHz) */
+		<90 512 100000 1200000>; /* PERF (ab=100, ib=1200 ~ 75MHz) */
+		qcom,bus-vector-names = "MIN", "SVS", "PERF";
 	};
 
 	spmi_bus: qcom,spmi@200f000 {
@@ -1722,9 +1715,9 @@
 #include "pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
 #include "msm-gdsc-8916.dtsi"
-//#include "msm8953-mdss.dtsi"
-//#include "msm8953-mdss-pll.dtsi"
-//#include "msm8953-audio.dtsi"
+#include "msm8953-mdss.dtsi"
+#include "msm8953-mdss-pll.dtsi"
+#include "msm8953-audio.dtsi"
 
 &gdsc_venus {
 	clock-names = "bus_clk", "core_clk";
