@@ -81,6 +81,11 @@
 			size = <0 0x09800000>;
 		};
 
+		smem_mem: smem_region@86300000 {
+			reg = <0x0 0x86300000 0x0 0x100000>;
+			no-map;
+		};
+
 		qseecom_mem: qseecom_region@0 {
 			compatible = "shared-dma-pool";
 			reusable;
@@ -166,8 +171,6 @@
 #include "msm-arm-smmu-8953.dtsi"
 #include "msm8953-vidc.dtsi"
 #include "msm8953-gpu.dtsi"
-#include "msm8953-mdss.dtsi"
-#include "msm8953-mdss-pll.dtsi"
 #include "msm8953-smp2p.dtsi"
 
 &soc {
@@ -887,6 +890,7 @@
 
 	qcom,smem@86300000 {
 		compatible = "qcom,smem";
+		memory-region = <&smem_mem>;
 		reg = <0x86300000 0x100000>,
 			<0x0b011008 0x4>,
 			<0x60000 0x8000>,
@@ -1750,6 +1754,7 @@
 #include "pm8953-rpm-regulator.dtsi"
 #include "pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
+#include "msm-pmi8950.dtsi"
 #include "msm-gdsc-8916.dtsi"
 #include "msm8953-mdss.dtsi"
 #include "msm8953-mdss-pll.dtsi"

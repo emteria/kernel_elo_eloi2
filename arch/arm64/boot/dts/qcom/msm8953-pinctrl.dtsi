@@ -1791,6 +1791,34 @@
 			};
 		};
 
+		extio_gpio: extio_gpio {
+			extio_in_default: extio_in_default {
+				mux {
+					pins = "gpio140", "gpio141";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio140", "gpio141";
+					drive-strength = <2>; /* 2 MA */
+					bias-pull-up; /* PULL UP*/
+				};
+			};
+
+			extio_out_default: extio_out_default {
+				mux {
+					pins = "gpio139";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio139";
+					drive-strength = <2>; /* 2 MA */
+					bias-disable;
+				};
+			};
+		};
+
 		ptdet_io: ptdet_io {
 			ptdet_io_default: ptdet_io_default {
 				mux {

@@ -15,9 +15,10 @@
 
 #include "apq8053.dtsi"
 #include "msm8953-mtp.dtsi"
-//#include "apq8053-oem.dtsi"
-//#include "apq8053-mtp-edp-hdmi.dtsi"//Leo Guo add to support all panel in one image
-//#include "apq8053-mtp-aaio2.dtsi"
+#include "apq8053-oem.dtsi"
+#include "apq8053-mtp-edp-hdmi.dtsi"//Leo Guo add to support all panel in one image
+#include "apq8053-mtp-aaio2.dtsi"
+
 / {
 	model = "Qualcomm Technologies, Inc. APQ8053 MTP 10";
 	compatible = "qcom,apq8053-mtp", "qcom,apq8053", "qcom,mtp";
