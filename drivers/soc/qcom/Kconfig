@@ -321,6 +321,15 @@ config MSM_GLADIATOR_HANG_DETECT
          gladiator hang detection and collects the context for the
          gladiator hang.
 
+config MSM_QDSP6_APRV2
+        bool "Audio QDSP6 APRv2 support"
+        depends on MSM_SMD
+        help
+          Enable APRv2 IPC protocol support between
+          application processor and QDSP6. APR is
+          used by audio driver to configure QDSP6's
+          ASM, ADM and AFE.
+
 config MSM_GLADIATOR_ERP
        tristate "GLADIATOR coherency interconnect error reporting driver"
        help

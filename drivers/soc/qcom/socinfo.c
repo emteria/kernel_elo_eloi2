@@ -116,6 +116,22 @@ const char *qrd_hw_platform_subtype[] = {
 };
 
 enum {
+	PLATFORM_SUBTYPE_MOJAVE_V1 = 0x0,
+	PLATFORM_SUBTYPE_MMX = 0x1,
+	PLATFORM_SUBTYPE_MOJAVE_FULL_V2 = 0x2,
+	PLATFORM_SUBTYPE_MOJAVE_BARE_V2 = 0x3,
+	PLATFORM_SUBTYPE_ADP_INVALID,
+};
+
+const char *adp_hw_platform_subtype[] = {
+	[PLATFORM_SUBTYPE_MOJAVE_V1] = "MOJAVE_V1",
+	[PLATFORM_SUBTYPE_MMX] = "MMX",
+	[PLATFORM_SUBTYPE_MOJAVE_FULL_V2] = "_MOJAVE_V2_FULL",
+	[PLATFORM_SUBTYPE_MOJAVE_BARE_V2] = "_MOJAVE_V2_BARE",
+	[PLATFORM_SUBTYPE_ADP_INVALID] = "INVALID",
+};
+
+enum {
 	PLATFORM_SUBTYPE_UNKNOWN = 0x0,
 	PLATFORM_SUBTYPE_CHARM = 0x1,
 	PLATFORM_SUBTYPE_STRANGE = 0x2,
@@ -666,6 +682,81 @@ static struct socinfo_v0_1 dummy_socinfo = {
 	.version = 1,
 };
 
+/*OEM, 20170125, add OEM SMEM interface {*/
+smem_vendor_id0_bl_data *vendor0_data = NULL;
+smem_vendor_id1_apps_data *vendor1_data = NULL;
+
+PROJECT_ID_TYPE socinfo_get_project_id(void)
+{
+	return (vendor0_data) ? vendor0_data->hw_id.project_id : UNKNOWN_PR_ID;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_project_id);
+
+BOARD_ID_TYPE socinfo_get_board_id(void)
+{
+	return (vendor0_data) ? vendor0_data->hw_id.board_id : UNKNOWN_BOARD_ID;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_board_id);
+
+PANEL_ID_TYPE socinfo_get_panel_id(void)
+{
+	return (vendor0_data) ? vendor0_data->hw_id.panel_id : UNKNOWN_PANEL_ID;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_panel_id);
+
+unsigned int socinfo_get_hw_id(void)
+{
+	uint32_t hw_id = 0x00;
+
+	if( vendor0_data == NULL)
+	{
+		pr_err("Invalid OEM hw id data\n");
+		return hw_id;
+	}
+
+	hw_id = hw_id | ( (vendor0_data->hw_id.project_id & 0xF) << 20 ) | ( ( vendor0_data->hw_id.board_id &0xF) << 8 ) | ( (vendor0_data->hw_id.panel_id & 0xFF) << 12);
+	return hw_id;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_hw_id);
+/*pp,tony.l.cai,20170222,add oem ddr_size sysfs{*/
+unsigned int socinfo_get_ddr_size(void)
+{
+	return (vendor0_data) ? vendor0_data->ddr_size : 0;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_ddr_size);
+
+unsigned int socinfo_get_ddr_type(void)
+{
+	return (vendor0_data) ? vendor0_data->ddr_type : 0;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_ddr_type);
+
+unsigned int socinfo_get_ddr_vendor(void)
+{
+	return (vendor0_data) ? vendor0_data->ddr_vendor : 0;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_ddr_vendor);
+/*}pp,tony.l.cai,20170222,add oem ddr_size sysfs*/
+char *socinfo_get_sn(void)
+{
+	return (vendor1_data) ? (vendor1_data->sn_valid ? (char *)vendor1_data->sn : NULL) : NULL;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_sn);
+
+char *socinfo_get_ethaddr(void)
+{
+	return (vendor1_data) ? (vendor1_data->ethaddr_valid ? (char *)vendor1_data->ethaddr : NULL) : NULL;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_ethaddr);
+
+char *socinfo_get_wifiaddr(void)
+{
+	return (vendor1_data) ? (vendor1_data->wifiaddr_valid ? (char *)vendor1_data->wifiaddr : NULL) : NULL;
+}
+EXPORT_SYMBOL_GPL(socinfo_get_wifiaddr);
+/*OEM, 20170125, add OEM SMEM interface }*/
+
+
 uint32_t socinfo_get_id(void)
 {
 	return (socinfo) ? socinfo->v0_1.id : 0;
@@ -1023,6 +1114,14 @@ msm_get_platform_subtype(struct device *dev,
 		}
 		return snprintf(buf, PAGE_SIZE, "%-.32s\n",
 					qrd_hw_platform_subtype[hw_subtype]);
+	}
+	if (HW_PLATFORM_ADP == socinfo_get_platform_type()) {
+		if (hw_subtype >= PLATFORM_SUBTYPE_ADP_INVALID) {
+			pr_err("Invalid hardware platform sub type for adp found\n");
+			hw_subtype = PLATFORM_SUBTYPE_ADP_INVALID;
+		}
+		return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+					adp_hw_platform_subtype[hw_subtype]);
 	} else {
 		if (hw_subtype >= PLATFORM_SUBTYPE_INVALID) {
 			pr_err("Invalid hardware platform subtype\n");
@@ -1375,6 +1474,109 @@ msm_get_images(struct device *dev,
 	return pos;
 }
 
+/*OEM, Terry.Yan, 20170125, add OEM soc sysfs{*/
+static ssize_t
+oem_get_project_id(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%x\n",
+			socinfo_get_project_id());
+}
+
+static ssize_t
+oem_get_board_id(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%x\n",
+			socinfo_get_board_id());
+}
+
+static ssize_t
+oem_get_panel_id(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%x\n",
+			socinfo_get_panel_id());
+}
+
+static ssize_t
+oem_get_hw_id(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%x\n",
+			socinfo_get_hw_id());
+}
+
+static ssize_t
+oem_get_oem_sn(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	if( socinfo_get_sn() == NULL)
+		return snprintf(buf, PAGE_SIZE, "0123456789\n"); //default value
+	else
+		return snprintf(buf, PAGE_SIZE, "%s\n",
+				socinfo_get_sn());
+}
+
+/*pp,tony.l.cai,20170222,add oem ddr info sysfs{*/
+static ssize_t
+oem_get_ddr_size(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			socinfo_get_ddr_size());
+}
+
+static ssize_t
+oem_get_ddr_type(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			socinfo_get_ddr_type());
+}
+
+static ssize_t
+oem_get_ddr_vendor(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			socinfo_get_ddr_vendor());
+}
+
+/*}pp,tony.l.cai,20170222,add oem ddr info sysfs*/
+
+static struct device_attribute project_id =
+	__ATTR(project_id, S_IRUGO, oem_get_project_id, NULL);
+
+static struct device_attribute board_id =
+	__ATTR(board_id, S_IRUGO, oem_get_board_id, NULL);
+
+static struct device_attribute panel =
+	__ATTR(panel, S_IRUGO, oem_get_panel_id, NULL);
+
+static struct device_attribute hw_id =
+	__ATTR(hw_id, S_IRUGO, oem_get_hw_id, NULL);
+
+static struct device_attribute oem_sn =
+	__ATTR(oem_sn, S_IRUGO, oem_get_oem_sn, NULL);
+/*OEM,  Terry.Yan, 20170125, add OEM soc sysfs }*/
+
+/*pp,tony.l.cai,20170222,add oem ddr info sysfs{*/
+static struct device_attribute ddr_size =
+	__ATTR(ddr_size, S_IRUGO, oem_get_ddr_size, NULL);
+static struct device_attribute ddr_type =
+	__ATTR(ddr_type, S_IRUGO, oem_get_ddr_type, NULL);
+static struct device_attribute ddr_vendor =
+	__ATTR(ddr_vendor, S_IRUGO, oem_get_ddr_vendor, NULL);
+/*}pp,tony.l.cai,20170222,add oem ddr info sysfs*/
 static struct device_attribute msm_soc_attr_raw_version =
 	__ATTR(raw_version, S_IRUGO, msm_get_raw_version,  NULL);
 
@@ -2017,6 +2219,17 @@ int __init socinfo_init(void)
 
 	if (socinfo_init_done)
 		return 0;
+
+	/*OEM, Terry.Yan, 20170125, add OEM SMEM interface {*/
+	vendor0_data = smem_get_entry(SMEM_ID_VENDOR0, &size, 0, SMEM_ANY_HOST_FLAG);
+	if (IS_ERR_OR_NULL(vendor0_data)) {
+		pr_err("Alloc share memory SMEM_ID_VENDOR0 failed\n");
+	}
+	vendor1_data = smem_get_entry(SMEM_ID_VENDOR1, &size, 0, SMEM_ANY_HOST_FLAG);
+	if (IS_ERR_OR_NULL(vendor1_data)) {
+		pr_err("Alloc share memory SMEM_ID_VENDOR1 failed\n");
+	}
+	/*OEM, Terry.Yan, 20170125, add OEM SMEM interface {*/
 
 	socinfo = smem_get_entry(SMEM_HW_SW_BUILD_ID, &size, 0,
 				 SMEM_ANY_HOST_FLAG);

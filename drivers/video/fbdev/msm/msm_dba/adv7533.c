@@ -10,7 +10,8 @@
  * GNU General Public License for more details.
  *
  */
-
+#include <linux/module.h>
+#include <linux/moduleparam.h>//Leo Guo add for ftd to read ic id
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -28,6 +29,11 @@
 #include <linux/pm_runtime.h>
 #include "msm_dba_internal.h"
 #include <linux/mdss_io_util.h>
+#include "ddcci_i2c.h"
+
+//Leo Guo add for ftd to read ic id
+int hdmi_ic_version=0;
+module_param(hdmi_ic_version, int, 0444);
 
 #define ADV7533_REG_CHIP_REVISION (0x00)
 #define ADV7533_DSI_CEC_I2C_ADDR_REG (0xE1)
@@ -82,10 +88,11 @@
 #define CFG_CEC_INTERRUPTS       BIT(3)
 
 #define MAX_OPERAND_SIZE	14
-#define CEC_MSG_SIZE            (MAX_OPERAND_SIZE + 2)
+#define MAX_CEC_FRAME_SIZE      (MAX_OPERAND_SIZE + 2)
+#define CEC_MSG_SIZE            (MAX_CEC_FRAME_SIZE + 1)
 
 enum adv7533_i2c_addr {
-	I2C_ADDR_MAIN = 0x3D,
+	I2C_ADDR_MAIN = 0x39,
 	I2C_ADDR_CEC_DSI = 0x3C,
 };
 
@@ -407,9 +414,19 @@ static int adv7533_read_device_rev(struct adv7533 *pdata)
 	u8 rev = 0;
 	int ret;
 
-	ret = adv7533_read(pdata, I2C_ADDR_MAIN, ADV7533_REG_CHIP_REVISION,
-							&rev, 1);
+	ret = adv7533_read(pdata, I2C_ADDR_MAIN, ADV7533_REG_CHIP_REVISION, &rev, 1);
+	printk("adv7533_read_device_rev rev is %x\n",rev);
 
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x00, &rev, 1);
+	printk("adv7533_read_chipid[00] is %x\n", rev);
+
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x01, &rev, 1);
+	printk("adv7533_read_chipid[01] is %x\n", rev);
+
+	ret = adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x02, &rev, 1);
+	printk("adv7533_read_chipid[02] is %x\n", rev);
+
+	hdmi_ic_version=rev;//Leo Guo add for ftd to read ic id
 	return ret;
 }
 
@@ -796,18 +813,18 @@ static int adv7533_cec_prepare_msg(struct adv7533 *pdata, u8 *msg, u32 size)
 	op_sz = size - 2;
 
 	/* write header */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x70, msg[0]);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x70, msg[0]);
 
 	/* write opcode */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x71, msg[1]);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x71, msg[1]);
 
 	/* write operands */
 	for (i = 0; i < op_sz && i < MAX_OPERAND_SIZE; i++) {
 		pr_debug("%s: writing operands\n", __func__);
-		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x72 + i, msg[i + 2]);
+		ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x72 + i, msg[i + 2]);
 	}
 
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x80, size);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x80, size);
 
 end:
 	return ret;
@@ -987,6 +1004,8 @@ static int adv7533_edid_read_init(struct adv7533 *pdata)
 		goto end;
 	}
 
+    ddcci_i2c_switch(I2C_SWITCH_TO_EDID);
+
 	/* initiate edid read in adv7533 */
 	adv7533_write(pdata, I2C_ADDR_MAIN, 0x41, 0x10);
 	adv7533_write(pdata, I2C_ADDR_MAIN, 0xC9, 0x13);
@@ -1047,9 +1066,6 @@ static int adv7533_enable_interrupts(struct adv7533 *pdata, int interrupts)
 	if (interrupts & CFG_EDID_INTERRUPTS)
 		reg_val |= EDID_INTERRUPTS;
 
-	if (interrupts & CFG_HDCP_INTERRUPTS)
-		reg_val |= HDCP_INTERRUPTS1;
-
 	if (reg_val != init_reg_val) {
 		pr_debug("%s: enabling 0x94 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x94, reg_val);
@@ -1058,9 +1074,6 @@ static int adv7533_enable_interrupts(struct adv7533 *pdata, int interrupts)
 	adv7533_read(pdata, I2C_ADDR_MAIN, 0x95, &reg_val, 1);
 
 	init_reg_val = reg_val;
-
-	if (interrupts & CFG_HDCP_INTERRUPTS)
-		reg_val |= HDCP_INTERRUPTS2;
 
 	if (interrupts & CFG_CEC_INTERRUPTS)
 		reg_val |= CEC_INTERRUPTS;
@@ -1093,9 +1106,6 @@ static int adv7533_disable_interrupts(struct adv7533 *pdata, int interrupts)
 	if (interrupts & CFG_EDID_INTERRUPTS)
 		reg_val &= ~EDID_INTERRUPTS;
 
-	if (interrupts & CFG_HDCP_INTERRUPTS)
-		reg_val &= ~HDCP_INTERRUPTS1;
-
 	if (reg_val != init_reg_val) {
 		pr_debug("%s: disabling 0x94 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x94, reg_val);
@@ -1104,9 +1114,6 @@ static int adv7533_disable_interrupts(struct adv7533 *pdata, int interrupts)
 	adv7533_read(pdata, I2C_ADDR_MAIN, 0x95, &reg_val, 1);
 
 	init_reg_val = reg_val;
-
-	if (interrupts & CFG_HDCP_INTERRUPTS)
-		reg_val &= ~HDCP_INTERRUPTS2;
 
 	if (interrupts & CFG_CEC_INTERRUPTS)
 		reg_val &= ~CEC_INTERRUPTS;
@@ -1163,10 +1170,9 @@ static void adv7533_intr_work(struct work_struct *work)
 
 		adv7533_notify_clients(&pdata->dev_info,
 			MSM_DBA_CB_HPD_CONNECT);
-	}
 
-	if (pdata->hdcp_enabled)
-		adv7533_handle_hdcp_intr(pdata, hdcp_cec_status);
+        ddcci_i2c_switch(I2C_SWITCH_TO_DDC);
+	}
 
 	if (pdata->cec_enabled)
 		adv7533_handle_cec_intr(pdata, hdcp_cec_status);
@@ -1182,10 +1188,6 @@ reset:
 
 	/* Re-enable EDID interrupts */
 	interrupts |= CFG_EDID_INTERRUPTS;
-
-	/* Re-enable HDCP interrupts */
-	if (pdata->hdcp_enabled)
-		interrupts |= CFG_HDCP_INTERRUPTS;
 
 	/* Re-enable CEC interrupts */
 	if (pdata->cec_enabled)
@@ -1550,6 +1552,29 @@ exit:
 
 }
 
+/* test pattern mode for adv7533, need dsi clk 594Mhz*/	// lewis 
+static int adv7533_test_pattern(struct adv7533 *pdata,
+								bool enable) 
+{ 
+	printk("\n[Lewis] adv7533_test_pattern() enable=%d\n\n", enable);
+
+	if (enable)	{ 
+ 		/*Set to test pattern*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x55, 0x80); 
+
+ 		/*Set HDMI enable*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x03, 0x89); 
+ 
+ 		/*Set to HDMI output*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0xAF, 0x16); 
+ 	} else { 
+ 		/*Disable test pattern*/ 
+ 		adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x55, 0x00); 
+ 	} 
+ 
+ 	return 0; 
+} 
+
 static int adv7533_video_on(void *client, bool on,
 	struct msm_dba_video_cfg *cfg, u32 flags)
 {
@@ -1560,7 +1585,11 @@ static int adv7533_video_on(void *client, bool on,
 
 	if (!pdata || !cfg) {
 		pr_err("%s: invalid platform data\n", __func__);
-		return -EINVAL;
+		if (!cfg) {
+			/* hdmi disable */
+			adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x03, 0x09);
+		}
+		return ret;
 	}
 
 	mutex_lock(&pdata->ops_mutex);
@@ -1600,6 +1629,20 @@ static int adv7533_video_on(void *client, bool on,
 
 	adv7533_write_array(pdata, adv7533_video_en,
 				sizeof(adv7533_video_en));
+
+	/* test pattern mode*/ 	// lewis
+	#if 1
+		ret = adv7533_test_pattern(pdata, true); 
+		if(ret < 0)	
+		{ 
+			printk("[Lewis] adi7533_test_pattern failed!!\n"); 
+		} 
+	#endif
+
+	if (pdata->hdcp_enabled)
+		adv7533_enable_interrupts(pdata, CFG_HDCP_INTERRUPTS);
+	else
+		adv7533_disable_interrupts(pdata, CFG_HDCP_INTERRUPTS);
 
 	mutex_unlock(&pdata->ops_mutex);
 	return ret;
@@ -1781,7 +1824,7 @@ static int adv7533_hdmi_cec_write(void *client, u32 size,
 		goto end;
 
 	/* Enable CEC msg tx with NACK 3 retries */
-	adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x81, 0x07);
+	ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x81, 0x07);
 end:
 	mutex_unlock(&pdata->ops_mutex);
 	return ret;
@@ -1928,7 +1971,7 @@ static int adv7533_register_dba(struct adv7533 *pdata)
 	client_ops->power_on        = adv7533_power_on;
 	client_ops->video_on        = adv7533_video_on;
 	client_ops->configure_audio = adv7533_configure_audio;
-	client_ops->hdcp_enable     = adv7533_hdcp_enable;
+	client_ops->hdcp_enable     = NULL;
 	client_ops->hdmi_cec_on     = adv7533_cec_enable;
 	client_ops->hdmi_cec_write  = adv7533_hdmi_cec_write;
 	client_ops->hdmi_cec_read   = adv7533_hdmi_cec_read;
@@ -2030,14 +2073,6 @@ static int adv7533_probe(struct i2c_client *client,
 
 	pdata->irq = gpio_to_irq(pdata->irq_gpio);
 
-	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
-		IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "adv7533", pdata);
-	if (ret) {
-		pr_err("%s: Failed to enable ADV7533 interrupt\n",
-			__func__);
-		goto err_irq;
-	}
-
 	dev_set_drvdata(&client->dev, &pdata->dev_info);
 	ret = msm_dba_helper_sysfs_init(&client->dev);
 	if (ret) {
@@ -2059,6 +2094,15 @@ static int adv7533_probe(struct i2c_client *client,
 	}
 
 	INIT_DELAYED_WORK(&pdata->adv7533_intr_work_id, adv7533_intr_work);
+
+//Leo Guo move here for ELO monitor display issue
+	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
+		IRQF_TRIGGER_LOW | IRQF_ONESHOT, "adv7533", pdata);
+	if (ret) {
+		pr_err("%s: Failed to enable ADV7533 interrupt\n",
+			__func__);
+		goto err_irq;
+	}
 
 	pm_runtime_enable(&client->dev);
 	pm_runtime_set_active(&client->dev);

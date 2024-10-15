@@ -38,3 +38,12 @@ config MSM_DBA_DSI_MOD_DISPLAY
 	select MSM_DBA_MOT_DBA
 	select PANEL_NOTIFICATIONS
 	default n
+
+config SN65DSI86_DSI_TO_EDP
+	bool "SN65DSI86 driver support DSI to eDP"
+	depends on MSM_DBA
+	default n
+	---help---
+	  Support for SN65DSI86 DSI to eDP display bridge driver. The driver
+	  controls the SN65DSI86 HW through the I2C interface and configures
+	  the DSI input and eDP output video format.	
