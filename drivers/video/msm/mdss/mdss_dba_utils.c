@@ -477,6 +477,8 @@ static int mdss_dba_utils_init_switch_dev(struct mdss_dba_utils_data *udata,
 {
 	int rc = -EINVAL, ret;
 
+	pr_err("starting mdss_dba_utils_init_switch_dev registration\n");
+
 	if (!udata) {
 		pr_err("invalid input\n");
 		goto end;

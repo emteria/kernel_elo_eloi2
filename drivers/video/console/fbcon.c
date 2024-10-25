@@ -571,6 +571,9 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 	unsigned short *save = NULL, *r, *q;
 	int logo_height;
 
+	printk(KERN_INFO
+		       "fbcon_init: inside fbcon_prepare_logo\n");
+
 	if (info->flags & FBINFO_MODULE) {
 		logo_shown = FBCON_LOGO_DONTSHOW;
 		return;
@@ -1029,6 +1032,8 @@ static void fbcon_init(struct vc_data *vc, int init)
 	struct display *t, *p = &fb_display[vc->vc_num];
 	int logo = 1, new_rows, new_cols, rows, cols, charcnt = 256;
 	int cap, ret;
+
+	printk(KERN_ERR "fbcon_init: started init for logo\n");
 
 	if (info_idx == -1 || info == NULL)
 	    return;
@@ -3506,6 +3511,7 @@ static int fbcon_init_device(void)
 	int i, error = 0;
 
 	fbcon_has_sysfs = 1;
+	printk(KERN_WARNING "Started initializing fbcon logo device\n");
 
 	for (i = 0; i < ARRAY_SIZE(device_attrs); i++) {
 		error = device_create_file(fbcon_device, &device_attrs[i]);
@@ -3526,6 +3532,7 @@ static int fbcon_init_device(void)
 
 static void fbcon_start(void)
 {
+	printk(KERN_WARNING "Before fbcon logo device start\n");
 	if (num_registered_fb) {
 		int i;
 
@@ -3538,6 +3545,7 @@ static void fbcon_start(void)
 			}
 		}
 
+		printk(KERN_WARNING "Started fbcon logo device takeover\n");
 		do_fbcon_takeover(0);
 		console_unlock();
 
@@ -3603,6 +3611,8 @@ static int __init fb_console_init(void)
 {
 	int i;
 
+	printk(KERN_WARNING "Started creating fbcon logo device\n");
+
 	console_lock();
 	fb_register_client(&fbcon_event_notifier);
 	fbcon_device = device_create(fb_class, NULL, MKDEV(0, 0), NULL,
@@ -3619,12 +3629,13 @@ static int __init fb_console_init(void)
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		con2fb_map[i] = -1;
 
+	printk(KERN_WARNING "Unlocking fbcon logo device\n");
 	console_unlock();
 	fbcon_start();
 	return 0;
 }
 
-module_init(fb_console_init);
+postcore_initcall(fb_console_init);
 
 #ifdef MODULE
 

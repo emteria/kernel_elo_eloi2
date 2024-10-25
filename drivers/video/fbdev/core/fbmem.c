@@ -597,6 +597,7 @@ int fb_prepare_logo(struct fb_info *info, int rotate)
 	int depth = fb_get_color_depth(&info->var, &info->fix);
 	unsigned int yres;
 
+	printk(KERN_WARNING "looking for fb logo\n");
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
 	if (info->flags & FBINFO_MISC_TILEBLITTING ||
@@ -617,6 +618,7 @@ int fb_prepare_logo(struct fb_info *info, int rotate)
 	}
 
 	/* Return if no suitable logo was found */
+	printk(KERN_WARNING "finding fb logo for depth %d\n", depth);
 	fb_logo.logo = fb_find_logo(depth);
 
 	if (!fb_logo.logo) {

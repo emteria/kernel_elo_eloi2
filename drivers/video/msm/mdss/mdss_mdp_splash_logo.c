@@ -719,11 +719,14 @@ int mdss_mdp_splash_init(struct msm_fb_data_type *mfd)
 		goto end;
 	}
 
+	pr_err("checking for splash logo\n");
 	if (!mfd->splash_info.splash_logo_enabled) {
+		pr_err("splash logo is disabled\n");
 		rc = -EINVAL;
 		goto end;
 	}
 
+	pr_err("starting splash logo thread\n");
 	mfd->splash_info.splash_thread = kthread_run(mdss_mdp_splash_thread,
 							mfd, "mdss_fb_splash");
 

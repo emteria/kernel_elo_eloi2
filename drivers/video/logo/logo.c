@@ -44,6 +44,7 @@ const struct linux_logo * __init_refok fb_find_logo(int depth)
 {
 	const struct linux_logo *logo = NULL;
 
+	pr_err("Evaluating showing a logo for %d", depth);
 	if (nologo || logos_freed)
 		return NULL;
 
@@ -76,6 +77,7 @@ const struct linux_logo * __init_refok fb_find_logo(int depth)
 	if (depth >= 8) {
 #ifdef CONFIG_LOGO_LINUX_CLUT224
 		/* Generic Linux logo */
+		pr_err("Showing generic linux logo");
 		logo = &logo_linux_clut224;
 #endif
 #ifdef CONFIG_LOGO_BLACKFIN_CLUT224

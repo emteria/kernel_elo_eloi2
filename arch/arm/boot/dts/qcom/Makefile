@@ -210,27 +210,7 @@ dtb-$(CONFIG_ARCH_SKIP) += msm8940-pmi8937-cdp.dtb \
 	msm8940-pmi8940-rcm.dtb \
 	msm8940-pmi8940-qrd-sku7.dtb
 
-dtb-$(CONFIG_ARCH_MSM8953) += apq8053-mtp.dtb \
-	apq8053-mtp-paypoint_refresh-auo_b133-evt0.dtb \
-	apq8053-mtp-paypoint_refresh-auo_b133-evt2.dtb \
-	apq8053-mtp-paypoint_refresh-boe_nv133-evt2.dtb \
-	apq8053-mtp-paypoint_refresh-auo_b133-dvt.dtb \
-	apq8053-mtp-paypoint_refresh-boe_nv133-dvt.dtb \
-	apq8053-mtp-paypoint2-boe_nv156-evt0.dtb \
-	apq8053-mtp-paypoint2-lp156-evt0.dtb \
-	apq8053-mtp-paypoint2-boe_nv156-evt2.dtb \
-	apq8053-mtp-paypoint2-lp156-evt2.dtb \
-	apq8053-mtp-puck-evt0.dtb \
-	apq8053-mtp-puck-evt2.dtb \
-	apq8053-mtp-puck-dvt.dtb \
-	apq8053-mtp-aaio2_std101-tm101-evt0.dtb \
-	apq8053-mtp-aaio2_std101-tm101-evt2.dtb \
-	apq8053-mtp-aaio2_std156-boe_nv156-evt0.dtb \
-	apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb \
-	apq8053-mtp-aaio2_std215-hr215-evt0.dtb \
-	apq8053-mtp-aaio2_std215-hr215-evt2.dtb \
-	apq8053-mtp-aaio2_value101-tm101-evt2.dtb \
-	apq8053-mtp-aaio2_value156-boe_nt156-evt2.dtb
+dtb-$(CONFIG_ARCH_MSM8953) += apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb
 
 dtb-$(CONFIG_ARCH_SKIP) += msm8953-sim.dtb \
 	msm8953-rumi.dtb \
