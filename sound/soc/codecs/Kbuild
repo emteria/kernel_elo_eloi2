@@ -86,4 +86,11 @@ endif
 #ifeq ($(CONFIG_GINNA_DTB), y)
 snd_smartpa_aw882xx-objs = aw882xx.o
 obj-y += snd_smartpa_aw882xx.o
+
+# Hack for AW8898 driver (stefan.lengfeld@inovex.de):
+# I could not get KConfig to work correctly. It should be just enough to enable
+# it in the config file. But it did not work. So add a hack here to compile it
+# into the kernel.
+obj-y += aw/aw8898.o
+
 #endif

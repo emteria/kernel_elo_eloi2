@@ -423,8 +423,7 @@ static int aw8898_volume_get(struct snd_kcontrol *kcontrol,struct snd_ctl_elem_v
     struct soc_mixer_control *mc = (struct soc_mixer_control*) kcontrol->private_value;
 
     aw8898_i2c_read(aw8898, AW8898_REG_HAGCCFG7, &reg_val);
-    ucontrol->value.integer.value[0] = (value >> mc->shift)\
-            &(AW8898_BIT_HAGCCFG7_VOL_MASK);
+    ucontrol->value.integer.value[0] = (value >> mc->shift) & (AW8898_BIT_HAGCCFG7_VOL_MASK);
     return 0;
 }
 
@@ -450,7 +449,7 @@ static int aw8898_volume_put(struct snd_kcontrol *kcontrol,struct snd_ctl_elem_v
       return 0;
     }
     //cal real value
-    value = value << mc->shift&AW8898_BIT_HAGCCFG7_VOL_MASK;
+    value = value << mc->shift & AW8898_BIT_HAGCCFG7_VOL_MASK;
     aw8898_i2c_read(aw8898, AW8898_REG_HAGCCFG7, &reg_value);
     value = value | (reg_value&0x00ff);
 
