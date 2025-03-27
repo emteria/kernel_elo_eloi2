@@ -51,7 +51,7 @@
 		other_ext_mem: other_ext_region@0 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x85b00000 0x0 0xd00000>;
+			reg = <0x0 0x85b00000 0x0 0x800000>;
 		};
 
 		adsp_fw_mem: adsp_fw_region@0 {

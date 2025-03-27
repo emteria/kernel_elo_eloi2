@@ -63,9 +63,12 @@
 /* OEM, Jerry.Zhai, 2017/01/09, usb gigabit ethernet pwr control }*/
 
 /* pp, Tony.L.Cai, 2017/03/23, gpio leds porting{*/
-
+/*
 	gpio-leds {
 		compatible = "gpio-leds";
+		status = "okay";
+		vdd_ldo_1-supply = ?;
+		vdd_ldo_2-supply = ?;
 
 		orange-led {
 			label="gpio_orange";
@@ -83,6 +86,7 @@
 			retain-state-suspended;
 		};
 	};
+*/
 /* pp, Tony.L.Cai, 2017/03/23, gpio leds porting}*/
 
 	/* Carl add for vbus detect on gpio87 {*/
