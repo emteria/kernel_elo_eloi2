@@ -5102,9 +5102,12 @@ static int __init regulator_init_complete(void)
 	 * not in use or always_on.  This is effectively the default
 	 * for DT and ACPI as they have full constraints.
 	 */
+	
+	/*
 	class_for_each_device(&regulator_class, NULL, NULL,
 			      regulator_late_cleanup);
-
+	*/
+	pr_err("Skip disabling unused regulators");
 	return 0;
 }
 late_initcall_sync(regulator_init_complete);

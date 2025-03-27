@@ -228,7 +228,7 @@ static int mdss_pll_util_parse_dt_supply(struct platform_device *pdev,
 		rc = of_property_read_u32(supply_node,
 					"qcom,supply-ulp-load", &tmp);
 		if (rc)
-			pr_warn(": error reading ulp load. rc=%d\n", rc);
+			pr_warn(": error reading ulp load 1. rc=%d\n", rc);
 
 		mp->vreg_config[i].load[DSS_REG_MODE_ULP] = (!rc ? tmp :
 			mp->vreg_config[i].load[DSS_REG_MODE_ENABLE]);

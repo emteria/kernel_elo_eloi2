@@ -1,4 +1,4 @@
-obj-$(CONFIG_IRQCHIP)			+= irqchip.o
+obj-$(CONFIG_IRQCHIP)			+= irqchip.o irq-msm.o
 
 obj-$(CONFIG_ALPINE_MSI)		+= irq-alpine-msi.o
 obj-$(CONFIG_ATH79)			+= irq-ath79-cpu.o

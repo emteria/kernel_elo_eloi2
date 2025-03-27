@@ -661,7 +661,12 @@ static int qbam_probe(struct platform_device *pdev)
 	qbam_dev->dma_dev.device_tx_status		= qbam_tx_status;
 
 	/* Regiser to DMA framework */
-	dma_async_device_register(&qbam_dev->dma_dev);
+	ret = dma_async_device_register(&qbam_dev->dma_dev);
+	if (ret) {
+		qbam_err(qbam_dev, "error:%d dma_async_device_register()\n",
+			 ret);
+		return ret;
+	}
 
 	/*
 	 * Do not return error in order to not break the existing

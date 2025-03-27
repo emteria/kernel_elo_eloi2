@@ -730,15 +730,20 @@ static int parse_devicetree(struct device_node *node,
 	remote_ss = of_get_property(node, key, NULL);
 	if (!remote_ss)
 		goto error;
+
 	edge = smd_remote_ss_to_edge(remote_ss);
-	if (edge < 0)
+	if (edge < 0) {
+		IPC_RTR_ERR("%s: failed calling smd_remote_ss_to_edge for %s\n", __func__, node->full_name);
 		goto error;
+	}
 	smd_xprt_config->edge = edge;
 
 	key = "qcom,xprt-linkid";
 	ret = of_property_read_u32(node, key, &link_id);
-	if (ret)
+	if (ret) {
+		IPC_RTR_ERR("%s: failed calling of_property_read_u32 for %s\n", __func__, node->full_name);
 		goto error;
+	}
 	smd_xprt_config->link_id = link_id;
 
 	key = "qcom,xprt-version";
@@ -759,7 +764,7 @@ static int parse_devicetree(struct device_node *node,
 	return 0;
 
 error:
-	IPC_RTR_ERR("%s: missing key: %s\n", __func__, key);
+	IPC_RTR_ERR("%s: missing key: %s for %s\n", __func__, key, node->full_name);
 	return -ENODEV;
 }
 

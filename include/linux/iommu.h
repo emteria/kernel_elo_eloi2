@@ -31,6 +31,7 @@
 #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
 #define IOMMU_NOEXEC	(1 << 3)
 #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+#define IOMMU_DEVICE	(1 << 5) /* Indicates access to device memory */
 #define IOMMU_PRIV	(1 << 5)
 #define IOMMU_GUARD	(1 << 28) /* Guard Page */
 /* Use upstream device's bus attribute */

@@ -4069,6 +4069,8 @@ static int fastrpc_cb_legacy_probe(struct device *dev)
 	if (err)
 		goto bail;
 
+	pr_err("reading channels in fastrpc_cb_legacy_probe\n");
+
 	for (i = 0; i < NUM_CHANNELS; i++) {
 		if (!gcinfo[i].name)
 			continue;
@@ -4125,6 +4127,7 @@ static int fastrpc_cb_legacy_probe(struct device *dev)
 		chan->sesscount++;
 	}
 bail:
+	pr_err("bailing out of fastrpc_cb_legacy_probe\n");
 	kfree(sids);
 	return err;
 }
@@ -4236,6 +4239,7 @@ static int fastrpc_probe(struct platform_device *pdev)
 
 	if (of_device_is_compatible(dev->of_node,
 					"qcom,msm-fastrpc-legacy-compute-cb")){
+		pr_err("calling fastrpc_cb_legacy_probe\n");
 		return fastrpc_cb_legacy_probe(dev);
 	}
 

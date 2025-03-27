@@ -707,7 +707,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-ulp-load", &tmp);
 		if (rc) {
-			pr_warn("%s: error reading ulp load. rc=%d\n",
+			pr_warn("%s: error reading ulp load 3. rc=%d\n",
 				__func__, rc);
 			rc = 0;
 		}

@@ -1266,8 +1266,12 @@ static int parse_smdpkt_devicetree(struct device_node *node,
 		goto error;
 
 	edge = smd_remote_ss_to_edge(remote_ss);
-	if (edge < 0)
+	if (edge < 0) {
+		pr_err("%s: smd_remote_ss_to_edge failed for key: %s\n", __func__, key);
 		goto error;
+	}
+
+	pr_err("%s: smd_remote_ss_to_edge worked for key: %s\n", __func__, key);
 
 	smd_pkt_devp->edge = edge;
 	D_STATUS("%s: %s = %d", __func__, key, edge);
