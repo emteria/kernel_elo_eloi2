@@ -40,6 +40,24 @@
 	firmware: firmware {
 		android {
 			compatible = "android,firmware";
+
+			vbmeta {
+				compatible = "android,vbmeta";
+				parts = "boot,system";
+			};
+
+			fstab {
+				compatible = "android,fstab";
+				system {
+					compatible = "android,system";
+					dev = "/dev/block/platform/soc/7824900.sdhci/by-name/system";
+					type = "ext4";
+					mnt_flags = "ro,barrier=1,discard";
+					fsmgr_flags = "wait";
+					status = "ok";
+				};
+
+			};
 		};
 	};
 
@@ -1703,7 +1721,6 @@
 #include "pm8953-rpm-regulator.dtsi"
 #include "pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
-#include "msm-pmi8950.dtsi"
 #include "msm-gdsc-8916.dtsi"
 #include "msm8953-mdss.dtsi"
 #include "msm8953-mdss-pll.dtsi"

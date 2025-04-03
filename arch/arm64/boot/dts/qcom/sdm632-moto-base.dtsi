@@ -40,20 +40,3 @@
 &soc {
 	/delete-node/ hbtp;
 };
-&cci {
-	/delete-node/ qcom,actuator@0;
-	/delete-node/ qcom,actuator@1;
-	/delete-node/ qcom,eeprom@0;
-	/delete-node/ qcom,eeprom@1;
-	/delete-node/ qcom,eeprom@2;
-	/delete-node/ qcom,camera@0;
-	/delete-node/ qcom,camera@1;
-	/delete-node/ qcom,camera@2;
-};
-
-&pmi632_charger {
-	/delete-property/ qcom,sw-jeita-enable;
-	/delete-property/ qcom,step-charging-enable;
-	/delete-property/ qcom,hw-die-temp-mitigation;
-	/delete-property/ qcom,hw-connector-mitigation;
-};
