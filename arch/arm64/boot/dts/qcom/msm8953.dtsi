@@ -1721,6 +1721,7 @@
 #include "pm8953-rpm-regulator.dtsi"
 #include "pm8953.dtsi"
 #include "msm8953-regulator.dtsi"
+#include "msm-pmi8950.dtsi"
 #include "msm-gdsc-8916.dtsi"
 #include "msm8953-mdss.dtsi"
 #include "msm8953-mdss-pll.dtsi"
