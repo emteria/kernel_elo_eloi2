@@ -2076,6 +2076,17 @@
 		qcom,pil-mss-memsetup;
 		qcom,firmware-name = "modem";
 		qcom,pil-self-auth;
+
+		/*
+		 * 2025-04-22 stefan@lengfeld.xyz:
+		 * Important difference to the Android9 device tree of the
+		 * FAP20 device. The property 'qcom,sequential-fw-load' must be set.
+		 * It's also set on the Motorola G7 power device, because the
+		 * modem does not support prallel loading of the firmware. The
+		 * loading must be sequential.
+		 */
+		qcom,sequential-fw-load;
+
 		qcom,sysmon-id = <0>;
 		qcom,ssctl-instance-id = <0x12>;
 		qcom,qdsp6v56-1-10;
