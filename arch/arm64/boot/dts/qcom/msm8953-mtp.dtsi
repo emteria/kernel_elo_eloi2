@@ -14,7 +14,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/clock/msm-clocks-8953.h>
 
-#include "msm8953-pinctrl.dtsi"
+/* #include "msm8953-pinctrl.dtsi" */
 
 &spi_3 { /* BLSP1 QUP3 */
 	spi-max-frequency = <16000000>;

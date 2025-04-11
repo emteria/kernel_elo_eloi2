@@ -120,10 +120,16 @@ int msm_tz_set_cb_format(enum tz_smmu_device_id sec_id, int cbndx)
 	ret = scm_call2(SCM_SIP_FNID(SCM_SVC_SMMU_PROGRAM,
 			SMMU_CHANGE_PAGETABLE_FORMAT), &desc);
 
+	pr_err("Changing format for CB %d with ID %d returned %d\n", cbndx, sec_id, ret);
+
+	/* At this stage, we cannot afford to fail because we have
+	 * committed to support V8L format to client and we can't
+	 * fallback.
+	 */
 	if (ret) {
-		WARN(1, "Format change failed for CB %d with ret %d\n",
-		     cbndx, ret);
-		return ret;
+		pr_err("Format change failed for CB %d with ret %d\n",
+			cbndx, ret);
+		BUG();
 	}
 
 	return 0;

@@ -20,8 +20,9 @@
 		qcom,tz-device-id = "GPU";
 		reg = <0x1c40000 0x10000>;
 		#iommu-cells = <1>;
-		#global-interrupts = <0>;
-		interrupts =  <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>,
+		#global-interrupts = <1>;
+		interrupts =  <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
+                                <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 232 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
@@ -30,6 +31,7 @@
 		qcom,enable-static-cb;
 		qcom,enable-smmu-halt;
 		qcom,skip-init;
+                qcom,no-smr-check;
 		vdd-supply = <&gdsc_oxili_cx>;
 		qcom,regulator-names = "vdd";
 		clocks = <&clock_gcc_gfx clk_gcc_oxili_ahb_clk>,

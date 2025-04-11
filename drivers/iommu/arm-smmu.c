@@ -1638,10 +1638,12 @@ static int arm_smmu_set_pt_format(struct arm_smmu_domain *smmu_domain,
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
 	int ret = 0;
 
+	pr_err("evaluating set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 	if ((smmu->version > ARM_SMMU_V1) &&
 	    (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64) &&
 	    !arm_smmu_has_secure_vmid(smmu_domain) &&
 	    arm_smmu_is_static_cb(smmu)) {
+		pr_err("calling set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 		ret = msm_tz_set_cb_format(smmu->sec_id, cfg->cbndx);
 	}
 	return ret;

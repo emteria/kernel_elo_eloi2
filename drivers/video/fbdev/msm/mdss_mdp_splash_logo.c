@@ -166,39 +166,24 @@ static int mdss_mdp_splash_iommu_attach(struct msm_fb_data_type *mfd)
 		return -EPERM;
 	}
 
-	/*
-	 * Putting handoff pending to false to ensure smmu attach happens
-	 * with early flag attribute
-	 */
-	mdata->handoff_pending = false;
-
-	ret = mdss_smmu_set_attribute(MDSS_IOMMU_DOMAIN_UNSECURE, EARLY_MAP, 1);
-	if (ret) {
-		pr_debug("mdss set attribute failed for early map\n");
-		goto end;
-	}
-
-	ret = mdss_iommu_ctrl(1);
-	if (IS_ERR_VALUE((unsigned long)ret)) {
-		pr_err("mdss iommu attach failed\n");
-		goto end;
-	}
-
 	ret = mdss_smmu_map(MDSS_IOMMU_DOMAIN_UNSECURE,
 				mdp5_data->splash_mem_addr,
 				mdp5_data->splash_mem_addr,
 				mdp5_data->splash_mem_size,
 				IOMMU_READ | IOMMU_NOEXEC);
 	if (ret) {
-		pr_err("iommu memory mapping failed ret=%d\n", ret);
+		pr_debug("iommu memory mapping failed ret=%d\n", ret);
 	} else {
-		pr_debug("iommu map passed for PA=VA\n");
-		mfd->splash_info.iommu_dynamic_attached = true;
+		ret = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("mdss iommu attach failed\n");
+			mdss_smmu_unmap(MDSS_IOMMU_DOMAIN_UNSECURE,
+					mdp5_data->splash_mem_addr,
+					mdp5_data->splash_mem_size);
+		} else {
+			mfd->splash_info.iommu_dynamic_attached = true;
+		}
 	}
-
-	ret = mdss_smmu_set_attribute(MDSS_IOMMU_DOMAIN_UNSECURE, EARLY_MAP, 0);
-end:
-	mdata->handoff_pending = true;
 
 	return ret;
 }
@@ -254,10 +239,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 {
 	struct mdss_overlay_private *mdp5_data;
 	struct mdss_mdp_ctl *ctl;
-	static u32 splash_mem_addr;
-	static u32 splash_mem_size;
 	int rc = 0;
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (!mfd)
 		return -EINVAL;
@@ -299,7 +281,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 		 */
 		if (mdp5_data->handoff && ctl && ctl->is_video_mode) {
 			rc = mdss_mdp_display_commit(ctl, NULL, NULL);
-			if (!IS_ERR_VALUE((unsigned long)rc)) {
+			if (!IS_ERR_VALUE(rc)) {
 				mdss_mdp_display_wait4comp(ctl);
 			} else {
 				/*
@@ -323,39 +305,8 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 
 	mdss_mdp_ctl_splash_finish(ctl, mdp5_data->handoff);
 
-	/* If DSI-1 interface is enabled by LK & split dsi is not enabled,
-	 * free cont_splash_mem for dsi during the cleanup for DSI-1.
-	 */
-	if (!mdata->splash_split_disp &&
-		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
-		mfd->panel_info->pdest == DISPLAY_1) {
-		pr_debug("delay cleanup for display %d\n",
-						mfd->panel_info->pdest);
-		splash_mem_addr = mdp5_data->splash_mem_addr;
-		splash_mem_size = mdp5_data->splash_mem_size;
-
-		mdss_mdp_footswitch_ctrl_splash(0);
-		goto end;
-	}
-
-	if (!mdata->splash_split_disp &&
-		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
-		mfd->panel_info->pdest == DISPLAY_2 &&
-		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_debug("free splash mem for display %d\n",
-						mfd->panel_info->pdest);
-		/* Give back the reserved memory to the system */
-		memblock_free(splash_mem_addr, splash_mem_size);
-		mdss_free_bootmem(splash_mem_addr, splash_mem_size);
-
-		mdss_mdp_footswitch_ctrl_splash(0);
-		goto end;
-	}
-
 	if (mdp5_data->splash_mem_addr &&
 		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_debug("free splash mem for display %d\n",
-						mfd->panel_info->pdest);
 		/* Give back the reserved memory to the system */
 		memblock_free(mdp5_data->splash_mem_addr,
 					mdp5_data->splash_mem_size);
