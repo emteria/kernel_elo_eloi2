@@ -4099,7 +4099,7 @@ static int arm_smmu_handoff_cbs(struct arm_smmu_device *smmu)
 		smmu->smrs[i] = smr;
 		smmu->s2crs[i] = s2cr;
 		bitmap_set(smmu->context_map, s2cr.cbndx, 1);
-		dev_dbg(smmu->dev, "Handoff smr: %x s2cr: %x cb: %d\n",
+		dev_err(smmu->dev, "Handoff smr: %x s2cr: %x cb: %d\n",
 			raw_smr, raw_s2cr, s2cr.cbndx);
 	}
 
@@ -4181,7 +4181,7 @@ static int arm_smmu_init_clocks(struct arm_smmu_power_resources *pwr)
 		struct clk *c = devm_clk_get(dev, cname);
 
 		if (IS_ERR(c)) {
-			dev_err(dev, "Couldn't get clock: %s",
+			dev_err(dev, "Couldn't get clock #1: %s",
 				cname);
 			return PTR_ERR(c);
 		}
@@ -4247,7 +4247,7 @@ static int register_regulator_notifier(struct arm_smmu_device *smmu)
 	consumers = pwr->gdscs;
 
 	if (!num_consumers) {
-		dev_info(dev, "no regulator info exist for %s\n",
+		dev_err(dev, "no regulator info exist for %s\n",
 			 dev_name(dev));
 		goto out;
 	}
@@ -4288,7 +4288,7 @@ static int arm_smmu_init_regulators(struct arm_smmu_power_resources *pwr)
 	if (!of_property_read_u32(dev->of_node,
 				  "qcom,deferred-regulator-disable-delay",
 				  &(pwr->regulator_defer)))
-		dev_info(dev, "regulator defer delay %d\n",
+		dev_err(dev, "regulator defer delay %d\n",
 			pwr->regulator_defer);
 
 	i = 0;
@@ -4306,7 +4306,7 @@ static int arm_smmu_init_bus_scaling(struct arm_smmu_power_resources *pwr)
 
 	/* We don't want the bus APIs to print an error message */
 	if (!of_find_property(dev->of_node, "qcom,msm-bus,name", NULL)) {
-		dev_dbg(dev, "No bus scaling info\n");
+		dev_err(dev, "No bus scaling info\n");
 		return 0;
 	}
 
@@ -4377,8 +4377,8 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if (arm_smmu_restore_sec_cfg(smmu, 0))
 		return -ENODEV;
 
-	dev_dbg(smmu->dev, "probing hardware configuration...\n");
-	dev_dbg(smmu->dev, "SMMUv%d with:\n",
+	dev_err(smmu->dev, "probing hardware configuration...\n");
+	dev_err(smmu->dev, "SMMUv%d with:\n",
 			smmu->version == ARM_SMMU_V2 ? 2 : 1);
 
 	/* ID0 */
@@ -4392,17 +4392,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 
 	if (id & ID0_S1TS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_S1;
-		dev_dbg(smmu->dev, "\tstage 1 translation\n");
+		dev_err(smmu->dev, "\tstage 1 translation\n");
 	}
 
 	if (id & ID0_S2TS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_S2;
-		dev_dbg(smmu->dev, "\tstage 2 translation\n");
+		dev_err(smmu->dev, "\tstage 2 translation\n");
 	}
 
 	if (id & ID0_NTS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_NESTED;
-		dev_dbg(smmu->dev, "\tnested translation\n");
+		dev_err(smmu->dev, "\tnested translation\n");
 	}
 
 	if (!(smmu->features &
@@ -4414,7 +4414,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if ((id & ID0_S1TS) &&
 		((smmu->version < ARM_SMMU_V2) || !(id & ID0_ATOSNS))) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
-		dev_dbg(smmu->dev, "\taddress translation ops\n");
+		dev_err(smmu->dev, "\taddress translation ops\n");
 	}
 
 	/*
@@ -4428,10 +4428,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if (cttw_dt)
 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
 	if (cttw_dt || cttw_reg)
-		dev_dbg(smmu->dev, "\t%scoherent table walk\n",
+		dev_err(smmu->dev, "\t%scoherent table walk\n",
 			   cttw_dt ? "" : "non-");
 	if (cttw_dt != cttw_reg)
-		dev_notice(smmu->dev,
+		dev_err(smmu->dev,
 			   "\t(IDR0.CTTW overridden by dma-coherent property)\n");
 
 	/* Max. number of entries we have for stream matching/indexing */
@@ -4527,7 +4527,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		dev_err(smmu->dev, "impossible number of S2 context banks!\n");
 		return -ENODEV;
 	}
-	dev_dbg(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+	dev_err(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
 		   smmu->num_context_banks, smmu->num_s2_context_banks);
 	/*
 	 * Cavium CN88xx erratum #27704.
@@ -4596,16 +4596,16 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
 	else
 		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
-	dev_dbg(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
+	dev_err(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
 		   smmu->pgsize_bitmap);
 
 
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S1)
-		dev_dbg(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
+		dev_err(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
 			smmu->va_size, smmu->ipa_size);
 
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S2)
-		dev_dbg(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
+		dev_err(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
 			smmu->ipa_size, smmu->pa_size);
 
 	return 0;
@@ -4702,12 +4702,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	pr_err("before allocating smmu device\n");
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
 		dev_err(dev, "failed to allocate arm_smmu_device\n");
 		return -ENOMEM;
 	}
+
 	smmu->dev = dev;
+	dev_err(dev, "allocated smmu device\n");
+
 	spin_lock_init(&smmu->atos_lock);
 	idr_init(&smmu->asid_idr);
 	mutex_init(&smmu->idr_mutex);
@@ -5677,6 +5681,7 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 	data->version = readl_relaxed(data->tcu_base + TCU_HW_VERSION_HLOS1);
 	smmu->archdata = data;
 
+	dev_err(dev, "Before static check and exit\n");
 	if (arm_smmu_is_static_cb(smmu))
 		return 0;
 
@@ -5709,6 +5714,7 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 	if (ret)
 		return -EPROBE_DEFER;
 
+	dev_err(dev, "Finish loading\n");
 	return 0;
 }
 
@@ -5731,6 +5737,8 @@ static int qsmmuv500_tbu_probe(struct platform_device *pdev)
 	struct qsmmuv500_tbu_device *tbu;
 	const __be32 *cell;
 	int len;
+
+	pr_err("started qsmmuv500_tbu_probe\n");
 
 	tbu = devm_kzalloc(dev, sizeof(*tbu), GFP_KERNEL);
 	if (!tbu)

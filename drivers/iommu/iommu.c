@@ -384,6 +384,7 @@ int iommu_group_add_device(struct iommu_group *group, struct device *dev)
 		return -ENOMEM;
 
 	device->dev = dev;
+	dev_err(dev, "Started adding device %s to group %d\n", dev_name(dev), group->id);
 
 	ret = sysfs_create_link(&dev->kobj, &group->kobj, "iommu_group");
 	if (ret)
@@ -415,6 +416,9 @@ rename:
 	kobject_get(group->devices_kobj);
 
 	dev->iommu_group = group;
+	pr_err("Early adding device %s to group %d\n", dev_name(dev), group->id);
+
+	struct iommu_group *new_group = dev->iommu_group;
 
 	iommu_group_create_direct_mappings(group, dev);
 
@@ -438,6 +442,7 @@ rename:
 	return 0;
 
 err_put_group:
+	pr_err("Failed adding device %s to group %d\n", dev_name(dev), group->id);
 	mutex_lock(&group->mutex);
 	list_del(&device->list);
 	mutex_unlock(&group->mutex);
@@ -833,6 +838,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	struct iommu_group *group;
 	int ret;
 
+	dev_err(dev, "Get group by iommu_group_get_for_dev\n");
+
 	group = iommu_group_get(dev);
 	if (group)
 		return group;
@@ -855,6 +862,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 		if (!group->domain)
 			group->domain = group->default_domain;
 	}
+
+	dev_err(dev, "Inside iommu_group_get_for_dev before calling adding iommu_group_add_device\n");
 
 	ret = iommu_group_add_device(group, dev);
 	if (ret) {

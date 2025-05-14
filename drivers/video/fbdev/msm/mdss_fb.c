@@ -1522,7 +1522,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	mfd->split_fb_left = mfd->split_fb_right = 0;
 
 	mdss_fb_set_split_mode(mfd, pdata);
-	pr_info("fb%d: split_mode:%d left:%d right:%d\n", mfd->index,
+	pr_err("fb%d: split_mode:%d left:%d right:%d\n", mfd->index,
 		mfd->split_mode, mfd->split_fb_left, mfd->split_fb_right);
 
 	mfd->mdp = *mdp_instance;
@@ -1595,8 +1595,11 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	mdss_fb_set_mdp_sync_pt_threshold(mfd, mfd->panel.type);
 
-	if (mfd->mdp.splash_init_fnc)
+	pr_err("before checking splash_init_fnc\n");
+	if (mfd->mdp.splash_init_fnc) {
+		pr_err("before calling splash_init_fnc\n");
 		mfd->mdp.splash_init_fnc(mfd);
+	}
 
 	/*
 	 * Register with input driver for a callback for command mode panels.

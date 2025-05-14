@@ -374,6 +374,8 @@ static int mdss_mdp_splash_kickoff(struct msm_fb_data_type *mfd,
 	if (!mfd)
 		return -EINVAL;
 
+	pr_err("inside mdss_mdp_splash_kickoff\n");
+
 	fbi = mfd->fbi;
 	mdp5_data = mfd_to_mdp5_data(mfd);
 	mdata = mfd_to_mdata(mfd);
@@ -576,6 +578,8 @@ static int mdss_mdp_splash_thread(void *data)
 	struct mdss_overlay_private *mdp5_data;
 	int ret = -EINVAL;
 
+	pr_err("starting mdss_mdp_splash_thread\n");
+
 	if (!mfd) {
 		pr_err("invalid input parameter\n");
 		goto end;
@@ -718,7 +722,9 @@ int mdss_mdp_splash_init(struct msm_fb_data_type *mfd)
 		goto end;
 	}
 
+	pr_err("checking for splash logo\n");
 	if (!mfd->splash_info.splash_logo_enabled) {
+		pr_err("splash logo is disabled\n");
 		rc = -EINVAL;
 		goto end;
 	}

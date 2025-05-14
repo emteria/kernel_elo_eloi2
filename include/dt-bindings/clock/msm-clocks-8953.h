@@ -67,6 +67,7 @@
 #define clk_sysmmnoc_msmbus_clk				 0xd61e5721
 #define clk_xo_dwc3_clk					 0xfad488ce
 #define clk_xo_lpm_clk					 0x2be48257
+#define clk_gcc_apss_tcu_clk			0xaf56a329
 #define clk_xo_pil_lpass_clk				 0xb72aa4c9
 #define clk_xo_pil_mss_clk				 0xe97a8354
 #define clk_xo_pil_pronto_clk				 0x89dae6d0

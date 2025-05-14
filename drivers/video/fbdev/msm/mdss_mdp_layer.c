@@ -2135,6 +2135,7 @@ int mdss_mdp_layer_pre_commit(struct msm_fb_data_type *mfd,
 	}
 	mutex_unlock(&mdp5_data->list_lock);
 
+	pr_err("before starting MDP overlay %d #1\n", mfd->index);
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);

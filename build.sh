@@ -40,6 +40,7 @@ function compile()
   # starting the actual compilation
   echo " * Starting compilation of the kernel..."
   make $GCC_ARGS -j8
+  make $GCC_ARGS -j8 dtbs
 }
 
 # show usage message to the user

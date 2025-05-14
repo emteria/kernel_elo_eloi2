@@ -645,8 +645,10 @@ int sde_smmu_probe(struct platform_device *pdev)
 	sde_smmu_enable_power(sde_smmu, false);
 
 	sde_smmu->dev = dev;
+	dev_err(dev, "allocated sde smmu device\n");
+
 	SDEROT_INFO(
-		"iommu v2 domain[%d] mapping and clk register successful!\n",
+		"iommu SDE domain[%d] mapping and clk register successful!\n",
 			smmu_domain.domain);
 	return 0;
 
@@ -680,7 +682,9 @@ int sde_smmu_remove(struct platform_device *pdev)
 			(sde_smmu->dev != &pdev->dev))
 			continue;
 
+		dev_err(sde_smmu->dev, "removed sde smmu device\n");
 		sde_smmu->dev = NULL;
+
 		arm_iommu_release_mapping(sde_smmu->mmu_mapping);
 		sde_smmu->mmu_mapping = NULL;
 		sde_smmu_enable_power(sde_smmu, false);

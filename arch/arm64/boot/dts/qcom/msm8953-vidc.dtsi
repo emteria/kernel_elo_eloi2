@@ -88,7 +88,7 @@
 				<&apps_iommu 0x82c 0x01>,
 				<&apps_iommu 0x821 0x10>;
 			buffer-types = <0xfff>;
-			virtual-addr-pool = <0x79000000 0x50000000
+			virtual-addr-pool = <0x79000000 0x28000000
 				0xa1000000 0xc9000000>;
 		};
 

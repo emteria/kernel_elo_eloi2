@@ -236,44 +236,6 @@ static int modeset_init_intf(struct mdp5_kms *mdp5_kms, int intf_num)
 	switch (intf_type) {
 	case INTF_DISABLED:
 		break;
-	case INTF_eDP:
-		if (!priv->edp)
-			break;
-
-		ctl = mdp5_ctlm_request(ctlm, intf_num);
-		if (!ctl) {
-			ret = -EINVAL;
-			break;
-		}
-
-		encoder = construct_encoder(mdp5_kms, INTF_eDP, intf_num,
-					MDP5_INTF_MODE_NONE, ctl);
-		if (IS_ERR(encoder)) {
-			ret = PTR_ERR(encoder);
-			break;
-		}
-
-		ret = msm_edp_modeset_init(priv->edp, dev, encoder);
-		break;
-	case INTF_HDMI:
-		if (!priv->hdmi)
-			break;
-
-		ctl = mdp5_ctlm_request(ctlm, intf_num);
-		if (!ctl) {
-			ret = -EINVAL;
-			break;
-		}
-
-		encoder = construct_encoder(mdp5_kms, INTF_HDMI, intf_num,
-					MDP5_INTF_MODE_NONE, ctl);
-		if (IS_ERR(encoder)) {
-			ret = PTR_ERR(encoder);
-			break;
-		}
-
-		ret = msm_hdmi_modeset_init(priv->hdmi, dev, encoder);
-		break;
 	case INTF_DSI:
 	{
 		int dsi_id = get_dsi_id_from_intf(hw_cfg, intf_num);

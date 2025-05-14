@@ -605,6 +605,8 @@ static int ipmmu_add_device(struct device *dev)
 	int num_utlbs;
 	int ret = -ENODEV;
 
+	dev_warn(dev, "Evaluate adding device\n");
+
 	if (dev->archdata.iommu) {
 		dev_warn(dev, "IOMMU driver already assigned to device %s\n",
 			 dev_name(dev));

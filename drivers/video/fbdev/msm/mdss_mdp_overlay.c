@@ -1353,12 +1353,17 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
 	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 
+    pr_err("init fb%d overlay\n", mfd->index);
+
 	if (mdss_mdp_ctl_is_power_on(ctl)) {
+		pr_err("power is already on\n", mfd->index);
 		if (!mdp5_data->mdata->batfet)
 			mdss_mdp_batfet_ctrl(mdp5_data->mdata, true);
 		mdss_mdp_release_splash_pipe(mfd);
+		pr_err("returning from power is on\n", mfd->index);
 		return 0;
 	} else if (mfd->panel_info->cont_splash_enabled) {
+		pr_err("splash is enabled\n", mfd->index);
 		if (mdp5_data->allow_kickoff) {
 			mdp5_data->allow_kickoff = false;
 		} else {
@@ -2874,6 +2879,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 	mutex_lock(&mdp5_data->ov_lock);
 	ctl->bw_pending = 0;
+	pr_err("before starting MDP overlay %d #2\n", mfd->index);
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
@@ -3437,6 +3443,7 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 		goto pipe_release;
 	}
 
+	pr_err("before starting MDP overlay %d #3\n", mfd->index);
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
@@ -6165,6 +6172,7 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 	 */
 	if (!mfd->panel_info->cont_splash_enabled &&
 		!mdata->handoff_pending) {
+		pr_err("before starting MDP overlay %d #4\n", mfd->index);
 		rc = mdss_mdp_overlay_start(mfd);
 		if (rc)
 			goto end;
@@ -6803,6 +6811,8 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data = NULL;
 	struct irq_info *mdss_irq;
 	int rc;
+
+	pr_err("inside mdss_mdp_overlay_init\n");
 
 	mdp5_data = kcalloc(1, sizeof(struct mdss_overlay_private), GFP_KERNEL);
 	if (!mdp5_data)

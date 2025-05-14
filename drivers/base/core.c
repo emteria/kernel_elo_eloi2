@@ -2213,7 +2213,7 @@ int dev_vprintk_emit(int level, const struct device *dev,
 	char hdr[128];
 	size_t hdrlen;
 
-	hdrlen = create_syslog_header(dev, hdr, sizeof(hdr));
+	hdrlen = 0; //create_syslog_header(dev, hdr, sizeof(hdr));
 
 	return vprintk_emit(0, level, hdrlen ? hdr : NULL, hdrlen, fmt, args);
 }
