@@ -14,7 +14,7 @@
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
 #include <video/msm_dba.h>
-#include <linux/switch.h>
+#include <linux/extcon.h>
 
 #include "mdss_dba_utils.h"
 #include "mdss_hdmi_edid.h"
@@ -33,12 +33,13 @@ struct mdss_dba_utils_data {
 	bool hpd_state;
 	bool audio_switch_registered;
 	bool display_switch_registered;
-	struct switch_dev sdev_display;
-	struct switch_dev sdev_audio;
+	struct extcon_dev sdev_display;
+	struct extcon_dev sdev_audio;
 	struct kobject *kobj;
 	struct mdss_panel_info *pinfo;
 	void *dba_data;
 	void *edid_data;
+	void *timing_data;
 	void *cec_abst_data;
 	u8 *edid_buf;
 	u32 edid_buf_size;
@@ -103,9 +104,9 @@ static void mdss_dba_utils_notify_display(
 
 	state = udata->sdev_display.state;
 
-	switch_set_state(&udata->sdev_display, val);
+	extcon_set_state_sync(&udata->sdev_display, 0, val);
 
-	pr_err("cable state %s %d\n",
+	pr_debug("cable state %s %d\n",
 		udata->sdev_display.state == state ?
 		"is same" : "switched to",
 		udata->sdev_display.state);
@@ -128,9 +129,9 @@ static void mdss_dba_utils_notify_audio(
 
 	state = udata->sdev_audio.state;
 
-	switch_set_state(&udata->sdev_audio, val);
+	extcon_set_state_sync(&udata->sdev_audio, 0, val);
 
-	pr_err("audio state %s %d\n",
+	pr_debug("audio state %s %d\n",
 		udata->sdev_audio.state == state ?
 		"is same" : "switched to",
 		udata->sdev_audio.state);
@@ -155,7 +156,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_connected(struct device *dev,
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->hpd_state);
-	pr_err("'%d'\n", udata->hpd_state);
+	pr_debug("'%d'\n", udata->hpd_state);
 
 	return ret;
 }
@@ -167,19 +168,19 @@ static ssize_t mdss_dba_utils_sysfs_rda_video_mode(struct device *dev,
 	struct mdss_dba_utils_data *udata = NULL;
 
 	if (!dev) {
-		pr_err("invalid device\n");
+		pr_debug("invalid device\n");
 		return -EINVAL;
 	}
 
 	udata = mdss_dba_utils_get_data(dev);
 
 	if (!udata) {
-		pr_err("invalid input\n");
+		pr_debug("invalid input\n");
 		return -EINVAL;
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->current_vic);
-	pr_err("'%d'\n", udata->current_vic);
+	pr_debug("'%d'\n", udata->current_vic);
 
 	return ret;
 }
@@ -192,17 +193,17 @@ static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 
 	udata = mdss_dba_utils_get_data(dev);
 	if (!udata) {
-		pr_err("%s: invalid input\n", __func__);
+		pr_debug("%s: invalid input\n", __func__);
 		return -EINVAL;
 	}
 
 	rc = kstrtoint(buf, 10, &hpd);
 	if (rc) {
-		pr_err("%s: kstrtoint failed\n", __func__);
+		pr_debug("%s: kstrtoint failed\n", __func__);
 		return -EINVAL;
 	}
 
-	pr_err("%s: set value: %d hpd state: %d\n", __func__,
+	pr_debug("%s: set value: %d hpd state: %d\n", __func__,
 					hpd, udata->hpd_state);
 	if (!hpd) {
 		if (udata->ops.power_on)
@@ -228,30 +229,30 @@ static ssize_t mdss_dba_utils_sysfs_rda_hpd(struct device *dev,
 	struct mdss_dba_utils_data *udata = NULL;
 
 	if (!dev) {
-		pr_err("invalid device\n");
+		pr_debug("invalid device\n");
 		return -EINVAL;
 	}
 
 	udata = mdss_dba_utils_get_data(dev);
 
 	if (!udata) {
-		pr_err("invalid input\n");
+		pr_debug("invalid input\n");
 		return -EINVAL;
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->hpd_state);
-	pr_err("'%d'\n", udata->hpd_state);
+	pr_debug("'%d'\n", udata->hpd_state);
 
 	return ret;
 }
 
-static DEVICE_ATTR(connected, S_IRUGO,
+static DEVICE_ATTR(connected, 0444,
 		mdss_dba_utils_sysfs_rda_connected, NULL);
 
-static DEVICE_ATTR(video_mode, S_IRUGO,
+static DEVICE_ATTR(video_mode, 0444,
 		mdss_dba_utils_sysfs_rda_video_mode, NULL);
 
-static DEVICE_ATTR(hpd, S_IRUGO | S_IWUSR, mdss_dba_utils_sysfs_rda_hpd,
+static DEVICE_ATTR(hpd, 0644, mdss_dba_utils_sysfs_rda_hpd,
 		mdss_dba_utils_sysfs_wta_hpd);
 
 static struct attribute *mdss_dba_utils_fs_attrs[] = {
@@ -300,7 +301,7 @@ static bool mdss_dba_check_audio_support(struct mdss_dba_utils_data *udata)
 	struct msm_hdmi_audio_edid_blk audio_blk;
 
 	if (!udata) {
-		pr_err("%s: Invalid input\n", __func__);
+		pr_debug("%s: Invalid input\n", __func__);
 		return false;
 	}
 	memset(&audio_blk, 0, sizeof(audio_blk));
@@ -334,7 +335,7 @@ static void mdss_dba_utils_dba_cb(void *data, enum msm_dba_callback_event event)
 		return;
 	}
 
-	pr_err("event: %d\n", event);
+	pr_debug("event: %d\n", event);
 
 	if (udata->pinfo)
 		pluggable = udata->pinfo->is_pluggable;
@@ -478,8 +479,6 @@ static int mdss_dba_utils_init_switch_dev(struct mdss_dba_utils_data *udata,
 {
 	int rc = -EINVAL, ret;
 
-	pr_err("starting mdss_dba_utils_init_switch_dev registration\n");
-
 	if (!udata) {
 		pr_err("invalid input\n");
 		goto end;
@@ -487,9 +486,9 @@ static int mdss_dba_utils_init_switch_dev(struct mdss_dba_utils_data *udata,
 
 	/* create switch device to update display modules */
 	udata->sdev_display.name = "hdmi";
-	rc = switch_dev_register(&udata->sdev_display);
+	rc = extcon_dev_register(&udata->sdev_display);
 	if (rc) {
-		pr_err("display switch registration failed\n");
+		pr_err("display hdmi switch registration failed\n");
 		goto end;
 	}
 
@@ -497,7 +496,7 @@ static int mdss_dba_utils_init_switch_dev(struct mdss_dba_utils_data *udata,
 
 	/* create switch device to update audio modules */
 	udata->sdev_audio.name = "hdmi_audio";
-	ret = switch_dev_register(&udata->sdev_audio);
+	ret = extcon_dev_register(&udata->sdev_audio);
 	if (ret) {
 		pr_err("audio switch registration failed\n");
 		goto end;
@@ -542,7 +541,7 @@ static int mdss_dba_get_vic_panel_info(struct mdss_dba_utils_data *udata,
 	ds_data.ds_max_clk = MSM_DBA_MAX_PCLK;
 
 	vic = hdmi_get_video_id_code(&timing, &ds_data);
-	pr_err("%s: current vic code is %d\n", __func__, vic);
+	pr_debug("%s: current vic code is %d\n", __func__, vic);
 
 	return vic;
 }
@@ -671,6 +670,11 @@ void mdss_dba_update_lane_cfg(struct mdss_panel_info *pinfo)
 	if (dba_data == NULL)
 		goto lane_cfg;
 
+	/* get adv supported timing info */
+	cfg_tbl = (struct mdss_dba_timing_info *)(dba_data->timing_data);
+	if (cfg_tbl == NULL)
+		goto lane_cfg;
+
 	while (cfg_tbl[i].xres != 0xffff) {
 		if (cfg_tbl[i].xres == pinfo->xres &&
 			cfg_tbl[i].yres == pinfo->yres &&
@@ -710,111 +714,6 @@ lane_cfg:
 		pinfo->mipi.data_lane3 = 1;
 		break;
 	}
-}
-
-/**
- * mdss_dba_utils_reconfigure_dsi() - Allow clients to perform DSI
- *    reconfiguration at a much lower level than HDMI requires.
- * @data: DBA utils instance which was allocated during registration
- * @pinfo: detailed panel information like x, y, porch values etc
- *
- * This API is used to reconfigure the DSI data structures in preperation
- * for unblanking a new panel.
- *
- * Return: returns the result of the dsi panel timing switch operation.
- */
-int mdss_dba_utils_reconfigure_dsi(void *data, struct mdss_panel_info *pinfo)
-{
-	struct mdss_dba_utils_data *ud = data;
-	struct mdss_dsi_ctrl_pdata *ctrl;
-	struct mdss_panel_data *panel_data;
-	struct msm_dba_dsi_cfg dsi_config;
-	struct dsi_panel_timing pt;
-	int ret = 0;
-	u64 clk_rate;
-
-	if (!ud || !pinfo) {
-		pr_err("invalid input\n");
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	pr_debug("%s+\n", __func__);
-
-	panel_data = container_of(pinfo, struct mdss_panel_data, panel_info);
-
-	ctrl = container_of(panel_data, struct mdss_dsi_ctrl_pdata, panel_data);
-
-	if (ud->ops.get_dsi_config) {
-		ret = ud->ops.get_dsi_config(ud->dba_data, &dsi_config);
-		if (ret) {
-			pr_err("%s: get_dsi_config not supported\n", __func__);
-			goto exit;
-		}
-	} else {
-		pr_err("%s: get_dsi_config not implemented\n", __func__);
-		ret = -ENODEV;
-		goto exit;
-	}
-
-	pinfo->physical_width = dsi_config.physical_width_dim;
-	pinfo->physical_height = dsi_config.physical_length_dim;
-	pinfo->bpp = dsi_config.bpp;
-	pinfo->mipi.mode = dsi_config.mode;
-	pinfo->type = pinfo->mipi.mode == DSI_VIDEO_MODE ? MIPI_VIDEO_PANEL :
-		MIPI_CMD_PANEL;
-	pinfo->mipi.pixel_packing = dsi_config.pixel_packing;
-	if (mdss_panel_get_dst_fmt(pinfo->bpp, pinfo->mipi.mode,
-	    pinfo->mipi.pixel_packing, &(pinfo->mipi.dst_format))) {
-		pr_debug("%s: problem determining dst format. Set Default\n",
-			__func__);
-		pinfo->mipi.dst_format = DSI_VIDEO_DST_FORMAT_RGB888;
-	}
-	/* TODO: pinfo->lcdc.underflow_clr */
-	/* TODO: pinfo->lcdc.border_clr */
-	/* TODO: pinfo->panel_orientation */
-	/* TODO: pinfo->mipi.interleave_mode */
-	/* TODO: pinfo->mipi.vsync_enable */
-	pinfo->mipi.traffic_mode = dsi_config.traffic_mode;
-	pinfo->mipi.vc = dsi_config.virtual_channel_id;
-	pinfo->mipi.rgb_swap = dsi_config.color_order;
-	/* TODO: pinfo->mipi.rx_eot_ignore */
-	pinfo->mipi.tx_eot_append = dsi_config.eot_mode;
-
-	pinfo->mipi.data_lane0 = dsi_config.num_lanes > 0;
-	pinfo->mipi.data_lane1 = dsi_config.num_lanes > 1;
-	pinfo->mipi.data_lane2 = dsi_config.num_lanes > 2;
-	pinfo->mipi.data_lane3 = dsi_config.num_lanes > 3;
-
-	memset(&pt, 0, sizeof(pt));
-	pt.timing.xres = dsi_config.width;
-	pt.timing.yres = dsi_config.height;
-	pt.timing.h_front_porch = dsi_config.horizontal_front_porch;
-	pt.timing.h_back_porch = dsi_config.horizontal_back_porch;
-	pt.timing.h_pulse_width = dsi_config.horizontal_pulse_width;
-	pt.timing.hsync_skew = dsi_config.horizontal_sync_skew;
-	pt.timing.v_back_porch = dsi_config.vertical_back_porch;
-	pt.timing.v_front_porch = dsi_config.vertical_front_porch;
-	pt.timing.v_pulse_width = dsi_config.vertical_pulse_width;
-	pt.timing.border_left = dsi_config.horizontal_left_border;
-	pt.timing.border_right = dsi_config.horizontal_right_border;
-	pt.timing.border_top = dsi_config.vertical_top_border;
-	pt.timing.border_bottom = dsi_config.vertical_bottom_border;
-	pt.timing.frame_rate = dsi_config.framerate;
-	pt.timing.clk_rate = dsi_config.clockrate * dsi_config.num_lanes;
-	pt.t_clk_pre = dsi_config.t_clk_pre;
-	pt.t_clk_post = dsi_config.t_clk_post;
-
-	clk_rate = (u64)(pt.timing.clk_rate);
-	do_div(clk_rate, dsi_config.bpp);
-	pinfo->mipi.dsi_pclk_rate = (u32)clk_rate;
-
-	ret = mdss_dsi_panel_timing_switch(ctrl, &pt.timing);
-	if (ret)
-		pr_err("%s: failed to switch panel timing\n", __func__);
-
-exit:
-	return ret;
 }
 
 /**
@@ -925,9 +824,15 @@ void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid)
 	udata->cec_abst_data = cec_abstract_init(&cec_abst_init_data);
 	if (IS_ERR_OR_NULL(udata->cec_abst_data)) {
 		pr_err("error initializing cec abstract module\n");
-		ret = PTR_ERR(cec_abst_data);
+		ret = PTR_ERR(udata->cec_abst_data);
 		goto error;
 	}
+
+	/* get the timing data for the adv chip */
+	if (udata->ops.get_supp_timing_info)
+		udata->timing_data = udata->ops.get_supp_timing_info();
+	else
+		udata->timing_data = NULL;
 
 	/* update cec data to retrieve it back in cec abstract module */
 	if (uid->pinfo) {
@@ -991,10 +896,10 @@ void mdss_dba_utils_deinit(void *data)
 	}
 
 	if (udata->audio_switch_registered)
-		switch_dev_unregister(&udata->sdev_audio);
+		extcon_dev_unregister(&udata->sdev_audio);
 
 	if (udata->display_switch_registered)
-		switch_dev_unregister(&udata->sdev_display);
+		extcon_dev_unregister(&udata->sdev_display);
 
 	if (udata->kobj)
 		mdss_dba_utils_sysfs_remove(udata->kobj);

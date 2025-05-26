@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3133,7 +3133,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 	}
 
 	if (!ad->bl_mfd || !ad->bl_mfd->panel_info ||
-		ad->bl_att_lut == NULL) {
+		!ad->bl_att_lut) {
 		pr_err("Invalid ad info: bl_mfd = 0x%pK, ad->bl_mfd->panel_info = 0x%pK, bl_att_lut = 0x%pK\n",
 			ad->bl_mfd,
 			(!ad->bl_mfd) ? NULL : ad->bl_mfd->panel_info,
@@ -6671,7 +6671,7 @@ static int is_valid_calib_dspp_addr(char __iomem *ptr)
 			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
 			break;
 		/* Dither enable/disable */
-		} else if (ptr == base + MDSS_MDP_REG_DSPP_DITHER_DEPTH) {
+		} else if ((ptr == base + MDSS_MDP_REG_DSPP_DITHER_DEPTH)) {
 			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
 			break;
 		/* Six zone and mem color */
@@ -7218,7 +7218,7 @@ int mdss_mdp_pp_get_version(struct mdp_pp_feature_version *version)
 	}
 	/* PA dither is not supported by driver */
 	if (version->pp_feature == PA_DITHER) {
-		pr_warn("unsupported feature %d\n", version->pp_feature);
+		pr_warn("unsupported feature %d (can be ignored)\n", version->pp_feature);
 		version->version_info = 0;
 		ret = 0;
 		goto exit_version;

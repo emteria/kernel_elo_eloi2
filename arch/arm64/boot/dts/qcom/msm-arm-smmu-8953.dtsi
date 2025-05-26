@@ -20,21 +20,22 @@
 		qcom,tz-device-id = "GPU";
 		reg = <0x1c40000 0x10000>;
 		#iommu-cells = <1>;
-		#global-interrupts = <0>;
-		interrupts = <GIC_SPI 225 IRQ_TYPE_NONE>,
+		#global-interrupts = <1>;
+		interrupts = <GIC_SPI 199 IRQ_TYPE_NONE>, <GIC_SPI 225 IRQ_TYPE_NONE>,
 				<GIC_SPI 232 IRQ_TYPE_NONE>,
 				<GIC_SPI 233 IRQ_TYPE_NONE>,
 				<GIC_SPI 234 IRQ_TYPE_NONE>;
-		qcom,dynamic;
 		qcom,use-3-lvl-tables;
 		qcom,enable-static-cb;
 		qcom,enable-smmu-halt;
 		qcom,skip-init;
+		qcom,no-smr-check;
 		vdd-supply = <&gdsc_oxili_cx>;
 		qcom,regulator-names = "vdd";
 		clocks = <&clock_gcc_gfx clk_gcc_oxili_ahb_clk>,
 			<&clock_gcc_gfx clk_gcc_bimc_gfx_clk>;
 		clock-names = "gpu_ahb_clk", "gcc_bimc_gfx_clk";
+		#clock-cells = <1>;
 	};
 
 	/* A test device to test the SMMU operation */

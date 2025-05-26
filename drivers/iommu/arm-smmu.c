@@ -2053,6 +2053,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	domain->geometry.aperture_end = (1UL << ias) - 1;
 	domain->geometry.force_aperture = true;
 
+	dev_err(smmu->dev, "inside arm_smmu_init_domain_context with CB %d and ID %d with secure=%d, static=%d, dynamic=%d\n", cfg->cbndx, smmu->sec_id, arm_smmu_has_secure_vmid(smmu_domain), arm_smmu_is_static_cb(smmu), dynamic);
+
 	/* Assign an asid */
 	ret = arm_smmu_init_asid(domain, smmu);
 	if (ret)
@@ -4181,7 +4183,7 @@ static int arm_smmu_init_clocks(struct arm_smmu_power_resources *pwr)
 		struct clk *c = devm_clk_get(dev, cname);
 
 		if (IS_ERR(c)) {
-			dev_err(dev, "Couldn't get clock #1: %s",
+			dev_err(dev, "Couldn't get clock #1: %s\n",
 				cname);
 			return PTR_ERR(c);
 		}
@@ -4702,7 +4704,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	pr_err("before allocating smmu device\n");
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
 		dev_err(dev, "failed to allocate arm_smmu_device\n");

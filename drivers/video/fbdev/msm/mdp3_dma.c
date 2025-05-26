@@ -691,7 +691,7 @@ static int mdp3_dmap_update(struct mdp3_dma *dma, void *buf,
 			ATRACE_BEGIN("mdp3_wait_for_dma_comp");
 retry_dma_done:
 			rc = wait_for_completion_timeout(&dma->dma_comp,
-			 dma_timeout_value(dma));
+				KOFF_TIMEOUT);
 			if (rc <= 0 && --retry_count) {
 				int  vsync_status;
 
@@ -756,7 +756,7 @@ retry_dma_done:
 		ATRACE_BEGIN("mdp3_wait_for_vsync_comp");
 retry_vsync:
 		rc = wait_for_completion_timeout(&dma->vsync_comp,
-			 dma_timeout_value(dma));
+			KOFF_TIMEOUT);
 		if (rc <= 0 && --retry_count) {
 			int vsync = MDP3_REG_READ(MDP3_REG_INTR_STATUS) &
 					(1 << MDP3_INTR_LCDC_START_OF_FRAME);

@@ -387,8 +387,11 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		ret = -EINVAL;
 		goto end;
 	}
-	if(strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi86_1080p")==0)
+
+	if(strcmp(pdata->panel_info.panel_name,"dsi_sn65dsi86_1080p")==0) {
+		pr_warn("%s: Calling custom disable\n", __func__);
 		sn65dsi86_dsi2edp_disable();
+	}
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -399,8 +402,16 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		ret = 0;
 	}
 
+	if (gpio_is_valid(ctrl_pdata->vdd_ext_gpio)) {
+		ret = gpio_direction_output(
+			ctrl_pdata->vdd_ext_gpio, 0);
+		if (ret)
+			pr_err("%s: unable to set dir for vdd gpio\n",
+					__func__);
+	}
+
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
-		pr_err("reset disable: pinctrl not enabled\n");
+		pr_debug("reset disable: pinctrl not enabled\n");
 
 	ret = msm_mdss_enable_vreg(
 		ctrl_pdata->panel_power_data.vreg_config,
@@ -426,6 +437,15 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+	if (gpio_is_valid(ctrl_pdata->vdd_ext_gpio)) {
+		ret = gpio_direction_output(
+				ctrl_pdata->vdd_ext_gpio, 1);
+		usleep_range(3000, 4000); /* h/w recommended delay */
+		if (ret)
+			pr_err("%s: unable to set dir for vdd gpio\n",
+					__func__);
+	}
+
 	ret = msm_mdss_enable_vreg(
 		ctrl_pdata->panel_power_data.vreg_config,
 		ctrl_pdata->panel_power_data.num_vreg, 1);
@@ -444,7 +464,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	if (pdata->panel_info.cont_splash_enabled ||
 		!pdata->panel_info.mipi.lp11_init) {
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
-			pr_err("reset enable: pinctrl not enabled\n");
+			pr_debug("reset enable: pinctrl not enabled\n");
 
 		ret = mdss_dsi_panel_reset(pdata, 1);
 		if (ret)
@@ -977,7 +997,7 @@ static ssize_t mdss_dsi_cmd_write(struct file *file, const char __user *p,
 {
 	struct buf_data *pcmds = file->private_data;
 	ssize_t ret = 0;
-	unsigned int blen = 0;
+	int blen = 0;
 	char *string_buf;
 
 	mutex_lock(&pcmds->dbg_mutex);
@@ -996,7 +1016,6 @@ static ssize_t mdss_dsi_cmd_write(struct file *file, const char __user *p,
 		return -ENOMEM;
 	}
 
-	pcmds->string_buf = string_buf;
 	/* Writing in batches is possible */
 	ret = simple_write_to_buffer(string_buf, blen, ppos, p, count);
 	if (ret < 0) {
@@ -1006,6 +1025,7 @@ static ssize_t mdss_dsi_cmd_write(struct file *file, const char __user *p,
 	}
 
 	string_buf[ret] = '\0';
+	pcmds->string_buf = string_buf;
 	pcmds->sblen = count;
 	mutex_unlock(&pcmds->dbg_mutex);
 	return ret;
@@ -1014,8 +1034,7 @@ static ssize_t mdss_dsi_cmd_write(struct file *file, const char __user *p,
 static int mdss_dsi_cmd_flush(struct file *file, fl_owner_t id)
 {
 	struct buf_data *pcmds = file->private_data;
-	unsigned int len;
-	int blen, i;
+	int blen, len, i;
 	char *buf, *bufp, *bp;
 	struct dsi_ctrl_hdr *dchdr;
 
@@ -1059,7 +1078,7 @@ static int mdss_dsi_cmd_flush(struct file *file, fl_owner_t id)
 	while (len >= sizeof(*dchdr)) {
 		dchdr = (struct dsi_ctrl_hdr *)bp;
 		dchdr->dlen = ntohs(dchdr->dlen);
-		if (dchdr->dlen > (len - sizeof(*dchdr)) || dchdr->dlen < 0) {
+		if (dchdr->dlen > len || dchdr->dlen < 0) {
 			pr_err("%s: dtsi cmd=%x error, len=%d\n",
 				__func__, dchdr->dtype, dchdr->dlen);
 			kfree(buf);
@@ -1345,7 +1364,6 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata, int power_state)
 
 	pr_debug("%s+: ctrl=%pK ndx=%d power_state=%d\n",
 		__func__, ctrl_pdata, ctrl_pdata->ndx, power_state);
-	pr_info("%s[%d]+.\n", __func__, ctrl_pdata->ndx);
 
 	if (power_state == panel_info->panel_power_state) {
 		pr_debug("%s: No change in power state %d -> %d\n", __func__,
@@ -1608,7 +1626,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	 */
 	if (mipi->lp11_init) {
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
-			pr_err("reset enable: pinctrl not enabled\n");
+			pr_debug("reset enable: pinctrl not enabled\n");
 		mdss_dsi_panel_reset(pdata, 1);
 	}
 
@@ -1691,7 +1709,8 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 	ctrl_pdata = platform_get_drvdata(pdev);
 	ctrl_pdata->pin_res.pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR_OR_NULL(ctrl_pdata->pin_res.pinctrl)) {
-		pr_err("%s: failed to get pinctrl\n", __func__);
+		dev_err(&pdev->dev, "No pinctrl DSI :(\n");
+		pr_err("%s: failed to get pinctrl DSI\n", __func__);
 		return PTR_ERR(ctrl_pdata->pin_res.pinctrl);
 	}
 
@@ -1766,8 +1785,6 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	if ((pdata->panel_info.type == MIPI_CMD_PANEL) &&
 		mipi->vsync_enable && mipi->hw_vsync_mode) {
 		mdss_dsi_set_tear_on(ctrl_pdata);
-		if (mdss_dsi_is_te_based_esd(ctrl_pdata))
-			enable_irq(gpio_to_irq(ctrl_pdata->disp_te_gpio));
 	}
 
 	ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
@@ -1837,11 +1854,6 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 
 	if ((pdata->panel_info.type == MIPI_CMD_PANEL) &&
 		mipi->vsync_enable && mipi->hw_vsync_mode) {
-		if (mdss_dsi_is_te_based_esd(ctrl_pdata)) {
-				disable_irq(gpio_to_irq(
-					ctrl_pdata->disp_te_gpio));
-				atomic_dec(&ctrl_pdata->te_irq_ready);
-		}
 		mdss_dsi_set_tear_off(ctrl_pdata);
 	}
 
@@ -2012,8 +2024,8 @@ static void __mdss_dsi_update_video_mode_total(struct mdss_panel_data *pdata,
 	if (ctrl_pdata->timing_db_mode)
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x1e4, 0x1);
 
-	pr_debug("%s new_fps:%d new_vtotal:0x%X cur_vtotal:0x%X frame_rate:%d\n",
-			__func__, new_fps, new_dsi_v_total, current_dsi_v_total,
+	pr_debug("%s new_fps:%d vsync:%d hsync:%d frame_rate:%d\n",
+			__func__, new_fps, vsync_period, hsync_period,
 			ctrl_pdata->panel_data.panel_info.mipi.frame_rate);
 
 	ctrl_pdata->panel_data.panel_info.current_fps = new_fps;
@@ -2595,6 +2607,7 @@ static int mdss_dsi_set_stream_size(struct mdss_panel_data *pdata)
 	return 0;
 }
 
+#ifdef TARGET_HW_MDSS_HDMI
 static void mdss_dsi_dba_work(struct work_struct *work)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
@@ -2622,25 +2635,26 @@ static void mdss_dsi_dba_work(struct work_struct *work)
 	utils_init_data.fb_node = ctrl_pdata->fb_node;
 	utils_init_data.kobj = ctrl_pdata->kobj;
 	utils_init_data.pinfo = pinfo;
-	if (ctrl_pdata->mdss_util)
-		utils_init_data.cont_splash_enabled =
-			ctrl_pdata->mdss_util->panel_intf_status(
-			ctrl_pdata->panel_data.panel_info.pdest,
-			MDSS_PANEL_INTF_DSI) ? true : false;
-	else
-		utils_init_data.cont_splash_enabled = false;
+
+	pr_err("%s: forcing splash_disabled\n", __func__);
+	utils_init_data.cont_splash_enabled = false;
 
 	pinfo->dba_data = mdss_dba_utils_init(&utils_init_data);
 
 	if (!IS_ERR_OR_NULL(pinfo->dba_data)) {
 		ctrl_pdata->ds_registered = true;
 	} else {
-		pr_err("%s: dba device not ready, queue again\n", __func__);
+		pr_debug("%s: dba device not ready, queue again\n", __func__);
 		queue_delayed_work(ctrl_pdata->workq,
 				&ctrl_pdata->dba_work, HZ);
 	}
 }
-
+#else
+static void mdss_dsi_dba_work(struct work_struct *work)
+{
+	(void)(*work);
+}
+#endif
 static int mdss_dsi_reset_write_ptr(struct mdss_panel_data *pdata)
 {
 
@@ -2757,7 +2771,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	pinfo = &pdata->panel_info;
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	pr_err("%s+: ctrl=%d event=%d\n", __func__, ctrl_pdata->ndx, event);
+	pr_debug("%s+: ctrl=%d event=%d\n", __func__, ctrl_pdata->ndx, event);
 
 	MDSS_XLOG(event, arg, ctrl_pdata->ndx, 0x3333);
 
@@ -2769,8 +2783,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_CHECK_PARAMS:
 		pr_debug("%s:Entered Case MDSS_EVENT_CHECK_PARAMS\n", __func__);
-		if (pinfo->is_dba_panel ||
-		    mdss_dsi_check_params(ctrl_pdata, arg)) {
+		if (mdss_dsi_check_params(ctrl_pdata, arg)) {
 			ctrl_pdata->update_phy_timing = true;
 			/*
 			 * Call to MDSS_EVENT_CHECK_PARAMS expects
@@ -2852,10 +2865,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_ENABLE_PARTIAL_ROI:
 		rc = mdss_dsi_ctl_partial_roi(pdata);
-		break;
-	case MDSS_EVENT_ENABLE_TE:
-		rc = mdss_dsi_hndl_enable_te(ctrl_pdata,
-				(int) (unsigned long) arg);
 		break;
 	case MDSS_EVENT_DSI_RESET_WRITE_PTR:
 		rc = mdss_dsi_reset_write_ptr(pdata);
@@ -2956,33 +2965,6 @@ static struct device_node *mdss_dsi_pref_prim_panel(
 		pr_err("%s:can't find panel phandle\n", __func__);
 
 	return dsi_pan_node;
-}
-
-int mdss_dsi_ioctl_handler(struct mdss_panel_data *pdata, u32 cmd, void *arg)
-{
-	int rc = -ENOSYS;
-	struct msmfb_reg_access reg_access;
-
-	if (mdss_panel_is_power_off(pdata->panel_info.panel_power_state)) {
-		pr_err("%s: Panel is off\n", __func__);
-		return -EPERM;
-	}
-
-	switch (cmd) {
-	case MSMFB_REG_WRITE:
-	case MSMFB_REG_READ:
-		if (copy_from_user(&reg_access, arg, sizeof(reg_access)))
-			return -EFAULT;
-
-		rc = mdss_dsi_panel_ioctl_handler(pdata, cmd, arg);
-		break;
-	default:
-		pr_err("%s: unsupport ioctl =0x%x\n", __func__, cmd);
-		rc = -EFAULT;
-		break;
-	}
-
-	return rc;
 }
 
 /**
@@ -3276,8 +3258,10 @@ static int mdss_dsi_cont_splash_config(struct mdss_panel_info *pinfo,
 			pr_err("%s: Panel power on failed\n", __func__);
 			return rc;
 		}
-		if (ctrl_pdata->bklt_ctrl == BL_PWM)
+		if (ctrl_pdata->bklt_ctrl == BL_PWM) {
 			mdss_dsi_panel_pwm_enable(ctrl_pdata);
+			ctrl_pdata->panel_data.set_backlight(&ctrl_pdata->panel_data, 482);
+		}
 		ctrl_pdata->ctrl_state |= (CTRL_STATE_PANEL_INIT |
 			CTRL_STATE_MDP_ACTIVE | CTRL_STATE_DSI_ACTIVE);
 
@@ -3386,6 +3370,14 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	pan_cfg = util->panel_intf_type(MDSS_PANEL_INTF_SPI);
+	if (IS_ERR(pan_cfg)) {
+		return PTR_ERR(pan_cfg);
+	} else if (pan_cfg) {
+		pr_debug("%s: SPI is primary\n", __func__);
+		return -ENODEV;
+	}
+
 	ctrl_pdata->mdss_util = util;
 	atomic_set(&ctrl_pdata->te_irq_ready, 0);
 
@@ -3398,15 +3390,19 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 			__func__, ctrl_name);
 
 	rc = mdss_dsi_pinctrl_init(pdev);
-	if (rc)
+	if (rc) {
+		dev_err(&pdev->dev, "failed to get pin resources\n");
 		pr_warn("%s: failed to get pin resources\n", __func__);
+	}
 
 	if (index == 0) {
 		ctrl_pdata->panel_data.panel_info.pdest = DISPLAY_1;
 		ctrl_pdata->ndx = DSI_CTRL_0;
+		pr_err("%s: settings DSI_CTRL to 0 and DISPLAY to 1\n", __func__);
 	} else {
 		ctrl_pdata->panel_data.panel_info.pdest = DISPLAY_2;
 		ctrl_pdata->ndx = DSI_CTRL_1;
+		pr_err("%s: settings DSI_CTRL to 1 and DISPLAY to 2\n", __func__);
 	}
 
 	if (mdss_dsi_ctrl_clock_init(pdev, ctrl_pdata)) {
@@ -3420,6 +3416,7 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	dev_err(&pdev->dev, "before split check\n");
 	if (!mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data) ||
 		(mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data) &&
 		(ctrl_pdata->panel_data.panel_info.pdest == DISPLAY_1))) {
@@ -3468,6 +3465,7 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	}
 
 	if (mdss_dsi_is_te_based_esd(ctrl_pdata)) {
+		init_completion(&ctrl_pdata->te_irq_comp);
 		rc = devm_request_irq(&pdev->dev,
 			gpio_to_irq(ctrl_pdata->disp_te_gpio),
 			hw_vsync_handler, IRQF_TRIGGER_FALLING,
@@ -3478,6 +3476,23 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		}
 		te_irq_registered = 1;
 		disable_irq(gpio_to_irq(ctrl_pdata->disp_te_gpio));
+	}
+
+	pdata = &ctrl_pdata->panel_data;
+	init_completion(&pdata->te_done);
+	if (pdata->panel_info.type == MIPI_CMD_PANEL) {
+		if (!te_irq_registered) {
+			rc = devm_request_irq(&pdev->dev,
+				gpio_to_irq(pdata->panel_te_gpio),
+				test_hw_vsync_handler, IRQF_TRIGGER_FALLING,
+				"VSYNC_GPIO", &ctrl_pdata->panel_data);
+			if (rc) {
+				pr_err("%s: TE request_irq failed\n", __func__);
+				goto error_shadow_clk_deinit;
+			}
+			te_irq_registered = 1;
+			disable_irq_nosync(gpio_to_irq(pdata->panel_te_gpio));
+		}
 	}
 
 	rc = mdss_dsi_get_bridge_chip_params(pinfo, ctrl_pdata, pdev);
@@ -3504,6 +3519,8 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		ctrl_pdata->shared_data->dsi0_active = true;
 	else
 		ctrl_pdata->shared_data->dsi1_active = true;
+
+	mdss_dsi_debug_bus_init(mdss_dsi_res);
 
 	return 0;
 
@@ -3608,15 +3625,7 @@ static void mdss_dsi_res_deinit(struct platform_device *pdev)
 
 	for (i = 0; i < DSI_CTRL_MAX; i++) {
 		if (dsi_res->ctrl_pdata[i]) {
-			if (dsi_res->ctrl_pdata[i]->ds_registered) {
-				struct mdss_panel_info *pinfo =
-					&dsi_res->ctrl_pdata[i]->
-						panel_data.panel_info;
-
-				if (pinfo)
-					mdss_dba_utils_deinit(pinfo->dba_data);
-			}
-
+			mdss_dsi_res_deinit_hdmi(pdev, i);
 			devm_kfree(&pdev->dev, dsi_res->ctrl_pdata[i]);
 		}
 	}
@@ -4149,7 +4158,6 @@ static int mdss_dsi_parse_ctrl_params(struct platform_device *ctrl_pdev,
 	if (!data) {
 		pr_err("%s:%d, Unable to read Phy Strength ctrl settings\n",
 			__func__, __LINE__);
-		return -EINVAL;
 	} else {
 		pinfo->mipi.dsi_phy_db.strength_len = len;
 		for (i = 0; i < len; i++)
@@ -4164,7 +4172,6 @@ static int mdss_dsi_parse_ctrl_params(struct platform_device *ctrl_pdev,
 	if (!data) {
 		pr_err("%s:%d, Unable to read Phy regulator settings\n",
 			__func__, __LINE__);
-		return -EINVAL;
 	} else {
 		pinfo->mipi.dsi_phy_db.regulator_len = len;
 		for (i = 0; i < len; i++)
@@ -4253,11 +4260,21 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
 		pr_err("%s:%d, TE gpio not specified\n",
 						__func__, __LINE__);
+	pdata->panel_te_gpio = ctrl_pdata->disp_te_gpio;
 
 	ctrl_pdata->bklt_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-bklight-en-gpio", 0);
 	if (!gpio_is_valid(ctrl_pdata->bklt_en_gpio))
 		pr_info("%s: bklt_en gpio not specified\n", __func__);
+
+	ctrl_pdata->bklt_en_gpio_invert =
+			of_property_read_bool(ctrl_pdev->dev.of_node,
+				"qcom,platform-bklight-en-gpio-invert");
+
+	ctrl_pdata->vdd_ext_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+		"qcom,ext-vdd-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->vdd_ext_gpio))
+		pr_info("%s: ext vdd gpio not specified\n", __func__);
 
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);
@@ -4276,6 +4293,12 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	} else {
 		ctrl_pdata->mode_gpio = -EINVAL;
 	}
+
+	ctrl_pdata->intf_mux_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			 "qcom,platform-intf-mux-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->intf_mux_gpio))
+		pr_debug("%s:%d, intf mux gpio not specified\n",
+						__func__, __LINE__);
 
 	return 0;
 }
@@ -4381,7 +4404,7 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 
 	if (ctrl_pdata->status_mode == ESD_REG ||
 			ctrl_pdata->status_mode == ESD_REG_NT35596)
-		ctrl_pdata->check_status = mdss_dsi_reg_status_check_dropbox;
+		ctrl_pdata->check_status = mdss_dsi_reg_status_check;
 	else if (ctrl_pdata->status_mode == ESD_BTA)
 		ctrl_pdata->check_status = mdss_dsi_bta_status_check;
 
@@ -4434,11 +4457,8 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 		}
 	}
 
-	pinfo->cont_splash_enabled =
-		ctrl_pdata->mdss_util->panel_intf_status(pinfo->pdest,
-		MDSS_PANEL_INTF_DSI) ? true : false;
-
-	pr_info("%s: Continuous splash %s\n", __func__,
+	pinfo->cont_splash_enabled = false;
+	pr_info("%s: Continuous splash forcibly %s\n", __func__,
 		pinfo->cont_splash_enabled ? "enabled" : "disabled");
 
 	rc = mdss_register_panel(ctrl_pdev, &(ctrl_pdata->panel_data));

@@ -1305,15 +1305,18 @@
 			<0x3800000 0x200000>,
 			<0x200a000 0x2100>;
 		reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
+		interrupt-names = "periph_irq";
 		interrupts = <0 190 0>;
 		qcom,pmic-arb-channel = <0>;
 		qcom,pmic-arb-max-peripherals = <256>;
 		qcom,pmic-arb-max-periph-interrupts = <256>;
 		qcom,pmic-arb-ee = <0>;
-		#interrupt-cells = <3>;
+		qcom,ee = <0>;
+		qcom,channel = <0>;
+		#interrupt-cells = <4>;
 		interrupt-controller;
 		#address-cells = <1>;
-		#size-cells = <0>;
+		#size-cells = <1>;
 		cell-index = <0>;
 	};
 

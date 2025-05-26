@@ -231,7 +231,6 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 			mdss_smmu->handoff_pending = false;
 
 			if (!mdss_smmu->domain_attached) {
-				pr_err("iommu attaching device for domain %d\n", i);
 				rc = arm_iommu_attach_device(mdss_smmu->dev,
 						mdss_smmu->mmu_mapping);
 				if (rc) {
@@ -242,7 +241,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 				mdss_smmu->domain_attached = true;
-				pr_err("iommu v2 domain[%i] attached\n", i);
+				pr_debug("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
 			pr_err("iommu device not attached for domain[%d]\n", i);
@@ -518,10 +517,8 @@ int mdss_smmu_fault_handler(struct iommu_domain *domain, struct device *dev,
 	} else {
 		pr_err("mdss_smmu: iova:0x%lx flags:0x%x\n",
 			iova, flags);
-		MDSS_XLOG_TOUT_HANDLER_MMI("mdp", "dsi0_ctrl", "dsi0_phy",
-		    "dsi1_ctrl", "dsi1_phy", "vbif", "vbif_nrt",
-		    "dbg_bus", "vbif_dbg_bus",
-		    "dsi_dbg_bus");
+		MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "dsi0_ctrl",
+				"dsi0_phy");
 	}
 end:
 	return -ENODEV;
@@ -780,10 +777,8 @@ int mdss_smmu_probe(struct platform_device *pdev)
 	}
 
 	if (of_find_property(pdev->dev.of_node, "iommus", NULL)) {
-		pr_err("USING iommus pdev->dev\n");
 		dev = &pdev->dev;
 	} else {
-		pr_err("GETTING dev from ctx for domain: %d\n", smmu_domain.domain);
 		/*
 		 * For old iommu driver we query the context bank device
 		 * rather than getting it from dt.
@@ -884,7 +879,7 @@ int mdss_smmu_probe(struct platform_device *pdev)
 		pr_debug("unable to map context bank base\n");
 	}
 
-	pr_err("iommu mdss smmu domain[%d] mapping and clk register successful!!!!!!!!!!!\n",
+	pr_info("iommu v2 domain[%d] mapping and clk register successful!\n",
 			smmu_domain.domain);
 	return 0;
 

@@ -413,8 +413,8 @@
 	};
 
 	qcom,pmi8950@3 {
-		spmi-slave-container;
-		reg = <0x3>;
+		compatible ="qcom,spmi-pmic";
+		reg = <0x3 0>;
 		#address-cells = <1>;
 		#size-cells = <1>;
 
@@ -430,11 +430,11 @@
 
 		labibb: qpnp-labibb-regulator {
 			status = "disabled";
-			spmi-dev-container;
 			compatible = "qcom,qpnp-labibb-regulator";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			qcom,pmic-revid = <&pmi8950_revid>;
+			qcom,qpnp-labibb-mode = "lcd";
 
 			ibb_regulator: qcom,ibb@dc00 {
 				reg = <0xdc00 0x100>;
@@ -511,7 +511,7 @@
 					"qpnp-wled-sink-base",
 					"qpnp-wled-ibb-base",
 					"qpnp-wled-lab-base";
-			interrupts = <0x3 0xd8 0x2>;
+			interrupts = <0x3 0xd8 0x2 1>;
 			interrupt-names = "sc-irq";
 			status = "okay";
 			linux,name = "wled";
@@ -530,6 +530,7 @@
 			qcom,fs-curr-ua = <20000>;
 			qcom,led-strings-list = [00 01];
 			qcom,en-ext-pfet-sc-pro;
+			qcom,pmic-revid = <&pmi8950_revid>;
 			qcom,cons-sync-write-delay-us = <1000>;
 		};
 

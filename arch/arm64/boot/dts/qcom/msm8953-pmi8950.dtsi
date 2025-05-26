@@ -16,16 +16,6 @@
 	qpnp,qpnp-labibb-mode = "lcd";
 };
 
-&usb3 {
-	vbus_dwc3-supply = <&smbcharger_charger_otg>;
-	extcon = <&qpnp_smbcharger>;
-};
-
-&qpnp_smbcharger {
-	qcom,external-typec;
-	qcom,typec-psy-name = "typec";
-};
-
 &mdss_dsi0 {
 	lab-supply = <&lab_regulator>;
 	ibb-supply = <&ibb_regulator>;

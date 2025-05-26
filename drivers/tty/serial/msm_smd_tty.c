@@ -839,7 +839,7 @@ static void smd_tty_log_init(void)
 	smd_tty_log_ctx = ipc_log_context_create(SMD_TTY_LOG_PAGES,
 						"smd_tty", 0);
 	if (!smd_tty_log_ctx)
-		pr_err("%s: Unable to create IPC log", __func__);
+		pr_err("%s: Unable to create IPC log\n", __func__);
 }
 
 static struct tty_driver *smd_tty_driver;

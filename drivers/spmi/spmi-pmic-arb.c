@@ -1323,6 +1323,7 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "intr");
 	pa->intr = devm_ioremap_resource(&ctrl->dev, res);
 	if (IS_ERR(pa->intr)) {
+		dev_err(&pdev->dev, "intr remap failed, failing probe!\n");
 		err = PTR_ERR(pa->intr);
 		goto err_put_ctrl;
 	}
@@ -1338,12 +1339,14 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cnfg");
 	pa->cnfg = devm_ioremap_resource(&ctrl->dev, res);
 	if (IS_ERR(pa->cnfg)) {
+		dev_err(&pdev->dev, "cnfg remap failed, failing probe!\n");
 		err = PTR_ERR(pa->cnfg);
 		goto err_put_ctrl;
 	}
 
 	pa->irq = platform_get_irq_byname(pdev, "periph_irq");
 	if (pa->irq < 0) {
+		dev_err(&pdev->dev, "irq failed, failing probe!\n");
 		err = pa->irq;
 		goto err_put_ctrl;
 	}
@@ -1383,6 +1386,7 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 	pa->mapping_table = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PERIPHS - 1,
 					sizeof(*pa->mapping_table), GFP_KERNEL);
 	if (!pa->mapping_table) {
+		dev_err(&pdev->dev, "mapping table failed, failing probe!\n");
 		err = -ENOMEM;
 		goto err_put_ctrl;
 	}

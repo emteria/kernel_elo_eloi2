@@ -123,6 +123,8 @@ int msm_dba_helper_i2c_write_byte(struct i2c_client *client,
 		return -EINVAL;
 	}
 
+	pr_debug("%s: [%s:0x%02x] : W[0x%02x, 0x%02x]\n", __func__,
+		 client->name, addr, reg, val);
 	client->addr = addr;
 
 	msg.addr = addr;

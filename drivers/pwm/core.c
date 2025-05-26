@@ -258,8 +258,12 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 	unsigned int i;
 	int ret;
 
+	pr_err("inside pwmchip_add_with_polarity\n");
+
 	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
 		return -EINVAL;
+
+	dev_err(chip->dev, "checking in pwmchip_add_with_polarity\n");
 
 	if (!pwm_ops_check(chip->ops))
 		return -EINVAL;
@@ -390,6 +394,7 @@ struct pwm_device *pwm_request(int pwm, const char *label)
 
 	dev = pwm_to_device(pwm);
 	if (!dev) {
+		pr_err("pwm_to_device failed for %s\n", label);
 		dev = ERR_PTR(-EPROBE_DEFER);
 		goto out;
 	}

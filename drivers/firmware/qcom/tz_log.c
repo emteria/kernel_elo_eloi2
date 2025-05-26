@@ -1082,7 +1082,7 @@ static int tz_log_probe(struct platform_device *pdev)
 	 * Get address that stores the physical location diagnostic data
 	 */
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!resource) {
+	if (!resource || 1) {
 		dev_err(&pdev->dev,
 				"%s: ERROR Missing MEM resource\n", __func__);
 		return -ENXIO;

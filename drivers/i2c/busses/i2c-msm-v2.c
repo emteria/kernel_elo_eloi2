@@ -1674,7 +1674,7 @@ static int i2c_msm_clk_path_postponed_register(struct i2c_msm_ctrl *ctrl)
 			/* log a success message if an error msg was logged */
 			ctrl->rsrcs.clk_path_vote.reg_err = false;
 			dev_err(ctrl->dev,
-				"msm_bus_scale_register_client(mstr-id:%d):0x%x (ok)",
+				"msm_bus_scale_register_client(mstr-id:%d):0x%x (ok)\n",
 				ctrl->rsrcs.clk_path_vote.mstr_id,
 				ctrl->rsrcs.clk_path_vote.client_hdl);
 		}
@@ -1684,7 +1684,7 @@ static int i2c_msm_clk_path_postponed_register(struct i2c_msm_ctrl *ctrl)
 			ctrl->rsrcs.clk_path_vote.reg_err = true;
 
 			dev_info(ctrl->dev,
-				"msm_bus_scale_register_client(mstr-id:%d):0 (not a problem)",
+				"msm_bus_scale_register_client(mstr-id:%d):0 (not a problem)\n",
 				ctrl->rsrcs.clk_path_vote.mstr_id);
 		}
 	}

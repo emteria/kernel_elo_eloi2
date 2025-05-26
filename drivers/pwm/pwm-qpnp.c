@@ -2141,6 +2141,8 @@ static int qpnp_pwm_probe(struct platform_device *pdev)
 	if (pwm_chip == NULL)
 		return -ENOMEM;
 
+	dev_err(&pdev->dev, "probing\n");
+
 	pwm_chip->regmap = dev_get_regmap(pdev->dev.parent, NULL);
 	if (!pwm_chip->regmap) {
 		dev_err(&pdev->dev, "Couldn't get parent's regmap\n");
