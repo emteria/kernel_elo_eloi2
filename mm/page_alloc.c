@@ -6836,15 +6836,12 @@ static void __setup_per_zone_wmarks(void)
 		 * scale factor in proportion to available memory, but
 		 * ensure a minimum size on small systems.
 		 */
-		min = max_t(u64, min >> 2,
-			    mult_frac(zone->managed_pages,
-				      watermark_scale_factor, 10000));
+		unsigned long low_adj  = min >> 2;   // 25% of min
+		unsigned long high_adj = min >> 1;   // 50% of min
 
-		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) +
-					low + min;
-		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
-					low + min * 2;
-
+		zone->watermark[WMARK_LOW]  = min + low_adj;
+		zone->watermark[WMARK_HIGH] = min + high_adj;
+		
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
 
