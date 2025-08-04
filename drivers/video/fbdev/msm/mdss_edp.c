@@ -287,7 +287,7 @@ int mdss_edp_mainlink_ready(struct mdss_edp_drv_pdata *ep, u32 which)
 	while (--cnt) {
 		data = edp_read(ep->base + 0x84); /* EDP_MAINLINK_READY */
 		if (data & which) {
-			pr_debug("%s: which=%x ready\n", __func__, which);
+			pr_err("%s: which=%x ready\n", __func__, which);
 			return 1;
 		}
 		usleep_range(1000, 1100);
@@ -363,7 +363,7 @@ int mdss_edp_phy_pll_ready(struct mdss_edp_drv_pdata *ep)
 		usleep_range(100, 110);
 	}
 
-	pr_debug("%s: PLL cnt=%d status=%x\n", __func__, cnt, (int)status);
+	pr_err("%s: PLL cnt=%d status=%x\n", __func__, cnt, (int)status);
 
 	if (cnt <= 0) {
 		pr_err("%s: PLL NOT ready\n", __func__);
@@ -508,11 +508,11 @@ static void mdss_edp_timing_cfg(struct mdss_edp_drv_pdata *ep)
 
 	pinfo = &ep->panel_data.panel_info;
 
-	pr_debug("%s: width=%d hporch= %d %d %d\n", __func__,
+	pr_err("%s: width=%d hporch= %d %d %d\n", __func__,
 		pinfo->xres, pinfo->lcdc.h_back_porch,
 		pinfo->lcdc.h_front_porch, pinfo->lcdc.h_pulse_width);
 
-	pr_debug("%s: height=%d vporch= %d %d %d\n", __func__,
+	pr_err("%s: height=%d vporch= %d %d %d\n", __func__,
 		pinfo->yres, pinfo->lcdc.v_back_porch,
 		pinfo->lcdc.v_front_porch, pinfo->lcdc.v_pulse_width);
 
@@ -558,7 +558,7 @@ int mdss_edp_wait4train(struct mdss_edp_drv_pdata *edp_drv)
 		ret = 0;
 	}
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	return ret;
 }
@@ -579,7 +579,7 @@ int mdss_edp_on(struct mdss_panel_data *pdata)
 	edp_drv = container_of(pdata, struct mdss_edp_drv_pdata,
 			panel_data);
 
-	pr_debug("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
+	pr_err("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
 	if (!edp_drv->cont_splash) { /* vote for clocks */
 		mdss_edp_phy_pll_reset(edp_drv);
@@ -630,7 +630,7 @@ int mdss_edp_on(struct mdss_panel_data *pdata)
 
 	edp_drv->cont_splash = 0;
 
-	pr_debug("%s:-\n", __func__);
+	pr_err("%s:-\n", __func__);
 	return ret;
 }
 
@@ -645,7 +645,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	pr_debug("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
+	pr_err("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
 	/* wait until link training is completed */
 	mutex_lock(&edp_drv->train_mutex);
@@ -682,7 +682,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 
 	mdss_edp_aux_ctrl(edp_drv, 0);
 
-	pr_debug("%s-: state_ctrl=%x\n", __func__,
+	pr_err("%s-: state_ctrl=%x\n", __func__,
 				edp_read(edp_drv->base + 0x8));
 
 	mutex_unlock(&edp_drv->train_mutex);
@@ -694,7 +694,7 @@ static int mdss_edp_event_handler(struct mdss_panel_data *pdata,
 {
 	int rc = 0;
 
-	pr_debug("%s: event=%d\n", __func__, event);
+	pr_err("%s: event=%d\n", __func__, event);
 	switch (event) {
 	case MDSS_EVENT_UNBLANK:
 		rc = mdss_edp_on(pdata);
@@ -718,19 +718,19 @@ static void mdss_edp_edid2pinfo(struct mdss_edp_drv_pdata *edp_drv)
 	pinfo = &edp_drv->panel_data.panel_info;
 
 	pinfo->clk_rate = dp->pclk;
-	pr_debug("%s: pclk=%d\n", __func__, pinfo->clk_rate);
+	pr_err("%s: pclk=%d\n", __func__, pinfo->clk_rate);
 
 	pinfo->xres = dp->h_addressable + dp->h_border * 2;
 	pinfo->yres = dp->v_addressable + dp->v_border * 2;
 
-	pr_debug("%s: x=%d y=%d\n", __func__, pinfo->xres, pinfo->yres);
+	pr_err("%s: x=%d y=%d\n", __func__, pinfo->xres, pinfo->yres);
 
 	pinfo->lcdc.h_back_porch = dp->h_blank - dp->h_fporch -
 					dp->h_sync_pulse;
 	pinfo->lcdc.h_front_porch = dp->h_fporch;
 	pinfo->lcdc.h_pulse_width = dp->h_sync_pulse;
 
-	pr_debug("%s: hporch= %d %d %d\n", __func__,
+	pr_err("%s: hporch= %d %d %d\n", __func__,
 		pinfo->lcdc.h_back_porch, pinfo->lcdc.h_front_porch,
 		pinfo->lcdc.h_pulse_width);
 
@@ -739,7 +739,7 @@ static void mdss_edp_edid2pinfo(struct mdss_edp_drv_pdata *edp_drv)
 	pinfo->lcdc.v_front_porch = dp->v_fporch;
 	pinfo->lcdc.v_pulse_width = dp->v_sync_pulse;
 
-	pr_debug("%s: vporch= %d %d %d\n", __func__,
+	pr_err("%s: vporch= %d %d %d\n", __func__,
 		pinfo->lcdc.v_back_porch, pinfo->lcdc.v_front_porch,
 		pinfo->lcdc.v_pulse_width);
 
@@ -825,7 +825,7 @@ static int mdss_edp_get_base_address(struct mdss_edp_drv_pdata *edp_drv)
 		return -ENOMEM;
 	}
 
-	pr_debug("%s: drv=%x base=%x size=%x\n", __func__,
+	pr_err("%s: drv=%x base=%x size=%x\n", __func__,
 		(int)edp_drv, (int)edp_drv->base, edp_drv->base_size);
 
 	mdss_debug_register_base("edp",
@@ -857,13 +857,13 @@ static int mdss_edp_get_mmss_cc_base_address(struct mdss_edp_drv_pdata
 
 static void mdss_edp_video_ready(struct mdss_edp_drv_pdata *ep)
 {
-	pr_debug("%s: edp_video_ready\n", __func__);
+	pr_err("%s: edp_video_ready\n", __func__);
 	complete(&ep->video_comp);
 }
 
 static void mdss_edp_idle_patterns_sent(struct mdss_edp_drv_pdata *ep)
 {
-	pr_debug("%s: idle_patterns_sent\n", __func__);
+	pr_err("%s: idle_patterns_sent\n", __func__);
 	complete(&ep->idle_comp);
 }
 
@@ -900,7 +900,7 @@ static int edp_event_thread(void *data)
 		ep->event_gndx %= HPD_EVENT_MAX;
 		spin_unlock_irqrestore(&ep->event_lock, flag);
 
-		pr_debug("%s: todo=%x\n", __func__, todo);
+		pr_err("%s: todo=%x\n", __func__, todo);
 
 		if (todo == 0)
 			continue;
@@ -953,7 +953,7 @@ irqreturn_t edp_isr(int irq, void *ptr)
 	isr1 &= ~mask1;	/* remove masks bit */
 	isr2 &= ~mask2;
 
-	pr_debug("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
+	pr_err("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
 			__func__, isr1, mask1, isr2, mask2);
 
 	ack = isr1 & EDP_INTR_STATUS1;
@@ -1098,7 +1098,7 @@ static int mdss_edp_probe(struct platform_device *pdev)
 	if (IS_ERR(pan_cfg)) {
 		return PTR_ERR(pan_cfg);
 	} else if (!pan_cfg) {
-		pr_debug("%s: not configured as prim\n", __func__);
+		pr_err("%s: not configured as prim\n", __func__);
 		return -ENODEV;
 	}
 
@@ -1207,7 +1207,7 @@ static int mdss_edp_probe(struct platform_device *pdev)
 
 	edp_drv->inited = true;
 
-	pr_debug("%s: done\n", __func__);
+	pr_err("%s: done\n", __func__);
 
 	return 0;
 

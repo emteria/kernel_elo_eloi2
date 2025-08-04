@@ -1409,7 +1409,7 @@ static inline u32 left_lm_w_from_mfd(struct msm_fb_data_type *mfd)
 	if (ctl && ctl->mixer_left) {
 		width =  ctl->mixer_left->width;
 		width -= (pinfo->lcdc.border_left + pinfo->lcdc.border_right);
-		pr_debug("ctl=%d mw=%d l=%d r=%d w=%d\n",
+		pr_err("ctl=%d mw=%d l=%d r=%d w=%d\n",
 			ctl->num, ctl->mixer_left->width,
 			pinfo->lcdc.border_left, pinfo->lcdc.border_right,
 			width);

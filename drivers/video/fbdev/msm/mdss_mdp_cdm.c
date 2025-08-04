@@ -46,7 +46,7 @@ static struct mdss_mdp_cdm *mdss_mdp_cdm_alloc(struct mdss_data_type *mdata)
 		if (atomic_read(&cdm->kref.refcount) == 0) {
 			kref_init(&cdm->kref);
 			cdm->mdata = mdata;
-			pr_debug("alloc cdm=%d\n", cdm->num);
+			pr_err("alloc cdm=%d\n", cdm->num);
 			break;
 		}
 		cdm = NULL;
@@ -69,7 +69,7 @@ static void mdss_mdp_cdm_free(struct kref *kref)
 		return;
 
 	complete_all(&cdm->free_comp);
-	pr_debug("free cdm_num = %d\n", cdm->num);
+	pr_err("free cdm_num = %d\n", cdm->num);
 
 }
 

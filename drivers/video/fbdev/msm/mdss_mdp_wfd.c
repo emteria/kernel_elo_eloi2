@@ -137,12 +137,12 @@ int mdss_mdp_wfd_setup(struct mdss_mdp_wfd *wfd,
 		return -EINVAL;
 
 	if (mdss_mdp_wfd_is_config_same(ctl->mfd, layer)) {
-		pr_debug("wfd prepared already\n");
+		pr_err("wfd prepared already\n");
 		return 0;
 	}
 
 	if (ctl->wb) {
-		pr_debug("config change, wait for pending buffer done\n");
+		pr_err("config change, wait for pending buffer done\n");
 		ret = mdss_mdp_wfd_wait_for_finish(wfd);
 		if (ret) {
 			pr_err("fail to wait for outstanding request\n");
@@ -153,7 +153,7 @@ int mdss_mdp_wfd_setup(struct mdss_mdp_wfd *wfd,
 	width = layer->buffer.width;
 	height = layer->buffer.height;
 	max_mixer_width = ctl->mdata->max_mixer_width;
-	pr_debug("widthxheight:%dx%d,wb_idx:%d, ctl:%d\n", width, height,
+	pr_err("widthxheight:%dx%d,wb_idx:%d, ctl:%d\n", width, height,
 			wb_idx, ctl->num);
 
 	wb = mdss_mdp_wb_assign(wb_idx, ctl->num);
@@ -422,7 +422,7 @@ int mdss_mdp_wfd_kickoff(struct mdss_mdp_wfd *wfd,
 
 	mutex_lock(&wfd->lock);
 	if (list_empty(&wfd->data_queue)) {
-		pr_debug("no output buffer\n");
+		pr_err("no output buffer\n");
 		mutex_unlock(&wfd->lock);
 		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_DONE);
 		return 0;

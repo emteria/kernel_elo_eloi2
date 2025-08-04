@@ -1103,10 +1103,14 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 				 struct device *dev)
 {
 	int ret;
-	if (unlikely(domain->ops->attach_dev == NULL))
+	if (unlikely(domain->ops->attach_dev == NULL)) {
+		pr_err("skip device attach due to domain->ops->attach_dev == NULL\n");
 		return -ENODEV;
+	}
 
 	ret = domain->ops->attach_dev(domain, dev);
+	pr_err("domain->ops->attach_dev returned %d for device %s\n", ret, dev_name(dev));
+
 	if (!ret) {
 		trace_attach_device_to_domain(dev);
 		iommu_debug_attach_device(domain, dev);
@@ -1114,8 +1118,10 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 		if (!strnlen(domain->name, IOMMU_DOMAIN_NAME_LEN)) {
 			strlcpy(domain->name, dev_name(dev),
 				IOMMU_DOMAIN_NAME_LEN);
+			pr_err("using domain name %s\n", domain->name);
 		}
 	}
+
 	return ret;
 }
 
@@ -1366,11 +1372,15 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	int ret = 0;
 
 	if (unlikely(domain->ops->map == NULL ||
-		     domain->pgsize_bitmap == 0UL))
+		     domain->pgsize_bitmap == 0UL)) {
+		pr_err("iommu_map failed #1\n");
 		return -ENODEV;
+	}
 
-	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING)))
+	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING))) {
+		pr_err("iommu_map failed #2\n");
 		return -EINVAL;
+	}
 
 	/* find out the minimum page size supported */
 	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
@@ -1386,18 +1396,20 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		return -EINVAL;
 	}
 
-	pr_debug("map: iova 0x%lx pa %pa size 0x%zx\n", iova, &paddr, size);
+	pr_err("map: iova 0x%lx pa %pa size 0x%zx\n", iova, &paddr, size);
 
 	while (size) {
 		size_t pgsize = iommu_pgsize(domain->pgsize_bitmap,
 						iova | paddr, size);
 
-		pr_debug("mapping: iova 0x%lx pa %pa pgsize 0x%zx\n",
-			 iova, &paddr, pgsize);
+		pr_err("mapping: iova 0x%lx pa %pa pgsize 0x%zx for domain %s\n",
+			 iova, &paddr, pgsize, domain->name);
 
 		ret = domain->ops->map(domain, iova, paddr, pgsize, prot);
-		if (ret)
+		if (ret) {
+			pr_err("iommu_map failed #3\n");
 			break;
+		}
 
 		iova += pgsize;
 		paddr += pgsize;

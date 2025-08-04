@@ -401,7 +401,7 @@
 		};
 
 		labibb: qpnp-labibb-regulator {
-			status = "disabled";
+			status = "ok";
 			compatible = "qcom,qpnp-labibb-regulator";
 			#address-cells = <1>;
 			#size-cells = <1>;

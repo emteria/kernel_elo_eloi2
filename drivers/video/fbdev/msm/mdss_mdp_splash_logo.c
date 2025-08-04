@@ -149,7 +149,9 @@ static int mdss_mdp_splash_iommu_attach(struct msm_fb_data_type *mfd)
 {
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-	int ret;
+	int rc, ret;
+
+	pr_err("started for index %d\n", mfd->index);
 
 	/*
 	 * iommu dynamic attach for following conditions.
@@ -162,45 +164,35 @@ static int mdss_mdp_splash_iommu_attach(struct msm_fb_data_type *mfd)
 		!mdss_mdp_iommu_dyn_attach_supported(mdp5_data->mdata) ||
 		!mdp5_data->splash_mem_addr ||
 		!mdp5_data->splash_mem_size) {
-		pr_debug("dynamic attach is not supported\n");
+		pr_err("dynamic attach is not supported\n");
 		return -EPERM;
 	}
 
-	/*
-	 * Putting handoff pending to false to ensure smmu attach happens
-	 * with early flag attribute
-	 */
-	mdata->handoff_pending = false;
-
-	ret = mdss_smmu_set_attribute(MDSS_IOMMU_DOMAIN_UNSECURE, EARLY_MAP, 1);
-	if (ret) {
-		pr_debug("mdss set attribute failed for early map\n");
-		goto end;
-	}
-
-	ret = mdss_iommu_ctrl(1);
-	if (IS_ERR_VALUE((unsigned long)ret)) {
-		pr_err("mdss iommu attach failed\n");
-		goto end;
-	}
-
-	ret = mdss_smmu_map(MDSS_IOMMU_DOMAIN_UNSECURE,
+	pr_err("iommu memory mapping for a=%x and s=%x\n", mdp5_data->splash_mem_addr, mdp5_data->splash_mem_size);
+	rc = mdss_smmu_map(MDSS_IOMMU_DOMAIN_UNSECURE,
 				mdp5_data->splash_mem_addr,
 				mdp5_data->splash_mem_addr,
 				mdp5_data->splash_mem_size,
 				IOMMU_READ | IOMMU_NOEXEC);
-	if (ret) {
-		pr_err("iommu memory mapping failed ret=%d\n", ret);
+	if (rc) {
+		pr_err("iommu memory mapping failed rc=%d\n", rc);
 	} else {
-		pr_debug("iommu map passed for PA=VA\n");
-		mfd->splash_info.iommu_dynamic_attached = true;
+		pr_err("before mdss_iommu_ctrl(1)\n");
+		ret = mdss_iommu_ctrl(1);
+		pr_err("returned from mdss_iommu_ctrl(1) with %d\n", ret);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("mdss iommu attach failed\n");
+			mdss_smmu_unmap(MDSS_IOMMU_DOMAIN_UNSECURE,
+					mdp5_data->splash_mem_addr,
+					mdp5_data->splash_mem_size);
+		} else {
+			pr_err("setting mfd dynamic attached\n");
+			mfd->splash_info.iommu_dynamic_attached = true;
+		}
 	}
 
-	ret = mdss_smmu_set_attribute(MDSS_IOMMU_DOMAIN_UNSECURE, EARLY_MAP, 0);
-end:
-	mdata->handoff_pending = true;
-
-	return ret;
+	pr_err("returning %d for index %d\n", rc, mfd->index);
+	return rc;
 }
 
 static void mdss_mdp_splash_unmap_splash_mem(struct msm_fb_data_type *mfd)
@@ -259,6 +251,8 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 	int rc = 0;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
+	pr_err("entered with index %d and borderfill %d\n", mfd->index, use_borderfill);
+
 	if (!mfd)
 		return -EINVAL;
 
@@ -284,10 +278,13 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 	}
 
 	/* 1-to-1 mapping */
+	pr_err("before mdss_mdp_splash_iommu_attach with bf=%d, hoff=%d, video=%d\n", use_borderfill, mdp5_data->handoff, ctl->is_video_mode);
 	mdss_mdp_splash_iommu_attach(mfd);
+	pr_err("after mdss_mdp_splash_iommu_attach\n");
 
 	if (use_borderfill && mdp5_data->handoff &&
 		!mfd->splash_info.iommu_dynamic_attached) {
+		pr_err("inside check after mdss_mdp_splash_iommu_attach\n");
 		/*
 		 * Set up border-fill on the handed off pipes.
 		 * This is needed to ensure that there are no memory
@@ -298,6 +295,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 		 * out on the dsi lanes.
 		 */
 		if (mdp5_data->handoff && ctl && ctl->is_video_mode) {
+			pr_err("calling mdss_mdp_display_commit #5\n");
 			rc = mdss_mdp_display_commit(ctl, NULL, NULL);
 			if (!IS_ERR_VALUE((unsigned long)rc)) {
 				mdss_mdp_display_wait4comp(ctl);
@@ -329,7 +327,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 	if (!mdata->splash_split_disp &&
 		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
 		mfd->panel_info->pdest == DISPLAY_1) {
-		pr_debug("delay cleanup for display %d\n",
+		pr_err("delay cleanup for display %d\n",
 						mfd->panel_info->pdest);
 		splash_mem_addr = mdp5_data->splash_mem_addr;
 		splash_mem_size = mdp5_data->splash_mem_size;
@@ -342,7 +340,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
 		mfd->panel_info->pdest == DISPLAY_2 &&
 		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_debug("free splash mem for display %d\n",
+		pr_err("free splash mem for display %d\n",
 						mfd->panel_info->pdest);
 		/* Give back the reserved memory to the system */
 		memblock_free(splash_mem_addr, splash_mem_size);
@@ -354,7 +352,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 
 	if (mdp5_data->splash_mem_addr &&
 		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_debug("free splash mem for display %d\n",
+		pr_err("free splash mem for display %d\n",
 						mfd->panel_info->pdest);
 		/* Give back the reserved memory to the system */
 		memblock_free(mdp5_data->splash_mem_addr,
@@ -363,6 +361,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 					mdp5_data->splash_mem_size);
 	}
 
+	pr_err("mdss_mdp_splash_cleanup: calling splash 0\n");
 	mdss_mdp_footswitch_ctrl_splash(0);
 end:
 	return rc;
@@ -434,9 +433,10 @@ static int mdss_mdp_splash_kickoff(struct msm_fb_data_type *mfd,
 	if (mutex_lock_interruptible(&mdp5_data->ov_lock))
 		return -EINVAL;
 
+	pr_err("calling mdss_mdp_overlay_start #5\n");
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
-		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
+		pr_err("unable to start overlay #5 %d (%d)\n", mfd->index, ret);
 		goto end;
 	}
 
@@ -574,7 +574,7 @@ static int mdss_mdp_display_splash_image(struct msm_fb_data_type *mfd)
 	pr_err("calling mdss_mdp_splash_iommu_attach\n");
 	rc = mdss_mdp_splash_iommu_attach(mfd);
 	if (rc)
-		pr_debug("iommu dynamic attach failed\n");
+		pr_err("iommu dynamic attach failed\n");
 
 	rc = mdss_mdp_splash_kickoff(mfd, &src_rect, &dest_rect);
 	if (rc)
@@ -683,6 +683,8 @@ static __ref int mdss_mdp_splash_parse_dt(struct msm_fb_data_type *mfd)
 				of_property_read_bool(pdev->dev.of_node,
 				"qcom,mdss-fb-splash-logo-enabled");
 
+	dev_err(&pdev->dev, "parsing splash dt\n");
+
 	of_find_property(pdev->dev.of_node, "qcom,memblock-reserve", &len);
 	if (len) {
 		len = len / sizeof(u32);
@@ -718,6 +720,7 @@ static __ref int mdss_mdp_splash_parse_dt(struct msm_fb_data_type *mfd)
 			offsets[0] = (u32) of_read_ulong(addr, 2);
 			offsets[1] = (u32) size;
 			of_node_put(pnode);
+			pr_err("initialized splash offsets\n");
 		} else {
 			pr_err("mem reservation for splash screen fb not present\n");
 			rc = -EINVAL;
@@ -726,20 +729,20 @@ static __ref int mdss_mdp_splash_parse_dt(struct msm_fb_data_type *mfd)
 	}
 
 	if (!memblock_is_reserved(offsets[0])) {
-		pr_debug("failed to reserve memory for fb splash\n");
+		pr_err("failed to reserve memory for fb splash\n");
 		rc = -EINVAL;
 		goto error;
 	}
 
 	mdp5_mdata->splash_mem_addr = offsets[0];
 	mdp5_mdata->splash_mem_size = offsets[1];
-	pr_debug("memaddr=%x size=%x\n", mdp5_mdata->splash_mem_addr,
+	pr_err("splash memaddr=%x size=%x\n", mdp5_mdata->splash_mem_addr,
 		mdp5_mdata->splash_mem_size);
 
 error:
 	if (!rc && !mfd->panel_info->cont_splash_enabled &&
 		mdp5_mdata->splash_mem_addr) {
-		pr_debug("mem reservation not reqd if cont splash disabled\n");
+		pr_err("mem reservation not reqd if cont splash disabled\n");
 		memblock_free(mdp5_mdata->splash_mem_addr,
 					mdp5_mdata->splash_mem_size);
 		mdss_free_bootmem(mdp5_mdata->splash_mem_addr,

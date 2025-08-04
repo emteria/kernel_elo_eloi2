@@ -37,7 +37,7 @@
 #define COMPATIBLE_NAME "qcom,mhl-sii8334"
 #define MAX_CURRENT 700000
 
-#define pr_debug_intr(...)
+#define pr_err_intr(...)
 
 #define MSC_START_BIT_MSC_CMD        (0x01 << 0)
 #define MSC_START_BIT_VS_CMD        (0x01 << 1)
@@ -258,12 +258,12 @@ static int mhl_tx_get_dt_data(struct device *dev,
 		goto error;
 	}
 
-	pr_debug("%s: id=%d\n", __func__, dev->id);
+	pr_err("%s: id=%d\n", __func__, dev->id);
 
 	/* GPIOs */
 	temp_gpio = NULL;
 	temp_gpio = devm_kzalloc(dev, sizeof(struct mdss_gpio), GFP_KERNEL);
-	pr_debug("%s: gpios allocd\n", __func__);
+	pr_err("%s: gpios allocd\n", __func__);
 	if (!(temp_gpio)) {
 		pr_err("%s: can't alloc %d gpio mem\n", __func__, i);
 		goto error;
@@ -277,14 +277,14 @@ static int mhl_tx_get_dt_data(struct device *dev,
 
 	temp_gpio->gpio = dt_gpio;
 	snprintf(temp_gpio->gpio_name, 32, "%s", "mhl-rst-gpio");
-	pr_debug("%s: rst gpio=[%d]\n", __func__,
+	pr_err("%s: rst gpio=[%d]\n", __func__,
 		 temp_gpio->gpio);
 	pdata->gpios[MHL_TX_RESET_GPIO] = temp_gpio;
 
 	/* PWR */
 	temp_gpio = NULL;
 	temp_gpio = devm_kzalloc(dev, sizeof(struct mdss_gpio), GFP_KERNEL);
-	pr_debug("%s: gpios allocd\n", __func__);
+	pr_err("%s: gpios allocd\n", __func__);
 	if (!(temp_gpio)) {
 		pr_err("%s: can't alloc %d gpio mem\n", __func__, i);
 		goto error;
@@ -297,14 +297,14 @@ static int mhl_tx_get_dt_data(struct device *dev,
 
 	temp_gpio->gpio = dt_gpio;
 	snprintf(temp_gpio->gpio_name, 32, "%s", "mhl-pwr-gpio");
-	pr_debug("%s: pmic gpio=[%d]\n", __func__,
+	pr_err("%s: pmic gpio=[%d]\n", __func__,
 		 temp_gpio->gpio);
 	pdata->gpios[MHL_TX_PMIC_PWR_GPIO] = temp_gpio;
 
 	/* INTR */
 	temp_gpio = NULL;
 	temp_gpio = devm_kzalloc(dev, sizeof(struct mdss_gpio), GFP_KERNEL);
-	pr_debug("%s: gpios allocd\n", __func__);
+	pr_err("%s: gpios allocd\n", __func__);
 	if (!(temp_gpio)) {
 		pr_err("%s: can't alloc %d gpio mem\n", __func__, i);
 		goto error;
@@ -317,7 +317,7 @@ static int mhl_tx_get_dt_data(struct device *dev,
 
 	temp_gpio->gpio = dt_gpio;
 	snprintf(temp_gpio->gpio_name, 32, "%s", "mhl-intr-gpio");
-	pr_debug("%s: intr gpio=[%d]\n", __func__,
+	pr_err("%s: intr gpio=[%d]\n", __func__,
 		 temp_gpio->gpio);
 	pdata->gpios[MHL_TX_INTR_GPIO] = temp_gpio;
 
@@ -333,7 +333,7 @@ static int mhl_tx_get_dt_data(struct device *dev,
 		pr_err("%s: can't find the device by node\n", __func__);
 		goto error;
 	}
-	pr_debug("%s: hdmi_pdev [0X%x] to pdata->pdev\n",
+	pr_err("%s: hdmi_pdev [0X%x] to pdata->pdev\n",
 	       __func__, (unsigned int)hdmi_pdev);
 
 	pdata->hdmi_pdev = hdmi_pdev;
@@ -362,10 +362,10 @@ static int mhl_sii_wait_for_rgnd(struct mhl_tx_ctrl *mhl_ctrl)
 {
 	int timeout;
 
-	pr_debug("%s:%u\n", __func__, __LINE__);
+	pr_err("%s:%u\n", __func__, __LINE__);
 
 	if (mhl_ctrl->mhl_mode) {
-		pr_debug("%s: already in mhl mode\n", __func__);
+		pr_err("%s: already in mhl mode\n", __func__);
 		return 0;
 	}
 
@@ -455,7 +455,7 @@ static int mhl_sii_device_discovery(void *data, int id,
 		/* When MHL cable is disconnected we get a sii8334
 		 * mhl_disconnect interrupt which is handled separately.
 		 */
-		pr_debug("%s: USB ID pin high\n", __func__);
+		pr_err("%s: USB ID pin high\n", __func__);
 		return id;
 	}
 
@@ -509,13 +509,13 @@ static int mhl_sii_device_discovery(void *data, int id,
 			mhl_sii_wait_for_rgnd(mhl_ctrl);
 		} else {
 			/* in MHL mode */
-			pr_debug("%s:%u\n", __func__, __LINE__);
+			pr_err("%s:%u\n", __func__, __LINE__);
 		}
 	}
 
 	rc = mhl_ctrl->mhl_mode ? 0 : 1;
 
-	pr_debug("%s: ret result: %s\n", __func__, rc ? "usb" : " mhl");
+	pr_err("%s: ret result: %s\n", __func__, rc ? "usb" : " mhl");
 	return rc;
 }
 
@@ -585,7 +585,7 @@ static void cbus_reset(struct mhl_tx_ctrl *mhl_ctrl)
 
 	/* Read the chip rev ID */
 	mhl_ctrl->chip_rev_id = MHL_SII_PAGE0_RD(0x04);
-	pr_debug("MHL: chip rev ID read=[%x]\n", mhl_ctrl->chip_rev_id);
+	pr_err("MHL: chip rev ID read=[%x]\n", mhl_ctrl->chip_rev_id);
 
 	/*
 	 * REG_SRST
@@ -818,7 +818,7 @@ static void switch_mode(struct mhl_tx_ctrl *mhl_ctrl, enum mhl_st_type to_mode,
 	int rc;
 	struct msm_hdmi_mhl_ops *hdmi_mhl_ops = mhl_ctrl->hdmi_mhl_ops;
 
-	pr_debug("%s: tx pwr on\n", __func__);
+	pr_err("%s: tx pwr on\n", __func__);
 	spin_lock_irqsave(&mhl_ctrl->lock, flags);
 	mhl_ctrl->tx_powered_off = false;
 	spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
@@ -839,7 +839,7 @@ static void switch_mode(struct mhl_tx_ctrl *mhl_ctrl, enum mhl_st_type to_mode,
 		break;
 	case POWER_STATE_D3:
 		if (mhl_ctrl->cur_state == POWER_STATE_D3) {
-			pr_debug("%s: mhl tx already in low power mode\n",
+			pr_err("%s: mhl tx already in low power mode\n",
 				__func__);
 			break;
 		}
@@ -858,7 +858,7 @@ static void switch_mode(struct mhl_tx_ctrl *mhl_ctrl, enum mhl_st_type to_mode,
 		if (hdmi_mhl_ops && hpd_off) {
 			rc = hdmi_mhl_ops->set_upstream_hpd(
 				mhl_ctrl->pdata->hdmi_pdev, 0);
-			pr_debug("%s: hdmi unset hpd %s\n", __func__,
+			pr_err("%s: hdmi unset hpd %s\n", __func__,
 				 rc ? "failed" : "passed");
 		}
 		mhl_ctrl->cur_state = POWER_STATE_D3;
@@ -882,7 +882,7 @@ static bool is_mhl_powered(void *mhl_ctx)
 		r = true;
 	spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
 
-	pr_debug("%s: ret pwr state as %x\n", __func__, r);
+	pr_err("%s: ret pwr state as %x\n", __func__, r);
 	return r;
 }
 
@@ -904,7 +904,7 @@ void mhl_drive_hpd(struct mhl_tx_ctrl *mhl_ctrl, uint8_t to_state)
 	struct i2c_client *client = mhl_ctrl->i2c_handle;
 	unsigned long flags;
 
-	pr_debug("%s: To state=[0x%x]\n", __func__, to_state);
+	pr_err("%s: To state=[0x%x]\n", __func__, to_state);
 	if (to_state == HPD_UP) {
 		/*
 		 * Drive HPD to UP state
@@ -928,7 +928,7 @@ static void mhl_msm_connection(struct mhl_tx_ctrl *mhl_ctrl)
 	uint8_t val;
 	struct i2c_client *client = mhl_ctrl->i2c_handle;
 
-	pr_debug("%s: cur st [0x%x]\n", __func__,
+	pr_err("%s: cur st [0x%x]\n", __func__,
 		mhl_ctrl->cur_state);
 
 	if (mhl_ctrl->cur_state == POWER_STATE_D0_MHL) {
@@ -990,14 +990,14 @@ static int mhl_msm_read_rgnd_int(struct mhl_tx_ctrl *mhl_ctrl)
 	/* DISC STATUS REG 2 */
 	rgnd_imp = (mhl_i2c_reg_read(client, TX_PAGE_3, 0x001C) &
 		    (BIT1 | BIT0));
-	pr_debug("imp range read=%02X\n", (int)rgnd_imp);
+	pr_err("imp range read=%02X\n", (int)rgnd_imp);
 
 	if (rgnd_impi == 0x02) {
-		pr_debug("%s: mhl sink\n", __func__);
+		pr_err("%s: mhl sink\n", __func__);
 		if (hdmi_mhl_ops) {
 			rc = hdmi_mhl_ops->set_upstream_hpd(
 				mhl_ctrl->pdata->hdmi_pdev, 1);
-			pr_debug("%s: hdmi set hpd %s\n", __func__,
+			pr_err("%s: hdmi set hpd %s\n", __func__,
 				 rc ? "failed" : "passed");
 		}
 		mhl_ctrl->mhl_mode = 1;
@@ -1005,7 +1005,7 @@ static int mhl_msm_read_rgnd_int(struct mhl_tx_ctrl *mhl_ctrl)
 		if (mhl_ctrl->notify_usb_online)
 			mhl_ctrl->notify_usb_online(mhl_ctrl->notify_ctx, 1);
 	} else {
-		pr_debug("%s: non-mhl sink\n", __func__);
+		pr_err("%s: non-mhl sink\n", __func__);
 		mhl_ctrl->mhl_mode = 0;
 		switch_mode(mhl_ctrl, POWER_STATE_D3, true);
 	}
@@ -1043,18 +1043,18 @@ static void scdt_st_chg(struct i2c_client *client)
 
 	/* tmds cstat */
 	tmds_cstat = MHL_SII_PAGE3_RD(0x0040);
-	pr_debug("%s: tmds cstat: 0x%02x\n", __func__,
+	pr_err("%s: tmds cstat: 0x%02x\n", __func__,
 		 tmds_cstat);
 
 	if (!(tmds_cstat & BIT1))
 		return;
 
 	mhl_fifo_status = MHL_SII_REG_NAME_RD(REG_INTR5);
-	pr_debug("%s: mhl fifo st: 0x%02x\n", __func__,
+	pr_err("%s: mhl fifo st: 0x%02x\n", __func__,
 		 mhl_fifo_status);
 	if (mhl_fifo_status & 0x0C) {
 		MHL_SII_REG_NAME_WR(REG_INTR5,  0x0C);
-		pr_debug("%s: mhl fifo rst\n", __func__);
+		pr_err("%s: mhl fifo rst\n", __func__);
 		MHL_SII_REG_NAME_WR(REG_SRST, 0x94);
 		MHL_SII_REG_NAME_WR(REG_SRST, 0x84);
 	}
@@ -1068,7 +1068,7 @@ static int dev_detect_isr(struct mhl_tx_ctrl *mhl_ctrl)
 
 	/* INTR_STATUS4 */
 	status = MHL_SII_REG_NAME_RD(REG_INTR4);
-	pr_debug("%s: reg int4 st=%02X\n", __func__, status);
+	pr_err("%s: reg int4 st=%02X\n", __func__, status);
 
 	if ((status == 0x00) &&
 	    (mhl_ctrl->cur_state == POWER_STATE_D3)) {
@@ -1083,20 +1083,20 @@ static int dev_detect_isr(struct mhl_tx_ctrl *mhl_ctrl)
 	}
 
 	if ((status & BIT0) && (mhl_ctrl->chip_rev_id < 1)) {
-		pr_debug("%s: scdt intr\n", __func__);
+		pr_err("%s: scdt intr\n", __func__);
 		scdt_st_chg(client);
 	}
 
 	if (status & BIT1)
-		pr_debug("mhl: int4 bit1 set\n");
+		pr_err("mhl: int4 bit1 set\n");
 
 	/* mhl_est interrupt */
 	if (status & BIT2) {
-		pr_debug("%s: mhl_est st=%02X\n", __func__,
+		pr_err("%s: mhl_est st=%02X\n", __func__,
 			 (int) status);
 		mhl_msm_connection(mhl_ctrl);
 	} else if (status & BIT3) {
-		pr_debug("%s: uUSB-a type dev detct\n", __func__);
+		pr_err("%s: uUSB-a type dev detct\n", __func__);
 		power_supply_changed(&mhl_ctrl->mhl_psy);
 		mhl_drive_hpd(mhl_ctrl, HPD_DOWN);
 		return 0;
@@ -1104,7 +1104,7 @@ static int dev_detect_isr(struct mhl_tx_ctrl *mhl_ctrl)
 
 	if (status & BIT5) {
 		/* clr intr - reg int4 */
-		pr_debug("%s: mhl discon: int4 st=%02X\n", __func__,
+		pr_err("%s: mhl discon: int4 st=%02X\n", __func__,
 			 (int)status);
 		mhl_ctrl->mhl_det_discon = true;
 
@@ -1123,7 +1123,7 @@ static int dev_detect_isr(struct mhl_tx_ctrl *mhl_ctrl)
 	if ((mhl_ctrl->cur_state != POWER_STATE_D0_NO_MHL) &&
 	    (status & BIT6)) {
 		/* rgnd rdy Intr */
-		pr_debug("%s: rgnd ready intr\n", __func__);
+		pr_err("%s: rgnd ready intr\n", __func__);
 		switch_mode(mhl_ctrl, POWER_STATE_D0_NO_MHL, true);
 		mhl_msm_read_rgnd_int(mhl_ctrl);
 	}
@@ -1181,7 +1181,7 @@ static void mhl_tx_down(struct mhl_tx_ctrl *mhl_ctrl)
 	spin_lock_irqsave(&mhl_ctrl->lock, flags);
 	mhl_ctrl->tx_powered_off = true;
 	spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
-	pr_debug("%s: disabled\n", __func__);
+	pr_err("%s: disabled\n", __func__);
 	disable_irq_nosync(client->irq);
 }
 
@@ -1210,12 +1210,12 @@ static void mhl_hpd_stat_isr(struct mhl_tx_ctrl *mhl_ctrl)
 		 * MSC REQ ABRT REASON
 		 */
 		cbus_stat = MHL_SII_CBUS_RD(0x0D);
-		pr_debug("%s: cbus_stat=[0x%02x] cur_pwr=[%u]\n",
+		pr_err("%s: cbus_stat=[0x%02x] cur_pwr=[%u]\n",
 			 __func__, cbus_stat, mhl_ctrl->cur_state);
 
 		spin_lock_irqsave(&mhl_ctrl->lock, flags);
 		t = mhl_ctrl->dwnstream_hpd;
-		pr_debug("%s: %u: dwnstrm_hpd=0x%02x\n",
+		pr_err("%s: %u: dwnstrm_hpd=0x%02x\n",
 			 __func__, __LINE__, mhl_ctrl->dwnstream_hpd);
 		spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
 
@@ -1224,13 +1224,13 @@ static void mhl_hpd_stat_isr(struct mhl_tx_ctrl *mhl_ctrl)
 
 			mhl_drive_hpd(mhl_ctrl, status ? HPD_UP : HPD_DOWN);
 			if (!status && mhl_ctrl->mhl_det_discon) {
-				pr_debug("%s:%u: power_down\n",
+				pr_err("%s:%u: power_down\n",
 					 __func__, __LINE__);
 				mhl_tx_down(mhl_ctrl);
 			}
 			spin_lock_irqsave(&mhl_ctrl->lock, flags);
 			mhl_ctrl->dwnstream_hpd = cbus_stat;
-			pr_debug("%s: %u: dwnstrm_hpd=0x%02x\n",
+			pr_err("%s: %u: dwnstrm_hpd=0x%02x\n",
 				 __func__, __LINE__, mhl_ctrl->dwnstream_hpd);
 			spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
 			mhl_ctrl->mhl_det_discon = false;
@@ -1245,19 +1245,19 @@ static void mhl_sii_cbus_process_errors(struct i2c_client *client,
 
 	if (int_status & BIT2) {
 		abort_reason = MHL_SII_REG_NAME_RD(REG_DDC_ABORT_REASON);
-		pr_debug("%s: CBUS DDC Abort Reason(0x%02x)\n",
+		pr_err("%s: CBUS DDC Abort Reason(0x%02x)\n",
 			 __func__, abort_reason);
 	}
 	if (int_status & BIT5) {
 		abort_reason = MHL_SII_REG_NAME_RD(REG_PRI_XFR_ABORT_REASON);
-		pr_debug("%s: CBUS MSC Requestor Abort Reason(0x%02x)\n",
+		pr_err("%s: CBUS MSC Requestor Abort Reason(0x%02x)\n",
 			 __func__, abort_reason);
 		MHL_SII_REG_NAME_WR(REG_PRI_XFR_ABORT_REASON, 0xFF);
 	}
 	if (int_status & BIT6) {
 		abort_reason = MHL_SII_REG_NAME_RD(
 			REG_CBUS_PRI_FWR_ABORT_REASON);
-		pr_debug("%s: CBUS MSC Responder Abort Reason(0x%02x)\n",
+		pr_err("%s: CBUS MSC Responder Abort Reason(0x%02x)\n",
 			 __func__, abort_reason);
 		MHL_SII_REG_NAME_WR(REG_CBUS_PRI_FWR_ABORT_REASON, 0xFF);
 	}
@@ -1273,7 +1273,7 @@ int mhl_send_msc_command(struct mhl_tx_ctrl *mhl_ctrl,
 	struct i2c_client *client = mhl_ctrl->i2c_handle;
 
 	if (mhl_ctrl->cur_state != POWER_STATE_D0_MHL) {
-		pr_debug("%s: power_state:%02x CBUS(0x0A):%02x\n",
+		pr_err("%s: power_state:%02x CBUS(0x0A):%02x\n",
 			 __func__,
 			 mhl_ctrl->cur_state,
 			 MHL_SII_REG_NAME_RD(REG_CBUS_BUS_STATUS));
@@ -1283,7 +1283,7 @@ int mhl_send_msc_command(struct mhl_tx_ctrl *mhl_ctrl,
 	if (!req)
 		return -EFAULT;
 
-	pr_debug("%s: command=0x%02x offset=0x%02x %02x %02x",
+	pr_err("%s: command=0x%02x offset=0x%02x %02x %02x",
 		 __func__,
 		 req->command,
 		 req->offset,
@@ -1360,7 +1360,7 @@ int mhl_send_msc_command(struct mhl_tx_ctrl *mhl_ctrl,
 		break;
 	}
 	mhl_msc_command_done(mhl_ctrl, req);
-	pr_debug("%s: msc cmd done\n", __func__);
+	pr_err("%s: msc cmd done\n", __func__);
 	return 0;
 
 cbus_send_fail:
@@ -1397,7 +1397,7 @@ static void mhl_cbus_isr(struct mhl_tx_ctrl *mhl_ctrl)
 	if (regval)
 		MHL_SII_REG_NAME_WR(REG_CBUS_INTR_STATUS, regval);
 
-	pr_debug("%s: CBUS_INT = %02x\n", __func__, regval);
+	pr_err("%s: CBUS_INT = %02x\n", __func__, regval);
 
 	/* MSC_MSG (RCP/RAP) */
 	if (regval & BIT3) {
@@ -1420,7 +1420,7 @@ static void mhl_cbus_isr(struct mhl_tx_ctrl *mhl_ctrl)
 	if (regval)
 		MHL_SII_REG_NAME_WR(REG_CBUS_MSC_INT2_STATUS, regval);
 
-	pr_debug("%s: CBUS_MSC_INT2 = %02x\n", __func__, regval);
+	pr_err("%s: CBUS_MSC_INT2 = %02x\n", __func__, regval);
 
 	/* received SET_INT */
 	if (regval & BIT2) {
@@ -1433,17 +1433,17 @@ static void mhl_cbus_isr(struct mhl_tx_ctrl *mhl_ctrl)
 			/* No need to go to low power mode */
 			spin_lock_irqsave(&mhl_ctrl->lock, flags);
 			mhl_ctrl->dwnstream_hpd = 0x00;
-			pr_debug("%s: %u: dwnstrm_hpd=0x%02x\n",
+			pr_err("%s: %u: dwnstrm_hpd=0x%02x\n",
 				 __func__, __LINE__, mhl_ctrl->dwnstream_hpd);
 			spin_unlock_irqrestore(&mhl_ctrl->lock, flags);
 		}
 
-		pr_debug("%s: MHL_INT_0 = %02x\n", __func__, intr);
+		pr_err("%s: MHL_INT_0 = %02x\n", __func__, intr);
 		intr = MHL_SII_REG_NAME_RD(REG_CBUS_SET_INT_1);
 		MHL_SII_REG_NAME_WR(REG_CBUS_SET_INT_1, intr);
 		mhl_msc_recv_set_int(mhl_ctrl, 1, intr);
 
-		pr_debug("%s: MHL_INT_1 = %02x\n", __func__, intr);
+		pr_err("%s: MHL_INT_1 = %02x\n", __func__, intr);
 		MHL_SII_REG_NAME_WR(REG_CBUS_SET_INT_2, 0xFF);
 		MHL_SII_REG_NAME_WR(REG_CBUS_SET_INT_3, 0xFF);
 	}
@@ -1455,10 +1455,10 @@ static void mhl_cbus_isr(struct mhl_tx_ctrl *mhl_ctrl)
 		stat = MHL_SII_REG_NAME_RD(REG_CBUS_WRITE_STAT_0);
 		mhl_msc_recv_write_stat(mhl_ctrl, 0, stat);
 
-		pr_debug("%s: MHL_STATUS_0 = %02x\n", __func__, stat);
+		pr_err("%s: MHL_STATUS_0 = %02x\n", __func__, stat);
 		stat = MHL_SII_REG_NAME_RD(REG_CBUS_WRITE_STAT_1);
 		mhl_msc_recv_write_stat(mhl_ctrl, 1, stat);
-		pr_debug("%s: MHL_STATUS_1 = %02x\n", __func__, stat);
+		pr_err("%s: MHL_STATUS_1 = %02x\n", __func__, stat);
 
 		MHL_SII_REG_NAME_WR(REG_CBUS_WRITE_STAT_0, 0xFF);
 		MHL_SII_REG_NAME_WR(REG_CBUS_WRITE_STAT_1, 0xFF);
@@ -1485,7 +1485,7 @@ static irqreturn_t mhl_tx_isr(int irq, void *data)
 	struct mhl_tx_ctrl *mhl_ctrl = (struct mhl_tx_ctrl *)data;
 	unsigned long flags;
 
-	pr_debug("%s: Getting Interrupts\n", __func__);
+	pr_err("%s: Getting Interrupts\n", __func__);
 
 	spin_lock_irqsave(&mhl_ctrl->lock, flags);
 	if (mhl_ctrl->tx_powered_off) {
@@ -1501,9 +1501,9 @@ static irqreturn_t mhl_tx_isr(int irq, void *data)
 	 */
 	rc = dev_detect_isr(mhl_ctrl);
 	if (rc)
-		pr_debug("%s: dev_detect_isr rc=[%d]\n", __func__, rc);
+		pr_err("%s: dev_detect_isr rc=[%d]\n", __func__, rc);
 
-	pr_debug("%s: cur pwr state is [0x%x]\n",
+	pr_err("%s: cur pwr state is [0x%x]\n",
 		 __func__, mhl_ctrl->cur_state);
 
 	/*
@@ -1533,7 +1533,7 @@ static int mhl_sii_reg_config(struct i2c_client *client, bool enable)
 	static struct regulator *reg_8941_vdda;
 	int rc = -EINVAL;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	if (!enable) {
 		if (reg_8941_vdda) {
@@ -1579,7 +1579,7 @@ static int mhl_sii_reg_config(struct i2c_client *client, bool enable)
 			       "avcc_1.8V", enable, rc);
 			goto l24_fail;
 		} else {
-			pr_debug("%s: vreg L24 %s\n",
+			pr_err("%s: vreg L24 %s\n",
 				 __func__, (enable ? "enabled" : "disabled"));
 		}
 	}
@@ -1597,11 +1597,11 @@ static int mhl_sii_reg_config(struct i2c_client *client, bool enable)
 		else
 			rc = regulator_disable(reg_8941_l02);
 		if (rc) {
-			pr_debug("'%s' regulator configure[%u] failed, rc=%d\n",
+			pr_err("'%s' regulator configure[%u] failed, rc=%d\n",
 				 "avcc_1.2V", enable, rc);
 			goto l02_fail;
 		} else {
-			pr_debug("%s: vreg L02 %s\n",
+			pr_err("%s: vreg L02 %s\n",
 				 __func__, (enable ? "enabled" : "disabled"));
 		}
 	}
@@ -1623,7 +1623,7 @@ static int mhl_sii_reg_config(struct i2c_client *client, bool enable)
 			       "SMPS3A", enable, rc);
 			goto smps3a_fail;
 		} else {
-			pr_debug("%s: vreg SMPS3A %s\n",
+			pr_err("%s: vreg SMPS3A %s\n",
 				 __func__, (enable ? "enabled" : "disabled"));
 		}
 	}
@@ -1645,7 +1645,7 @@ static int mhl_sii_reg_config(struct i2c_client *client, bool enable)
 			       "VDDA", enable, rc);
 			goto vdda_fail;
 		} else {
-			pr_debug("%s: vreg VDDA %s\n",
+			pr_err("%s: vreg VDDA %s\n",
 				 __func__, (enable ? "enabled" : "disabled"));
 		}
 	}
@@ -1675,7 +1675,7 @@ static int mhl_vreg_config(struct mhl_tx_ctrl *mhl_ctrl, uint8_t on)
 	struct i2c_client *client = mhl_ctrl->i2c_handle;
 	int pwr_gpio = mhl_ctrl->pdata->gpios[MHL_TX_PMIC_PWR_GPIO]->gpio;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 	if (on) {
 		ret = gpio_request(pwr_gpio,
 		    mhl_ctrl->pdata->gpios[MHL_TX_PMIC_PWR_GPIO]->gpio_name);
@@ -1696,13 +1696,13 @@ static int mhl_vreg_config(struct mhl_tx_ctrl *mhl_ctrl, uint8_t on)
 			pr_err("%s: regulator enable failed\n", __func__);
 			goto vreg_config_failed;
 		}
-		pr_debug("%s: mhl sii power on successful\n", __func__);
+		pr_err("%s: mhl sii power on successful\n", __func__);
 	} else {
 		pr_warn("%s: turning off pwr controls\n", __func__);
 		mhl_sii_reg_config(client, false);
 		gpio_free(pwr_gpio);
 	}
-	pr_debug("%s: successful\n", __func__);
+	pr_err("%s: successful\n", __func__);
 	return 0;
 vreg_config_failed:
 	gpio_free(pwr_gpio);
@@ -1754,7 +1754,7 @@ static int mhl_gpio_config(struct mhl_tx_ctrl *mhl_ctrl, int on)
 			}
 			mhl_ctrl->i2c_handle->irq = gpio_to_irq(
 				temp_intr_gpio->gpio);
-			pr_debug("%s: gpio_to_irq=%d\n",
+			pr_err("%s: gpio_to_irq=%d\n",
 				 __func__, mhl_ctrl->i2c_handle->irq);
 		}
 	} else {
@@ -1762,7 +1762,7 @@ static int mhl_gpio_config(struct mhl_tx_ctrl *mhl_ctrl, int on)
 		gpio_free(temp_intr_gpio->gpio);
 		gpio_free(temp_reset_gpio->gpio);
 	}
-	pr_debug("%s: successful\n", __func__);
+	pr_err("%s: successful\n", __func__);
 	return 0;
 }
 
@@ -1892,7 +1892,7 @@ static int mhl_i2c_probe(struct i2c_client *client,
 		goto failed_probe_pwr;
 	}
 
-	pr_debug("%s: i2c client addr is [%x]\n", __func__, client->addr);
+	pr_err("%s: i2c client addr is [%x]\n", __func__, client->addr);
 	if (mhl_ctrl->pdata->hdmi_pdev) {
 		rc = msm_hdmi_register_mhl(mhl_ctrl->pdata->hdmi_pdev,
 					   hdmi_mhl_ops, mhl_ctrl);
@@ -1990,7 +1990,7 @@ static int mhl_i2c_suspend_sub(struct i2c_client *client)
 {
 	struct mhl_tx_ctrl *mhl_ctrl = i2c_get_clientdata(client);
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	if (!mhl_ctrl) {
 		pr_err("%s: invalid ctrl data\n", __func__);
@@ -2012,7 +2012,7 @@ static int mhl_i2c_suspend_sub(struct i2c_client *client)
 
 static int mhl_i2c_resume_sub(struct i2c_client *client)
 {
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	return 0;
 }
@@ -2023,7 +2023,7 @@ static int mhl_i2c_suspend(struct i2c_client *client, pm_message_t state)
 {
 	if (!client)
 		return -ENODEV;
-	pr_debug("%s: mhl suspend\n", __func__);
+	pr_err("%s: mhl suspend\n", __func__);
 	return mhl_i2c_suspend_sub(client);
 }
 
@@ -2031,7 +2031,7 @@ static int mhl_i2c_resume(struct i2c_client *client)
 {
 	if (!client)
 		return -ENODEV;
-	pr_debug("%s: mhl resume\n", __func__);
+	pr_err("%s: mhl resume\n", __func__);
 	return mhl_i2c_resume_sub(client);
 }
 #else
@@ -2047,7 +2047,7 @@ static int mhl_i2c_pm_suspend(struct device *dev)
 
 	if (!client)
 		return -ENODEV;
-	pr_debug("%s: mhl pm suspend\n", __func__);
+	pr_err("%s: mhl pm suspend\n", __func__);
 	return mhl_i2c_suspend_sub(client);
 
 }
@@ -2059,7 +2059,7 @@ static int mhl_i2c_pm_resume(struct device *dev)
 
 	if (!client)
 		return -ENODEV;
-	pr_debug("%s: mhl pm resume\n", __func__);
+	pr_err("%s: mhl pm resume\n", __func__);
 	return mhl_i2c_resume_sub(client);
 }
 

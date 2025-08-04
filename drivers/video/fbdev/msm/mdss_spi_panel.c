@@ -42,18 +42,18 @@ static int mdss_spi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				panel_data);
 
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
-		pr_debug("%s:%d, reset line not configured\n",
+		pr_err("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
 		return rc;
 	}
 
 	if (!gpio_is_valid(ctrl_pdata->disp_dc_gpio)) {
-		pr_debug("%s:%d, dc line not configured\n",
+		pr_err("%s:%d, dc line not configured\n",
 			   __func__, __LINE__);
 		return rc;
 	}
 
-	pr_debug("%s: enable = %d\n", __func__, enable);
+	pr_err("%s: enable = %d\n", __func__, enable);
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
 	if (enable) {
@@ -80,7 +80,7 @@ static int mdss_spi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
-			pr_debug("%s: Panel Not properly turned OFF\n",
+			pr_err("%s: Panel Not properly turned OFF\n",
 						__func__);
 			ctrl_pdata->ctrl_state &= ~CTRL_STATE_PANEL_INIT;
 			pr_err("%s: Reset panel done\n", __func__);
@@ -179,7 +179,7 @@ static int mdss_spi_panel_power_on(struct mdss_panel_data *pdata)
 	 */
 	if (pdata->panel_info.cont_splash_enabled) {
 		if (mdss_spi_panel_pinctrl_set_state(ctrl_pdata, true))
-			pr_debug("reset enable: pinctrl not enabled\n");
+			pr_err("reset enable: pinctrl not enabled\n");
 
 		ret = mdss_spi_panel_reset(pdata, 1);
 		if (ret)
@@ -237,11 +237,11 @@ static int mdss_spi_panel_power_ctrl(struct mdss_panel_data *pdata,
 	}
 
 	pinfo = &pdata->panel_info;
-	pr_debug("%s: cur_power_state=%d req_power_state=%d\n", __func__,
+	pr_err("%s: cur_power_state=%d req_power_state=%d\n", __func__,
 		pinfo->panel_power_state, power_state);
 
 	if (pinfo->panel_power_state == power_state) {
-		pr_debug("%s: no change needed\n", __func__);
+		pr_err("%s: no change needed\n", __func__);
 		return 0;
 	}
 
@@ -357,10 +357,10 @@ static int mdss_spi_panel_event_handler(struct mdss_panel_data *pdata,
 		rc = mdss_spi_panel_power_ctrl(pdata, power_state);
 		break;
 	default:
-		pr_debug("%s: unhandled event=%d\n", __func__, event);
+		pr_err("%s: unhandled event=%d\n", __func__, event);
 		break;
 	}
-	pr_debug("%s-:event=%d, rc=%d\n", __func__, event, rc);
+	pr_err("%s-:event=%d, rc=%d\n", __func__, event, rc);
 	return rc;
 }
 
@@ -512,7 +512,7 @@ static int mdss_spi_panel_on(struct mdss_panel_data *pdata)
 
 	pinfo->blank_state = MDSS_PANEL_BLANK_UNBLANK;
 
-	pr_debug("%s:-\n", __func__);
+	pr_err("%s:-\n", __func__);
 
 	return 0;
 }
@@ -550,7 +550,7 @@ static int mdss_spi_panel_off(struct mdss_panel_data *pdata)
 
 	pinfo->blank_state = MDSS_PANEL_BLANK_BLANK;
 
-	pr_debug("%s:-\n", __func__);
+	pr_err("%s:-\n", __func__);
 	return 0;
 }
 
@@ -595,10 +595,10 @@ static int mdss_spi_get_panel_vreg_data(struct device *dev,
 		mp->num_vreg++;
 	}
 	if (mp->num_vreg == 0) {
-		pr_debug("%s: no vreg\n", __func__);
+		pr_err("%s: no vreg\n", __func__);
 		goto novreg;
 	} else {
-		pr_debug("%s: vreg found. count=%d\n", __func__, mp->num_vreg);
+		pr_err("%s: vreg found. count=%d\n", __func__, mp->num_vreg);
 	}
 
 	mp->vreg_config = kcalloc(mp->num_vreg, sizeof(struct mdss_vreg),
@@ -663,7 +663,7 @@ static int mdss_spi_get_panel_vreg_data(struct device *dev,
 			rc = of_property_read_u32(supply_node,
 				"qcom,supply-pre-on-sleep", &tmp);
 			if (rc) {
-				pr_debug("%s: error read pre on value\n",
+				pr_err("%s: error read pre on value\n",
 						__func__);
 				rc = 0;
 			} else {
@@ -673,7 +673,7 @@ static int mdss_spi_get_panel_vreg_data(struct device *dev,
 			rc = of_property_read_u32(supply_node,
 				"qcom,supply-pre-off-sleep", &tmp);
 			if (rc) {
-				pr_debug("%s: error read pre off value\n",
+				pr_err("%s: error read pre off value\n",
 						__func__);
 				rc = 0;
 			} else {
@@ -684,7 +684,7 @@ static int mdss_spi_get_panel_vreg_data(struct device *dev,
 			rc = of_property_read_u32(supply_node,
 				"qcom,supply-post-on-sleep", &tmp);
 			if (rc) {
-				pr_debug("%s: error read post on value\n",
+				pr_err("%s: error read post on value\n",
 						__func__);
 				rc = 0;
 			} else {
@@ -694,7 +694,7 @@ static int mdss_spi_get_panel_vreg_data(struct device *dev,
 			rc = of_property_read_u32(supply_node,
 				"qcom,supply-post-off-sleep", &tmp);
 			if (rc) {
-				pr_debug("%s: error read post off value\n",
+				pr_err("%s: error read post off value\n",
 						__func__);
 				rc = 0;
 			} else {
@@ -783,7 +783,7 @@ static int mdss_spi_panel_parse_cmds(struct device_node *np,
 		len -= dchdr->dlen;
 	}
 
-	pr_debug("%s: dcs_cmd=%x, len=%d, cmd_cnt=%d\n", __func__,
+	pr_err("%s: dcs_cmd=%x, len=%d, cmd_cnt=%d\n", __func__,
 		pcmds->buf[0], pcmds->blen, pcmds->cmd_cnt);
 
 	return 0;
@@ -846,7 +846,7 @@ static bool mdss_spi_reg_status_check(struct spi_panel_data *ctrl_pdata)
 		return false;
 	}
 
-	pr_debug("%s: Checking Register status\n", __func__);
+	pr_err("%s: Checking Register status\n", __func__);
 
 	ret = mdss_spi_read_panel_data(&ctrl_pdata->panel_data,
 					ctrl_pdata->panel_status_reg,
@@ -856,7 +856,7 @@ static bool mdss_spi_reg_status_check(struct spi_panel_data *ctrl_pdata)
 		pr_err("%s: Read status register returned error\n", __func__);
 	} else {
 		for (i = 0; i < ctrl_pdata->status_cmds_rlen; i++) {
-			pr_debug("act_value[%d] = %x, exp_value[%d] = %x\n",
+			pr_err("act_value[%d] = %x, exp_value[%d] = %x\n",
 					i, ctrl_pdata->act_status_value[i],
 					i, ctrl_pdata->exp_status_value[i]);
 			if (ctrl_pdata->act_status_value[i] !=
@@ -1020,13 +1020,13 @@ static int mdss_spi_panel_parse_dt(struct device_node *np,
 		if (!strcmp(data, "bl_ctrl_wled")) {
 			led_trigger_register_simple("bkl-trigger",
 				&bl_led_trigger);
-			pr_debug("%s: SUCCESS-> WLED TRIGGER register\n",
+			pr_err("%s: SUCCESS-> WLED TRIGGER register\n",
 				__func__);
 			ctrl_pdata->bklt_ctrl = SPI_BL_WLED;
 		} else if (!strcmp(data, "bl_gpio_pulse")) {
 			led_trigger_register_simple("gpio-bklt-trigger",
 				&bl_led_trigger);
-			pr_debug("%s: SUCCESS-> GPIO PULSE TRIGGER register\n",
+			pr_err("%s: SUCCESS-> GPIO PULSE TRIGGER register\n",
 				__func__);
 			ctrl_pdata->bklt_ctrl = SPI_BL_WLED;
 		} else if (!strcmp(data, "bl_ctrl_pwm")) {
@@ -1062,7 +1062,7 @@ static int mdss_spi_panel_parse_dt(struct device_node *np,
 				tmp = of_get_named_gpio(np,
 					"qcom,mdss-spi-pwm-gpio", 0);
 				ctrl_pdata->pwm_pmic_gpio = tmp;
-				pr_debug("%s: Configured PWM bklt ctrl\n",
+				pr_err("%s: Configured PWM bklt ctrl\n",
 								 __func__);
 			}
 		}
@@ -1132,7 +1132,7 @@ static void mdss_spi_panel_bklt_pwm(struct spi_panel_data *ctrl, int level)
 	duty = level * ctrl->pwm_period;
 	duty /= ctrl->bklt_max;
 
-	pr_debug("%s: bklt_ctrl=%d pwm_period=%d pwm_gpio=%d pwm_lpg_chan=%d\n",
+	pr_err("%s: bklt_ctrl=%d pwm_period=%d pwm_gpio=%d pwm_lpg_chan=%d\n",
 			__func__, ctrl->bklt_ctrl, ctrl->pwm_period,
 				ctrl->pwm_pmic_gpio, ctrl->pwm_lpg_chan);
 
@@ -1222,14 +1222,14 @@ static int mdss_spi_panel_init(struct device_node *node,
 
 	pinfo = &ctrl_pdata->panel_data.panel_info;
 
-	pr_debug("%s:%d\n", __func__, __LINE__);
+	pr_err("%s:%d\n", __func__, __LINE__);
 	pinfo->panel_name[0] = '\0';
 	panel_name = of_get_property(node, "qcom,mdss-spi-panel-name", NULL);
 	if (!panel_name) {
 		pr_info("%s:%d, Panel name not specified\n",
 						__func__, __LINE__);
 	} else {
-		pr_debug("%s: Panel Name = %s\n", __func__, panel_name);
+		pr_err("%s: Panel Name = %s\n", __func__, panel_name);
 		strlcpy(&pinfo->panel_name[0], panel_name, MDSS_MAX_PANEL_LEN);
 	}
 	rc = mdss_spi_panel_parse_dt(node, ctrl_pdata);
@@ -1276,7 +1276,7 @@ static int mdss_spi_get_panel_cfg(char *panel_cfg,
 		return 0;
 	}
 
-	pr_debug("%s:%d: cfg:[%s]\n", __func__, __LINE__,
+	pr_err("%s:%d: cfg:[%s]\n", __func__, __LINE__,
 		 pan_cfg->arg_cfg);
 	ctrl_pdata->panel_data.panel_info.is_prim_panel = true;
 	rc = strlcpy(panel_cfg, pan_cfg->arg_cfg,
@@ -1371,7 +1371,7 @@ static struct device_node *mdss_spi_pref_prim_panel(
 {
 	struct device_node *spi_pan_node = NULL;
 
-	pr_debug("%s:%d: Select primary panel from dt\n",
+	pr_err("%s:%d: Select primary panel from dt\n",
 					__func__, __LINE__);
 	spi_pan_node = of_parse_phandle(pdev->dev.of_node,
 					"qcom,spi-pref-prim-pan", 0);
@@ -1463,7 +1463,7 @@ static int spi_panel_device_register(struct device_node *pan_node,
 		return rc;
 	}
 
-	pr_debug("%s: Panel data initialized\n", __func__);
+	pr_err("%s: Panel data initialized\n", __func__);
 	return 0;
 }
 
@@ -1518,7 +1518,7 @@ static struct device_node *mdss_spi_find_panel_of_node(
 			panel_name[i] = 0;
 		}
 
-		pr_debug("%s:%d:%s:%s\n", __func__, __LINE__,
+		pr_err("%s:%d:%s:%s\n", __func__, __LINE__,
 			 panel_cfg, panel_name);
 
 		mdss_node = of_parse_phandle(pdev->dev.of_node,
@@ -1603,7 +1603,7 @@ static int mdss_spi_panel_probe(struct platform_device *pdev)
 		pr_info("%s:%d, Ctrl name not specified\n",
 			__func__, __LINE__);
 	else
-		pr_debug("%s: Ctrl name = %s\n",
+		pr_err("%s: Ctrl name = %s\n",
 			__func__, ctrl_name);
 
 
@@ -1672,7 +1672,7 @@ static int mdss_spi_panel_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	pr_debug("%s: spi panel  initialized\n", __func__);
+	pr_err("%s: spi panel  initialized\n", __func__);
 	return 0;
 
 error_pan_node:

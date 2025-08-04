@@ -187,7 +187,7 @@ int mdss_qpic_alloc_fb_mem(struct msm_fb_data_type *mfd)
 						size,
 						&qpic_res->fb_phys,
 						GFP_KERNEL);
-		pr_debug("%s size=%d vir_addr=%x phys_addr=%x",
+		pr_err("%s size=%d vir_addr=%x phys_addr=%x",
 			__func__, size, (int)qpic_res->fb_virt,
 			(int)qpic_res->fb_phys);
 		if (!qpic_res->fb_virt) {
@@ -200,7 +200,7 @@ int mdss_qpic_alloc_fb_mem(struct msm_fb_data_type *mfd)
 		qpic_res->cmd_buf_virt = dma_alloc_writecombine(
 			NULL, QPIC_MAX_CMD_BUF_SIZE,
 			&qpic_res->cmd_buf_phys, GFP_KERNEL);
-		pr_debug("%s cmd_buf virt=%x phys=%x", __func__,
+		pr_err("%s cmd_buf virt=%x phys=%x", __func__,
 			(int)qpic_res->cmd_buf_virt,
 			qpic_res->cmd_buf_phys);
 		if (!qpic_res->cmd_buf_virt) {
@@ -571,7 +571,7 @@ static int qpic_send_pkt_sw(u32 cmd, u32 len, u8 *param)
 	}
 
 	if ((len & 0x1) != 0) {
-		pr_debug("%s: number of bytes needs be even", __func__);
+		pr_err("%s: number of bytes needs be even", __func__);
 		len = (len + 1) & (~0x1);
 	}
 	QPIC_OUTP(QPIC_REG_QPIC_LCDC_IRQ_CLR, 0xff);

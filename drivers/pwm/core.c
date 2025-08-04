@@ -258,12 +258,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 	unsigned int i;
 	int ret;
 
-	pr_err("inside pwmchip_add_with_polarity\n");
-
 	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
 		return -EINVAL;
-
-	dev_err(chip->dev, "checking in pwmchip_add_with_polarity\n");
 
 	if (!pwm_ops_check(chip->ops))
 		return -EINVAL;

@@ -158,7 +158,7 @@ static int mdss_spi_client_probe(struct spi_device *spidev)
 	cs_high = (spidev->mode & SPI_CS_HIGH) ? 1:0;
 	max_speed = spidev->max_speed_hz;
 	np = spidev->dev.of_node;
-	pr_debug("cs[%x] CPHA[%x] CPOL[%x] CS_HIGH[%x] Max_speed[%d]\n",
+	pr_err("cs[%x] CPHA[%x] CPOL[%x] CS_HIGH[%x] Max_speed[%d]\n",
 		cs, cpha, cpol, cs_high, max_speed);
 	mdss_spi_client = spidev;
 

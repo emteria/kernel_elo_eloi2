@@ -622,7 +622,7 @@ inline int linear_map(int in, int *out, int in_max, int out_max)
 	if (in < 0 || !out || in_max <= 0 || out_max <= 0)
 		return -EINVAL;
 	*out = ((2 * (in * out_max) + in_max) / (2 * in_max));
-	pr_debug("in = %d, out = %d, in_max = %d, out_max = %d\n",
+	pr_err("in = %d, out = %d, in_max = %d, out_max = %d\n",
 		in, *out, in_max, out_max);
 	if ((in > 0) && (*out == 0))
 		*out = 1;
@@ -782,7 +782,7 @@ int mdss_mdp_csc_setup(u32 block, u32 blk_idx, u32 csc_type)
 		return -ERANGE;
 	}
 
-	pr_debug("csc type=%d blk=%d idx=%d\n", csc_type,
+	pr_err("csc type=%d blk=%d idx=%d\n", csc_type,
 		 block, blk_idx);
 
 	if (block == MDSS_MDP_BLOCK_CDM || block == MDSS_MDP_BLOCK_SSPP_10)
@@ -1099,7 +1099,7 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 	int ret = 0;
 	u32 csc_op;
 
-	pr_debug("pnum=%x\n", pipe->num);
+	pr_err("pnum=%x\n", pipe->num);
 
 	mdss_mdp_pp_get_dcm_state(pipe, &dcm_state);
 
@@ -1160,7 +1160,7 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 			&pipe->pp_res.pp_sts);
 
 	if (!(pipe->flags & MDP_OVERLAY_PP_CFG_EN)) {
-		pr_debug("Overlay PP CFG enable not set\n");
+		pr_err("Overlay PP CFG enable not set\n");
 		return 0;
 	}
 
@@ -1300,7 +1300,7 @@ static int mdss_mdp_qseed2_setup(struct mdss_mdp_pipe *pipe)
 	u32 dcm_state = DCM_UNINIT;
 	u32 chroma_shift_x = 0, chroma_shift_y = 0;
 
-	pr_debug("pipe=%d, change pxl ext=%d\n", pipe->num,
+	pr_err("pipe=%d, change pxl ext=%d\n", pipe->num,
 			pipe->scaler.enable);
 	mdata = mdss_mdp_get_mdata();
 
@@ -1357,7 +1357,7 @@ static int mdss_mdp_qseed2_setup(struct mdss_mdp_pipe *pipe)
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_H1V2) ||
 	    (pipe->scaler.enable && (src_h != pipe->dst.h))) {
-		pr_debug("scale y - src_h=%d dst_h=%d\n", src_h, pipe->dst.h);
+		pr_err("scale y - src_h=%d dst_h=%d\n", src_h, pipe->dst.h);
 
 		if ((src_h / MAX_DOWNSCALE_RATIO) > pipe->dst.h) {
 			pr_err("too much downscaling height=%d->%d\n",
@@ -1414,7 +1414,7 @@ static int mdss_mdp_qseed2_setup(struct mdss_mdp_pipe *pipe)
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_H2V1) ||
 	    (pipe->scaler.enable && (src_w != pipe->dst.w))) {
-		pr_debug("scale x - src_w=%d dst_w=%d\n", src_w, pipe->dst.w);
+		pr_err("scale x - src_w=%d dst_w=%d\n", src_w, pipe->dst.w);
 
 		if ((src_w / MAX_DOWNSCALE_RATIO) > pipe->dst.w) {
 			pr_err("too much downscaling width=%d->%d\n",
@@ -1731,7 +1731,7 @@ int mdss_mdp_qseed3_setup(struct mdss_mdp_pipe *pipe,
 		return -EINVAL;
 	}
 
-	pr_debug("scaler->enable=%d", scaler->enable);
+	pr_err("scaler->enable=%d", scaler->enable);
 	op_mode = readl_relaxed(MDSS_MDP_REG_SCALER_OP_MODE +
 			offset);
 
@@ -1887,7 +1887,7 @@ int mdss_mdp_pipe_pp_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 		ret = pp_dma_pipe_setup(pipe, op);
 		break;
 	default:
-		pr_debug("no PP setup for pipe type %d\n",
+		pr_err("no PP setup for pipe type %d\n",
 			 pipe->type);
 		break;
 	}
@@ -2111,7 +2111,7 @@ static char __iomem *mdss_mdp_get_dspp_addr_off(u32 dspp_num)
 
 	mdata = mdss_mdp_get_mdata();
 	if (mdata->ndspp <= dspp_num) {
-		pr_debug("destination not supported dspp_num=%d\n",
+		pr_err("destination not supported dspp_num=%d\n",
 			  dspp_num);
 		return ERR_PTR(-EINVAL);
 	}
@@ -2152,7 +2152,7 @@ static int pp_hist_setup(u32 *op, u32 block, struct mdss_mdp_mixer *mix,
 		block_type = SSPP_VIG;
 		pipe = __get_hist_pipe(PP_BLOCK(block));
 		if (IS_ERR_OR_NULL(pipe)) {
-			pr_debug("pipe DNE (%d)\n",
+			pr_err("pipe DNE (%d)\n",
 					(u32) PP_BLOCK(block));
 			ret = -ENODEV;
 			goto error;
@@ -2683,7 +2683,7 @@ int mdss_mdp_pp_resume(struct msm_fb_data_type *mfd)
 	}
 
 	if (!mdss_mdp_mfd_valid_dspp(mfd)) {
-		pr_debug("PP not supported on display num %d hw config\n",
+		pr_err("PP not supported on display num %d hw config\n",
 			mfd->index);
 		return -EPERM;
 	}
@@ -2764,7 +2764,7 @@ int mdss_mdp_pp_resume(struct msm_fb_data_type *mfd)
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
@@ -2780,7 +2780,7 @@ int mdss_mdp_pp_resume(struct msm_fb_data_type *mfd)
 			ad->ipc_frame_count = 0;
 			ad->state |= PP_AD_STATE_IPC_RESUME;
 			ad->cfg.mode |= MDSS_AD_MODE_IPC_BIT;
-			pr_debug("switch mode to %d, last_ad_data = %d\n",
+			pr_err("switch mode to %d, last_ad_data = %d\n",
 				 ad->cfg.mode, ad->last_ad_data);
 		}
 	}
@@ -2876,7 +2876,7 @@ static int mdss_mdp_pp_dt_parse(struct device *dev)
 						   "qcom,mdss-dspp-gamut-off",
 						   &prop_val);
 			if (ret) {
-				pr_debug("Could not read/find %s prop ret %d\n",
+				pr_err("Could not read/find %s prop ret %d\n",
 				       "qcom,mdss-dspp-gamut-off", ret);
 				mdata->pp_block_off.dspp_gamut_off = U32_MAX;
 			} else {
@@ -2905,7 +2905,7 @@ static int mdss_mdp_pp_dt_parse(struct device *dev)
 				mdata->pp_block_off.dspp_pgc_off = prop_val;
 			}
 		} else {
-			pr_debug("offsets are not supported\n");
+			pr_err("offsets are not supported\n");
 			ret = 0;
 		}
 	} else {
@@ -3087,15 +3087,15 @@ static bool pp_ad_bl_threshold_check(int al_thresh, int base, int prev_bl,
 	int bl_thresh = 0, diff = 0;
 	bool ret = false;
 
-	pr_debug("al_thresh = %d, base = %d\n", al_thresh, base);
+	pr_err("al_thresh = %d, base = %d\n", al_thresh, base);
 	if (base <= 0) {
-		pr_debug("Invalid base for threshold calculation %d\n", base);
+		pr_err("Invalid base for threshold calculation %d\n", base);
 		return ret;
 	}
 	bl_thresh = (curr_bl * al_thresh) / (base * 4);
 	diff = (curr_bl > prev_bl) ? (curr_bl - prev_bl) : (prev_bl - curr_bl);
 	ret = (diff > bl_thresh) ? true : false;
-	pr_debug("prev_bl =%d, curr_bl = %d, bl_thresh = %d, diff = %d, ret = %d\n",
+	pr_err("prev_bl =%d, curr_bl = %d, bl_thresh = %d, diff = %d, ret = %d\n",
 		prev_bl, curr_bl, bl_thresh, diff, ret);
 
 	return ret;
@@ -3111,7 +3111,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
@@ -3127,7 +3127,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 	if (!mfd->ad_bl_level)
 		mfd->ad_bl_level = bl_in;
 	if (!(ad->sts & PP_STS_ENABLE)) {
-		pr_debug("AD is not enabled.\n");
+		pr_err("AD is not enabled.\n");
 		mutex_unlock(&ad->lock);
 		return -EPERM;
 	}
@@ -3174,7 +3174,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 	if (pp_ad_bl_threshold_check(ad->init.al_thresh, ad->init.alpha_base,
 					ad->last_bl, ad_bl_out)) {
 		mfd->ad_bl_level = ad_bl_out;
-		pr_debug("backlight send to AD block: %d\n", mfd->ad_bl_level);
+		pr_err("backlight send to AD block: %d\n", mfd->ad_bl_level);
 		*bl_out_notify = true;
 		pp_ad_invalidate_input(mfd);
 	}
@@ -3325,7 +3325,7 @@ pa_clk_off:
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	} else {
 		if (pp_ops[PA].pp_set_config) {
-			pr_debug("version of PA is %d\n", config->version);
+			pr_err("version of PA is %d\n", config->version);
 			res_cache.block = DSPP;
 			res_cache.mdss_pp_res = mdss_pp_res;
 			res_cache.pipe_res = NULL;
@@ -3659,7 +3659,7 @@ pcc_clk_off:
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	} else {
 		if (pp_ops[PCC].pp_set_config) {
-			pr_debug("version of pcc is %d\n", config->version);
+			pr_err("version of pcc is %d\n", config->version);
 			res_cache.block = DSPP;
 			res_cache.mdss_pp_res = mdss_pp_res;
 			res_cache.pipe_res = NULL;
@@ -3779,7 +3779,7 @@ static int mdss_mdp_limited_lut_igc_config(struct msm_fb_data_type *mfd,
 		return -EINVAL;
 
 	if (!mdss_mdp_mfd_valid_dspp(mfd)) {
-		pr_debug("IGC not supported on display num %d hw configuration\n",
+		pr_err("IGC not supported on display num %d hw configuration\n",
 			mfd->index);
 		return 0;
 	}
@@ -4239,7 +4239,7 @@ clock_off:
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	} else {
 		if (pp_ops[GC].pp_set_config) {
-			pr_debug("version of gc is %d\n", config->version);
+			pr_err("version of gc is %d\n", config->version);
 			is_lm = (PP_LOCAT(config->block) == MDSS_PP_LM_CFG);
 			ret = pp_pgc_lut_cache_params(config, mdss_pp_res,
 				((is_lm) ? LM : DSPP));
@@ -4395,7 +4395,7 @@ static int mdss_mdp_panel_default_dither_config(struct msm_fb_data_type *mfd,
 	struct mdp_dither_data_v1_7 dither_data;
 
 	if (!mdss_mdp_mfd_valid_dspp(mfd)) {
-		pr_debug("dither config not supported on display num %d\n",
+		pr_err("dither config not supported on display num %d\n",
 			mfd->index);
 		return 0;
 	}
@@ -4499,7 +4499,7 @@ int mdss_mdp_dither_config(struct msm_fb_data_type *mfd,
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
 	if (pp_ops[DITHER].pp_set_config) {
-		pr_debug("version of dither is %d\n", config->version);
+		pr_err("version of dither is %d\n", config->version);
 		ret = pp_dither_cache_params(config, mdss_pp_res,
 				copy_from_kernel);
 		if (ret) {
@@ -4685,7 +4685,7 @@ gamut_clk_off:
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	} else {
 		if (pp_ops[GAMUT].pp_set_config) {
-			pr_debug("version of gamut is %d\n", config->version);
+			pr_err("version of gamut is %d\n", config->version);
 			ret = pp_gamut_cache_params(config, mdss_pp_res);
 			if (ret) {
 				pr_err("gamut config failed version %d ret %d\n",
@@ -4924,7 +4924,7 @@ static int pp_hist_disable(struct pp_hist_col_info *hist_info)
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	if (hist_info->col_en == false) {
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
-		pr_debug("Histogram already disabled (%pK)\n", hist_info->base);
+		pr_err("Histogram already disabled (%pK)\n", hist_info->base);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -5365,7 +5365,7 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 			ret = pp_hist_collect(hist, hist_info, ctl_base,
 				exp_sum, SSPP_VIG);
 			if (ret)
-				pr_debug("hist error: pipe[%d] collect: %d\n",
+				pr_err("hist error: pipe[%d] collect: %d\n",
 					pipe->num, ret);
 
 			mdss_mdp_pipe_unmap(pipe);
@@ -5490,7 +5490,7 @@ static inline struct pp_hist_col_info *get_hist_info_from_isr(u32 *isr)
 		pipe = mdss_mdp_pipe_search(mdata, BIT(blk_idx),
 				MDSS_MDP_PIPE_RECT0);
 		if (IS_ERR_OR_NULL(pipe)) {
-			pr_debug("pipe DNE, %d\n", blk_idx);
+			pr_err("pipe DNE, %d\n", blk_idx);
 			return NULL;
 		}
 		hist_info = &pipe->pp_res.hist;
@@ -5595,18 +5595,18 @@ static int mdss_mdp_get_ad(struct msm_fb_data_type *mfd,
 	mdata = mfd_to_mdata(mfd);
 
 	if (mdata->nad_cfgs == 0) {
-		pr_debug("Assertive Display not supported by device\n");
+		pr_err("Assertive Display not supported by device\n");
 		return -ENODEV;
 	}
 
 	if (!mdss_mdp_mfd_valid_ad(mfd)) {
-		pr_debug("AD not supported on display num %d hw config\n",
+		pr_err("AD not supported on display num %d hw config\n",
 			mfd->index);
 		return -EPERM;
 	}
 
 	if (mfd->panel_info->type == DTV_PANEL) {
-		pr_debug("AD not supported on external display\n");
+		pr_err("AD not supported on external display\n");
 		return -EPERM;
 	}
 
@@ -5632,7 +5632,7 @@ static int pp_ad_invalidate_input(struct msm_fb_data_type *mfd)
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
@@ -5640,7 +5640,7 @@ static int pp_ad_invalidate_input(struct msm_fb_data_type *mfd)
 			ret, ad);
 		return ret;
 	}
-	pr_debug("AD backlight level changed (%d), trigger update to AD\n",
+	pr_err("AD backlight level changed (%d), trigger update to AD\n",
 						mfd->ad_bl_level);
 	if (ad->cfg.mode == MDSS_AD_MODE_AUTO_BL) {
 		pr_err("AD auto backlight no longer supported.\n");
@@ -5816,7 +5816,7 @@ int mdss_mdp_ad_input(struct msm_fb_data_type *mfd,
 			goto error;
 		}
 		ad->ad_data_mode = MDSS_AD_INPUT_AMBIENT;
-		pr_debug("ambient = %d\n", input->in.amb_light);
+		pr_err("ambient = %d\n", input->in.amb_light);
 		ad->ad_data = input->in.amb_light;
 		ad->calc_itr = ad->cfg.stab_itr;
 		ad->sts |= PP_AD_STS_DIRTY_VSYNC;
@@ -5839,7 +5839,7 @@ int mdss_mdp_ad_input(struct msm_fb_data_type *mfd,
 			goto error;
 		}
 		ad->ad_data_mode = MDSS_AD_INPUT_STRENGTH;
-		pr_debug("strength = %d\n", input->in.strength);
+		pr_err("strength = %d\n", input->in.strength);
 		ad->ad_data = input->in.strength;
 		ad->calc_itr = ad->cfg.stab_itr;
 		ad->sts |= PP_AD_STS_DIRTY_VSYNC;
@@ -5886,7 +5886,7 @@ static void pp_ad_input_write(struct mdss_mdp_ad *ad_hw,
 		writel_relaxed(ad->ad_data, base + MDSS_MDP_REG_AD_AL);
 		break;
 	case MDSS_AD_MODE_AUTO_STR:
-		pr_debug("bl_data = %d, ad_data = %d\n", ad->bl_data,
+		pr_err("bl_data = %d, ad_data = %d\n", ad->bl_data,
 				ad->ad_data);
 		ad->last_ad_data = ad->ad_data;
 		ad->last_ad_data_valid = true;
@@ -5906,7 +5906,7 @@ static void pp_ad_input_write(struct mdss_mdp_ad *ad_hw,
 			ad->last_ad_data = ad->ad_data;
 			ad->last_ad_data_valid = true;
 		}
-		pr_debug("bl_data = %d, last_ad_data = %d, last_str = %d\n",
+		pr_err("bl_data = %d, last_ad_data = %d, last_str = %d\n",
 				ad->bl_data, ad->last_ad_data, ad->last_str);
 		writel_relaxed(ad->bl_data, base + MDSS_MDP_REG_AD_BL);
 		writel_relaxed(ad->last_ad_data, base + MDSS_MDP_REG_AD_AL);
@@ -6071,7 +6071,7 @@ static void pp_ad_cfg_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad)
 				base + MDSS_MDP_REG_AD_BL_MAX);
 		writel_relaxed(ad->cfg.mode | MDSS_AD_AUTO_TRIGGER,
 				base + MDSS_MDP_REG_AD_MODE_SEL);
-		pr_debug("stab_itr = %d\n", ad->cfg.stab_itr);
+		pr_err("stab_itr = %d\n", ad->cfg.stab_itr);
 		break;
 	case MDSS_AD_MODE_MAN_IPC:
 		if (!ad->last_calib_valid) {
@@ -6096,7 +6096,7 @@ static void pp_ad_cfg_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad)
 				base + MDSS_MDP_REG_AD_BL_MAX);
 		writel_relaxed(ad->cfg.mode | MDSS_AD_AUTO_TRIGGER,
 				base + MDSS_MDP_REG_AD_MODE_SEL);
-		pr_debug("stab_itr = %d\n", ad->cfg.stab_itr);
+		pr_err("stab_itr = %d\n", ad->cfg.stab_itr);
 		break;
 	default:
 		break;
@@ -6157,7 +6157,7 @@ static int mdss_mdp_ad_ipc_reset(struct msm_fb_data_type *mfd)
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
@@ -6198,7 +6198,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
@@ -6231,7 +6231,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 			if (memcmp(ad->last_calib, ad->cfg.calib,
 				sizeof(ad->last_calib)))
 				ad->sts |= PP_AD_STS_DIRTY_CFG;
-			pr_debug("switch mode to %d, last_ad_data = %d\n",
+			pr_err("switch mode to %d, last_ad_data = %d\n",
 				 ad->cfg.mode, ad->last_ad_data);
 		} else {
 			ad->ipc_frame_count++;
@@ -6241,14 +6241,14 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 	if (ad->sts != last_sts || ad->state != last_state) {
 		last_sts = ad->sts;
 		last_state = ad->state;
-		pr_debug("beginning: ad->sts = 0x%08x, state = 0x%08x\n",
+		pr_err("beginning: ad->sts = 0x%08x, state = 0x%08x\n",
 							ad->sts, ad->state);
 	}
 
 	if (ad->sts & PP_AD_STS_DIRTY_DATA) {
 		ad->sts &= ~PP_AD_STS_DIRTY_DATA;
 		ad->state |= PP_AD_STATE_DATA;
-		pr_debug("dirty data, last_bl = %d\n", ad->last_bl);
+		pr_err("dirty data, last_bl = %d\n", ad->last_bl);
 		if (!bl_mfd->ad_bl_level)
 			bl_mfd->ad_bl_level = bl_mfd->bl_level;
 		bl = bl_mfd->ad_bl_level;
@@ -6290,7 +6290,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 	/* update ad screen size if it has changed since last configuration */
 	if ((ad->init.frame_w != width) ||
 			(ad->init.frame_h != ctl->height)) {
-		pr_debug("changing from %dx%d to %dx%d\n", ad->init.frame_w,
+		pr_err("changing from %dx%d to %dx%d\n", ad->init.frame_w,
 							ad->init.frame_h,
 							width,
 							ctl->height);
@@ -6348,7 +6348,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 		ad->reg_sts &= ~PP_STS_ENABLE;
 
 	if (PP_AD_STS_DIRTY_VSYNC & ad->sts) {
-		pr_debug("dirty vsync, calc_itr = %d\n", ad->calc_itr);
+		pr_err("dirty vsync, calc_itr = %d\n", ad->calc_itr);
 		ad->sts &= ~PP_AD_STS_DIRTY_VSYNC;
 		if (!(PP_AD_STATE_VSYNC & ad->state) && ad->calc_itr &&
 					(ad->state & PP_AD_STATE_RUN)) {
@@ -6364,7 +6364,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 	if (ad->sts != last_sts || ad->state != last_state) {
 		last_sts = ad->sts;
 		last_state = ad->state;
-		pr_debug("end: ad->sts = 0x%08x, state = 0x%08x\n", ad->sts,
+		pr_err("end: ad->sts = 0x%08x, state = 0x%08x\n", ad->sts,
 								ad->state);
 	}
 	mutex_unlock(&ad->lock);
@@ -6425,7 +6425,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 	ad->last_str = 0xFF & readl_relaxed(base + MDSS_MDP_REG_AD_STR_OUT);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
-	pr_debug("itr number %d str %d\n", ad->calc_itr, ad->last_str);
+	pr_err("itr number %d str %d\n", ad->calc_itr, ad->last_str);
 }
 
 #define PP_AD_LUT_LEN 33
@@ -6456,16 +6456,16 @@ static int pp_ad_attenuate_bl(struct mdss_ad_info *ad, u32 bl, u32 *bl_out)
 	}
 
 	if (ad->init.alpha == 0) {
-		pr_debug("alpha = %d, hence no attenuation needed\n",
+		pr_err("alpha = %d, hence no attenuation needed\n",
 			ad->init.alpha);
 		return 0;
 	}
-	pr_debug("bl_in = %d\n", bl);
+	pr_err("bl_in = %d\n", bl);
 	/* map panel backlight range to AD backlight range */
 	linear_map(bl, &bl, ad->bl_mfd->panel_info->bl_max,
 		MDSS_MDP_AD_BL_SCALE);
 
-	pr_debug("Before attenuation = %d\n", bl);
+	pr_err("Before attenuation = %d\n", bl);
 	ratio_temp = MDSS_MDP_AD_BL_SCALE / (AD_BL_ATT_LUT_LEN - 1);
 	while (ratio_temp > 0) {
 		ratio_temp = ratio_temp >> 1;
@@ -6480,18 +6480,18 @@ static int pp_ad_attenuate_bl(struct mdss_ad_info *ad, u32 bl, u32 *bl_out)
 	bl_att = ((ad->bl_att_lut[n + 1] - ad->bl_att_lut[n]) *
 		(bl - lut_interval * n) + (ad->bl_att_lut[n] * lut_interval)) /
 		lut_interval;
-	pr_debug("n = %u, bl_att_lut[%u] = %u, bl_att_lut[%u] = %u, bl_att = %u\n",
+	pr_err("n = %u, bl_att_lut[%u] = %u, bl_att_lut[%u] = %u, bl_att = %u\n",
 		n, n, ad->bl_att_lut[n], n + 1, ad->bl_att_lut[n + 1], bl_att);
 	*bl_out = (ad->init.alpha * bl_att +
 		(ad->init.alpha_base - ad->init.alpha) * bl) /
 		ad->init.alpha_base;
 
-	pr_debug("After attenuation = %d\n", *bl_out);
+	pr_err("After attenuation = %d\n", *bl_out);
 	/* map AD backlight range back to panel backlight range */
 	linear_map(*bl_out, bl_out, MDSS_MDP_AD_BL_SCALE,
 		ad->bl_mfd->panel_info->bl_max);
 
-	pr_debug("bl_out = %d\n", *bl_out);
+	pr_err("bl_out = %d\n", *bl_out);
 	return 0;
 }
 
@@ -6510,7 +6510,7 @@ static int pp_ad_linearize_bl(struct mdss_ad_info *ad, u32 bl, u32 *bl_out,
 		return -EINVAL;
 	}
 
-	pr_debug("bl_in = %d, inv = %d\n", bl, inv);
+	pr_err("bl_in = %d, inv = %d\n", bl, inv);
 	if (inv == MDP_PP_AD_BL_LINEAR) {
 		bl_lut = ad->bl_lin;
 	} else if (inv == MDP_PP_AD_BL_LINEAR_INV) {
@@ -6524,9 +6524,9 @@ static int pp_ad_linearize_bl(struct mdss_ad_info *ad, u32 bl, u32 *bl_out,
 	linear_map(bl, &bl, ad->bl_mfd->panel_info->bl_max,
 		MDSS_MDP_AD_BL_SCALE);
 
-	pr_debug("Before linearization = %d\n", bl);
+	pr_err("Before linearization = %d\n", bl);
 	n = bl * bl_lut_max_index / MDSS_MDP_AD_BL_SCALE;
-	pr_debug("n = %u\n", n);
+	pr_err("n = %u\n", n);
 	if (n > bl_lut_max_index) {
 		pr_err("Invalid index for BL linearization: %d.\n", n);
 		return ret;
@@ -6544,13 +6544,13 @@ static int pp_ad_linearize_bl(struct mdss_ad_info *ad, u32 bl, u32 *bl_out,
 			MDSS_MDP_AD_BL_SCALE / bl_lut_max_index) *
 			bl_lut_max_index / MDSS_MDP_AD_BL_SCALE;
 	}
-	pr_debug("After linearization = %d\n", *bl_out);
+	pr_err("After linearization = %d\n", *bl_out);
 
 	/* map AD backlight range back to panel backlight range */
 	linear_map(*bl_out, bl_out, MDSS_MDP_AD_BL_SCALE,
 		ad->bl_mfd->panel_info->bl_max);
 
-	pr_debug("bl_out = %d\n", *bl_out);
+	pr_err("bl_out = %d\n", *bl_out);
 	return 0;
 }
 
@@ -7247,7 +7247,7 @@ static void mdss_mdp_hist_irq_set_mask(u32 irq)
 	spin_lock(&mdata->hist_intr.lock);
 	mask = readl_relaxed(mdata->mdp_base + MDSS_MDP_REG_HIST_INTR_EN);
 	mask |= irq;
-	pr_debug("interrupt mask being set %x irq updated %x\n", mask, irq);
+	pr_err("interrupt mask being set %x irq updated %x\n", mask, irq);
 	writel_relaxed(mask, mdata->mdp_base + MDSS_MDP_REG_HIST_INTR_EN);
 	spin_unlock(&mdata->hist_intr.lock);
 }
@@ -7260,7 +7260,7 @@ static void mdss_mdp_hist_irq_clear_mask(u32 irq)
 	spin_lock(&mdata->hist_intr.lock);
 	mask = readl_relaxed(mdata->mdp_base + MDSS_MDP_REG_HIST_INTR_EN);
 	mask = mask & ~irq;
-	pr_debug("interrupt mask being cleared %x irq cleared %x\n", mask, irq);
+	pr_err("interrupt mask being cleared %x irq cleared %x\n", mask, irq);
 	writel_relaxed(mask, mdata->mdp_base + MDSS_MDP_REG_HIST_INTR_EN);
 	spin_unlock(&mdata->hist_intr.lock);
 }
@@ -7463,7 +7463,7 @@ static int pp_mfd_ad_release_all(struct msm_fb_data_type *mfd)
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret == -ENODEV || ret == -EPERM) {
-		pr_debug("AD not supported on device, disp num %d\n",
+		pr_err("AD not supported on device, disp num %d\n",
 			mfd->index);
 		return 0;
 	} else if (ret) {

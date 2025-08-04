@@ -58,12 +58,12 @@ void mdss_enable_irq(struct mdss_hw *hw)
 
 	ndx_bit = BIT(hw->hw_ndx);
 
-	pr_debug("Enable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
+	pr_err("Enable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
 			hw->irq_info->irq_ena, hw->irq_info->irq_mask);
 
 	spin_lock_irqsave(&mdss_lock, irq_flags);
 	if (hw->irq_info->irq_mask & ndx_bit) {
-		pr_debug("MDSS HW ndx=%d is already set, mask=%x\n",
+		pr_err("MDSS HW ndx=%d is already set, mask=%x\n",
 				hw->hw_ndx, hw->irq_info->irq_mask);
 	} else {
 		hw->irq_info->irq_mask |= ndx_bit;
@@ -86,7 +86,7 @@ void mdss_disable_irq(struct mdss_hw *hw)
 
 	ndx_bit = BIT(hw->hw_ndx);
 
-	pr_debug("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
+	pr_err("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
 			hw->irq_info->irq_ena, hw->irq_info->irq_mask);
 
 	spin_lock_irqsave(&mdss_lock, irq_flags);
@@ -116,7 +116,7 @@ void mdss_disable_irq_nosync(struct mdss_hw *hw)
 
 	ndx_bit = BIT(hw->hw_ndx);
 
-	pr_debug("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
+	pr_err("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
 			hw->irq_info->irq_ena, hw->irq_info->irq_mask);
 
 	spin_lock(&mdss_lock);
@@ -165,13 +165,13 @@ void mdss_enable_irq_wake(struct mdss_hw *hw)
 
 	ndx_bit = BIT(hw->hw_ndx);
 
-	pr_debug("Enable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
+	pr_err("Enable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
 			hw->irq_info->irq_wake_ena,
 			hw->irq_info->irq_wake_mask);
 
 	spin_lock_irqsave(&mdss_lock, irq_flags);
 	if (hw->irq_info->irq_wake_mask & ndx_bit) {
-		pr_debug("MDSS HW ndx=%d is already set, mask=%x\n",
+		pr_err("MDSS HW ndx=%d is already set, mask=%x\n",
 				hw->hw_ndx, hw->irq_info->irq_wake_mask);
 	} else {
 		hw->irq_info->irq_wake_mask |= ndx_bit;
@@ -194,7 +194,7 @@ void mdss_disable_irq_wake(struct mdss_hw *hw)
 
 	ndx_bit = BIT(hw->hw_ndx);
 
-	pr_debug("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
+	pr_err("Disable HW=%d irq ena=%d mask=%x\n", hw->hw_ndx,
 			hw->irq_info->irq_wake_ena,
 			hw->irq_info->irq_wake_mask);
 

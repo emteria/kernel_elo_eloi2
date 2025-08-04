@@ -232,7 +232,7 @@ static int dsi_mod_display_conf_to_edid(struct dsi_mod_display *pdata)
 	if (!pdata->edid_buf)
 		return -ENOMEM;
 
-	pr_debug("%s: total_pixels =%d framerate=%d\n",
+	pr_err("%s: total_pixels =%d framerate=%d\n",
 			__func__, total_pixels, dsi_config->framerate);
 	memcpy(pdata->edid_buf, &edid, pdata->edid_size);
 
@@ -242,7 +242,7 @@ static int dsi_mod_display_conf_to_edid(struct dsi_mod_display *pdata)
 static void dsi_mod_display_do_hotplug(struct dsi_mod_display *pdata,
 	u8 attached)
 {
-	pr_debug("%s: %d\n", __func__, attached);
+	pr_err("%s: %d\n", __func__, attached);
 
 	if (attached)
 		mot_dba_notify_clients(MSM_DBA_CB_HPD_CONNECT);
@@ -261,16 +261,16 @@ static int dsi_mod_display_panel_event_handler(struct notifier_block *nb,
 	struct mdss_dsi_ctrl_pdata *ctrl = container_of(panel_data,
 		struct mdss_dsi_ctrl_pdata, panel_data);
 
-	pr_debug("%s+: Received panel event: %lu dsi_ndx=%d dsi_connect=%d\n",
+	pr_err("%s+: Received panel event: %lu dsi_ndx=%d dsi_connect=%d\n",
 				__func__, event, ctrl->ndx, pdata->dsi_connect);
 
 	if (ctrl->ndx != pdata->dsi_connect) {
-		pr_debug("%s: Event not for this DBA\n", __func__);
+		pr_err("%s: Event not for this DBA\n", __func__);
 		goto exit;
 	}
 
 	if (!pdata->connecting) {
-		pr_debug("%s: Dont care about events while not connecting\n",
+		pr_err("%s: Dont care about events while not connecting\n",
 			__func__);
 		goto exit;
 	}
@@ -281,7 +281,7 @@ static int dsi_mod_display_panel_event_handler(struct notifier_block *nb,
 		complete(&pdata->dsi_on_wait);
 
 		/* Block here until APBA is happy */
-		pr_debug("%s: Block panel on returning...\n", __func__);
+		pr_err("%s: Block panel on returning...\n", __func__);
 		wait_for_completion(&pdata->apba_on_wait);
 		break;
 	default:
@@ -290,7 +290,7 @@ static int dsi_mod_display_panel_event_handler(struct notifier_block *nb,
 	}
 
 exit:
-	pr_debug("%s-\n", __func__);
+	pr_err("%s-\n", __func__);
 
 	return 0;
 }
@@ -314,7 +314,7 @@ static int dsi_mod_display_get_edid_size(void *client, u32 *size, u32 flags)
 		return ret;
 	}
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 	mutex_lock(&pdata->ops_mutex);
 
 	if (pdata->edid_buf)
@@ -341,7 +341,7 @@ static int dsi_mod_display_get_raw_edid(void *client, u32 size, char *buf,
 		return -EINVAL;
 	}
 
-	pr_debug("%s+\n", __func__);
+	pr_err("%s+\n", __func__);
 	mutex_lock(&pdata->ops_mutex);
 
 	if (pdata->edid_buf) {
@@ -364,7 +364,7 @@ static int dsi_mod_display_get_dsi_config(void *client,
 				dsi_mod_display_get_platform_data(client);
 	int ret = 0;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	if (dsi_config)
 		memcpy(dsi_config, pdata->dsi_config,
@@ -411,7 +411,7 @@ static int dsi_mod_display_handle_available(void *data)
 	struct dsi_mod_display *pdata;
 	int ret = 0;
 
-	pr_debug("%s+\n", __func__);
+	pr_err("%s+\n", __func__);
 
 	pdata = (struct dsi_mod_display *)data;
 	ret = mot_dba_device_enable(MOD_DISPLAY_TYPE_DSI);
@@ -419,7 +419,7 @@ static int dsi_mod_display_handle_available(void *data)
 		pr_err("%s: fail to enable DBA device MOD_DISPLAY_TYPE_DSI\n",
 						__func__);
 
-	pr_debug("%s-\n", __func__);
+	pr_err("%s-\n", __func__);
 
 	return ret;
 }
@@ -429,7 +429,7 @@ static int dsi_mod_display_handle_unavailable(void *data)
 	struct dsi_mod_display *pdata;
 	int ret = 0;
 
-	pr_debug("%s+\n", __func__);
+	pr_err("%s+\n", __func__);
 
 	pdata = (struct dsi_mod_display *)data;
 	ret = mot_dba_device_disable(MOD_DISPLAY_TYPE_DSI);
@@ -437,7 +437,7 @@ static int dsi_mod_display_handle_unavailable(void *data)
 		pr_err("%s: fail to disable DBA device MOD_DISPLAY_TYPE_DSI\n",
 							__func__);
 
-	pr_debug("%s-\n", __func__);
+	pr_err("%s-\n", __func__);
 
 	return ret;
 }
@@ -447,7 +447,7 @@ static int dsi_mod_display_handle_connect(void *data)
 	struct dsi_mod_display *pdata;
 	int ret = 0;
 
-	pr_debug("%s+\n", __func__);
+	pr_err("%s+\n", __func__);
 
 	pdata = (struct dsi_mod_display *)data;
 
@@ -492,7 +492,7 @@ static int dsi_mod_display_handle_connect(void *data)
 	}
 
 exit:
-	pr_debug("%s-\n", __func__);
+	pr_err("%s-\n", __func__);
 
 	return ret;
 }
@@ -502,7 +502,7 @@ static int dsi_mod_display_handle_disconnect(void *data)
 	struct dsi_mod_display *pdata;
 	int ret = 0;
 
-	pr_debug("%s+\n", __func__);
+	pr_err("%s+\n", __func__);
 
 	pdata = (struct dsi_mod_display *)data;
 
@@ -517,7 +517,7 @@ static int dsi_mod_display_handle_disconnect(void *data)
 	kfree(pdata->display_config);
 	pdata->display_config = NULL;
 
-	pr_debug("%s-\n", __func__);
+	pr_err("%s-\n", __func__);
 
 	return ret;
 }
@@ -594,7 +594,7 @@ static int dsi_mod_display_probe(struct platform_device *pdev)
 
 	pdata->panel_nb.notifier_call = dsi_mod_display_panel_event_handler;
 	if (!panel_register_notifier(&pdata->panel_nb))
-		pr_debug("%s: registered panel notifier\n", __func__);
+		pr_err("%s: registered panel notifier\n", __func__);
 	else {
 		pr_err("%s: unable to register panel notifier\n", __func__);
 		msm_dba_helper_sysfs_remove(&pdev->dev);
@@ -606,7 +606,7 @@ static int dsi_mod_display_probe(struct platform_device *pdev)
 	mod_display_register_impl(&dsi_mod_display_impl);
 
 exit:
-	pr_debug("%s: ret = %d\n", __func__, ret);
+	pr_err("%s: ret = %d\n", __func__, ret);
 
 	return 0;
 }

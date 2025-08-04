@@ -72,7 +72,7 @@ static int mdss_wb_event_handler(struct mdss_panel_data *pdata,
 		rc = mdss_wb_check_params(pdata, (struct mdss_panel_info *)arg);
 		break;
 	default:
-		pr_debug("%s: panel event (%d) not handled\n", __func__, event);
+		pr_err("%s: panel event (%d) not handled\n", __func__, event);
 		break;
 	}
 	return rc;

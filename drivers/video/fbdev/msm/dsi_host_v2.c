@@ -1427,7 +1427,7 @@ static int msm_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	if (ret <= 0)
 		pr_err("%s: DSI BTA error: %i\n", __func__, __LINE__);
 
-	pr_debug("%s: BTA done with ret: %d\n", __func__, ret);
+	pr_err("%s: BTA done with ret: %d\n", __func__, ret);
 	return ret;
 }
 
@@ -1480,7 +1480,7 @@ static int dsi_get_panel_cfg(char *panel_cfg)
 		return 0;
 	}
 
-	pr_debug("%s:%d: cfg:[%s]\n", __func__, __LINE__,
+	pr_err("%s:%d: cfg:[%s]\n", __func__, __LINE__,
 		 pan_cfg->arg_cfg);
 	rc = strlcpy(panel_cfg, pan_cfg->arg_cfg,
 				MDSS_MAX_PANEL_LEN);
@@ -1492,7 +1492,7 @@ static struct device_node *dsi_pref_prim_panel(
 {
 	struct device_node *dsi_pan_node = NULL;
 
-	pr_debug("%s:%d: Select primary panel from dt\n",
+	pr_err("%s:%d: Select primary panel from dt\n",
 					__func__, __LINE__);
 	dsi_pan_node = of_parse_phandle(pdev->dev.of_node,
 					"qcom,dsi-pref-prim-pan", 0);
@@ -1529,7 +1529,7 @@ static struct device_node *dsi_find_panel_of_node(
 	l = strlen(panel_cfg);
 	if (!l) {
 		/* no panel cfg chg, parse dt */
-		pr_debug("%s:%d: no cmd line cfg present\n",
+		pr_err("%s:%d: no cmd line cfg present\n",
 			 __func__, __LINE__);
 		dsi_pan_node = dsi_pref_prim_panel(pdev);
 	} else {
@@ -1543,7 +1543,7 @@ static struct device_node *dsi_find_panel_of_node(
 		 * ':' to get to the panel name
 		 */
 		panel_name = panel_cfg + 2;
-		pr_debug("%s:%d:%s:%s\n", __func__, __LINE__,
+		pr_err("%s:%d:%s:%s\n", __func__, __LINE__,
 			 panel_cfg, panel_name);
 
 		mdss_node = of_parse_phandle(pdev->dev.of_node,
@@ -1570,7 +1570,7 @@ static int msm_dsi_clk_ctrl(struct mdss_panel_data *pdata, int enable)
 	u32 bitclk_rate = 0, byteclk_rate = 0, pclk_rate = 0, dsiclk_rate = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -1665,7 +1665,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 	struct resource *mdss_dsi_mres;
 	int i;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	rc = msm_dsi_init();
 	if (rc)
@@ -1769,7 +1769,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 		}
 	}
 
-	pr_debug("%s: Dsi Ctrl->0 initialized\n", __func__);
+	pr_err("%s: Dsi Ctrl->0 initialized\n", __func__);
 
 	dsi_host_private->dis_dev = pdev->dev;
 	intf.on = msm_dsi_on;
@@ -1798,7 +1798,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 		pr_err("%s: dsi panel dev reg failed\n", __func__);
 		goto error_device_register;
 	}
-	pr_debug("%s success\n", __func__);
+	pr_err("%s success\n", __func__);
 	return 0;
 error_device_register:
 	kfree(ctrl_pdata->dsi_hw->irq_info);

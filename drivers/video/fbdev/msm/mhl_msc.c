@@ -57,19 +57,19 @@ static void mhl_print_devcap(u8 offset, u8 devcap)
 {
 	switch (offset) {
 	case DEVCAP_OFFSET_DEV_CAT:
-		pr_debug("DCAP: %02X %s: %02X DEV_TYPE=%X POW=%s\n",
+		pr_err("DCAP: %02X %s: %02X DEV_TYPE=%X POW=%s\n",
 			offset, devcap_reg_name[offset], devcap,
 			devcap & 0x0F, (devcap & 0x10) ? "y" : "n");
 		break;
 	case DEVCAP_OFFSET_FEATURE_FLAG:
-		pr_debug("DCAP: %02X %s: %02X RCP=%s RAP=%s SP=%s\n",
+		pr_err("DCAP: %02X %s: %02X RCP=%s RAP=%s SP=%s\n",
 			offset, devcap_reg_name[offset], devcap,
 			(devcap & 0x01) ? "y" : "n",
 			(devcap & 0x02) ? "y" : "n",
 			(devcap & 0x04) ? "y" : "n");
 		break;
 	default:
-		pr_debug("DCAP: %02X %s: %02X\n",
+		pr_err("DCAP: %02X %s: %02X\n",
 			offset, devcap_reg_name[offset], devcap);
 		break;
 	}
@@ -268,10 +268,10 @@ int mhl_msc_command_done(struct mhl_tx_ctrl *mhl_ctrl,
 		switch (req->offset) {
 		case MHL_DEV_CATEGORY_OFFSET:
 			if (req->retval & MHL_DEV_CATEGORY_POW_BIT)
-				pr_debug("%s: devcap pow bit set\n",
+				pr_err("%s: devcap pow bit set\n",
 					 __func__);
 			else
-				pr_debug("%s: devcap pow bit unset\n",
+				pr_err("%s: devcap pow bit unset\n",
 					 __func__);
 			break;
 		case DEVCAP_OFFSET_RESERVED:
@@ -397,7 +397,7 @@ static void mhl_handle_input(struct mhl_tx_ctrl *mhl_ctrl,
 {
 	int key_press = (key_code & 0x80) == 0;
 
-	pr_debug("%s: send key events[%x][%x][%d]\n",
+	pr_err("%s: send key events[%x][%x][%d]\n",
 		 __func__, key_code, input_key_code, key_press);
 	input_report_key(mhl_ctrl->input, input_key_code, key_press);
 	input_sync(mhl_ctrl->input);
@@ -503,21 +503,21 @@ int mhl_msc_recv_msc_msg(struct mhl_tx_ctrl *mhl_ctrl,
 
 	switch (sub_cmd) {
 	case MHL_MSC_MSG_RCP:
-		pr_debug("MHL: receive RCP(0x%02x)\n", cmd_data);
+		pr_err("MHL: receive RCP(0x%02x)\n", cmd_data);
 		rc = mhl_rcp_recv(mhl_ctrl, cmd_data);
 		break;
 	case MHL_MSC_MSG_RCPK:
-		pr_debug("MHL: receive RCPK(0x%02x)\n", cmd_data);
+		pr_err("MHL: receive RCPK(0x%02x)\n", cmd_data);
 		break;
 	case MHL_MSC_MSG_RCPE:
-		pr_debug("MHL: receive RCPE(0x%02x)\n", cmd_data);
+		pr_err("MHL: receive RCPE(0x%02x)\n", cmd_data);
 		break;
 	case MHL_MSC_MSG_RAP:
-		pr_debug("MHL: receive RAP(0x%02x)\n", cmd_data);
+		pr_err("MHL: receive RAP(0x%02x)\n", cmd_data);
 		rc = mhl_rap_recv(mhl_ctrl, cmd_data);
 		break;
 	case MHL_MSC_MSG_RAPK:
-		pr_debug("MHL: receive RAPK(0x%02x)\n", cmd_data);
+		pr_err("MHL: receive RAPK(0x%02x)\n", cmd_data);
 		break;
 	default:
 		break;
@@ -542,7 +542,7 @@ int mhl_msc_recv_set_int(struct mhl_tx_ctrl *mhl_ctrl,
 		}
 		if (set_int & MHL_INT_DSCR_CHG) {
 			/* peer's scratchpad reg changed */
-			pr_debug("%s: dscr chg\n", __func__);
+			pr_err("%s: dscr chg\n", __func__);
 			mhl_read_scratchpad(mhl_ctrl);
 			mhl_ctrl->scrpd_busy = false;
 		}
@@ -562,7 +562,7 @@ int mhl_msc_recv_set_int(struct mhl_tx_ctrl *mhl_ctrl,
 		}
 		if (set_int & MHL_INT_GRT_WRT) {
 			/* SET_INT: GRT_WRT */
-			pr_debug("%s: recvd req to permit/grant write",
+			pr_err("%s: recvd req to permit/grant write",
 				 __func__);
 			complete_all(&mhl_ctrl->req_write_done);
 			mhl_msc_write_burst(
@@ -577,7 +577,7 @@ int mhl_msc_recv_set_int(struct mhl_tx_ctrl *mhl_ctrl,
 			/* peer EDID has changed
 			 * toggle HPD to read EDID
 			 */
-			pr_debug("%s: EDID CHG\n", __func__);
+			pr_err("%s: EDID CHG\n", __func__);
 			mhl_drive_hpd(mhl_ctrl, HPD_DOWN);
 			msleep(110);
 			mhl_drive_hpd(mhl_ctrl, HPD_UP);
@@ -610,7 +610,7 @@ int mhl_msc_recv_write_stat(struct mhl_tx_ctrl *mhl_ctrl,
 				 * peer dcap turned not ready
 				 * use old devap state
 				 */
-				pr_debug("%s: DCAP RDY bit cleared\n",
+				pr_err("%s: DCAP RDY bit cleared\n",
 					 __func__);
 			}
 		}
@@ -665,7 +665,7 @@ static int mhl_request_write_burst(struct mhl_tx_ctrl *mhl_ctrl,
 
 	if (!(mhl_ctrl->devcap[DEVCAP_OFFSET_FEATURE_FLAG] &
 	      MHL_FEATURE_SP_SUPPORT)) {
-		pr_debug("MHL: SCRATCHPAD_NOT_SUPPORTED\n");
+		pr_err("MHL: SCRATCHPAD_NOT_SUPPORTED\n");
 		return -EFAULT;
 	}
 
@@ -677,7 +677,7 @@ static int mhl_request_write_burst(struct mhl_tx_ctrl *mhl_ctrl,
 	while (mhl_ctrl->scrpd_busy && retry--)
 		msleep(50);
 	if (!retry) {
-		pr_debug("MHL: scratchpad_busy\n");
+		pr_err("MHL: scratchpad_busy\n");
 		return -EBUSY;
 	}
 
@@ -719,7 +719,7 @@ int mhl_write_scratchpad(struct mhl_tx_ctrl *mhl_ctrl,
 	    (length > MAX_SCRATCHPAD_TRANSFER_SIZE) ||
 	    (offset > (MAX_SCRATCHPAD_TRANSFER_SIZE - ADOPTER_ID_SIZE)) ||
 	    ((offset + length) > MAX_SCRATCHPAD_TRANSFER_SIZE)) {
-		pr_debug("MHL: write_burst (0x%02x)\n", -EINVAL);
+		pr_err("MHL: write_burst (0x%02x)\n", -EINVAL);
 		return  -EINVAL;
 	}
 

@@ -37,7 +37,7 @@ static int mdp3_check_te_status(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 {
 	int ret;
 
-	pr_debug("%s: Checking panel TE status\n", __func__);
+	pr_err("%s: Checking panel TE status\n", __func__);
 
 	atomic_set(&ctrl_pdata->te_irq_ready, 0);
 	reinit_completion(&ctrl_pdata->te_irq_comp);
@@ -47,7 +47,7 @@ static int mdp3_check_te_status(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 			msecs_to_jiffies(interval));
 
 	disable_irq(gpio_to_irq(ctrl_pdata->disp_te_gpio));
-	pr_debug("%s: Panel TE check done with ret = %d\n", __func__, ret);
+	pr_err("%s: Panel TE check done with ret = %d\n", __func__, ret);
 
 	return ret;
 }
@@ -113,7 +113,7 @@ void mdp3_check_dsi_ctrl_status(struct work_struct *work,
 	if (mdp3_session->in_splash_screen) {
 		schedule_delayed_work(&pdsi_status->check_status,
 			msecs_to_jiffies(interval));
-		pr_debug("%s: cont splash is on\n", __func__);
+		pr_err("%s: cont splash is on\n", __func__);
 		return;
 	}
 
@@ -132,7 +132,7 @@ void mdp3_check_dsi_ctrl_status(struct work_struct *work,
 
 	mutex_lock(&mdp3_session->lock);
 	if (!mdp3_session->status) {
-		pr_debug("%s: display off already\n", __func__);
+		pr_err("%s: display off already\n", __func__);
 		mutex_unlock(&mdp3_session->lock);
 		return;
 	}
@@ -155,7 +155,7 @@ void mdp3_check_dsi_ctrl_status(struct work_struct *work,
 	}
 sim:
 	if (pdata->panel_info.panel_force_dead) {
-		pr_debug("force_dead=%d\n", pdata->panel_info.panel_force_dead);
+		pr_err("force_dead=%d\n", pdata->panel_info.panel_force_dead);
 		pdata->panel_info.panel_force_dead--;
 		if (!pdata->panel_info.panel_force_dead)
 			goto status_dead;
@@ -205,13 +205,13 @@ void mdp3_check_spi_panel_status(struct work_struct *work, uint32_t interval)
 	if (mdp3_session->in_splash_screen) {
 		schedule_delayed_work(&pdsi_status->check_status,
 			msecs_to_jiffies(interval));
-		pr_debug("%s: cont splash is on\n", __func__);
+		pr_err("%s: cont splash is on\n", __func__);
 		return;
 	}
 
 	mutex_lock(&mdp3_session->lock);
 	if (!mdp3_session->status) {
-		pr_debug("%s: display off already\n", __func__);
+		pr_err("%s: display off already\n", __func__);
 		mutex_unlock(&mdp3_session->lock);
 		return;
 	}

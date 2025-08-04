@@ -26,7 +26,7 @@ static int dsi_off(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
 
-	pr_debug("turn off dsi controller\n");
+	pr_err("turn off dsi controller\n");
 	if (dsi_intf.off)
 		rc = dsi_intf.off(pdata);
 
@@ -41,7 +41,7 @@ static int dsi_on(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
 
-	pr_debug("dsi_on DSI controller on\n");
+	pr_err("dsi_on DSI controller on\n");
 	if (dsi_intf.on)
 		rc = dsi_intf.on(pdata);
 
@@ -89,7 +89,7 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 	int rc = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
-	pr_debug("dsi_panel_handler enable=%d\n", enable);
+	pr_err("dsi_panel_handler enable=%d\n", enable);
 	if (!pdata)
 		return -ENODEV;
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
@@ -135,7 +135,7 @@ static int dsi_splash_on(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	if (dsi_intf.cont_on)
 		rc = dsi_intf.cont_on(pdata);
@@ -151,7 +151,7 @@ static int dsi_clk_ctrl(struct mdss_panel_data *pdata, int enable)
 {
 	int rc = 0;
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	if (dsi_intf.clk_ctrl)
 		rc = dsi_intf.clk_ctrl(pdata, enable);
@@ -193,7 +193,7 @@ static int dsi_event_handler(struct mdss_panel_data *pdata,
 		rc = dsi_update_pconfig(pdata, (int)(unsigned long) arg);
 		break;
 	default:
-		pr_debug("%s: unhandled event=%d\n", __func__, event);
+		pr_err("%s: unhandled event=%d\n", __func__, event);
 		break;
 	}
 	return rc;
@@ -285,10 +285,10 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 	}
 
 	if (mp->num_vreg == 0) {
-		pr_debug("%s: no vreg\n", __func__);
+		pr_err("%s: no vreg\n", __func__);
 		goto novreg;
 	} else {
-		pr_debug("%s: vreg found. count=%d\n", __func__, mp->num_vreg);
+		pr_err("%s: vreg found. count=%d\n", __func__, mp->num_vreg);
 	}
 
 	mp->vreg_config = devm_kzalloc(dev, sizeof(struct mdss_vreg) *
@@ -364,7 +364,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-pre-on-sleep", &tmp);
 		if (rc) {
-			pr_debug("%s: error reading supply pre sleep value. rc=%d\n",
+			pr_err("%s: error reading supply pre sleep value. rc=%d\n",
 				__func__, rc);
 			rc = 0;
 		} else {
@@ -374,7 +374,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-pre-off-sleep", &tmp);
 		if (rc) {
-			pr_debug("%s: error reading supply pre sleep value. rc=%d\n",
+			pr_err("%s: error reading supply pre sleep value. rc=%d\n",
 				__func__, rc);
 			rc = 0;
 		} else {
@@ -385,7 +385,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-post-on-sleep", &tmp);
 		if (rc) {
-			pr_debug("%s: error reading supply post sleep value. rc=%d\n",
+			pr_err("%s: error reading supply post sleep value. rc=%d\n",
 				__func__, rc);
 			rc = 0;
 		} else {
@@ -395,14 +395,14 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 		rc = of_property_read_u32(supply_node,
 			"qcom,supply-post-off-sleep", &tmp);
 		if (rc) {
-			pr_debug("%s: error reading supply post sleep value. rc=%d\n",
+			pr_err("%s: error reading supply post sleep value. rc=%d\n",
 				__func__, rc);
 			rc = 0;
 		} else {
 			mp->vreg_config[i].post_off_sleep = tmp;
 		}
 
-		pr_debug("%s: %s min=%d, max=%d, enable=%d, disable=%d, ulp=%d, preonsleep=%d, postonsleep=%d, preoffsleep=%d, postoffsleep=%d\n",
+		pr_err("%s: %s min=%d, max=%d, enable=%d, disable=%d, ulp=%d, preonsleep=%d, postonsleep=%d, preoffsleep=%d, postoffsleep=%d\n",
 			__func__,
 			mp->vreg_config[i].vreg_name,
 			mp->vreg_config[i].min_voltage,
@@ -591,7 +591,7 @@ int dsi_panel_device_register_v2(struct platform_device *dev,
 		return rc;
 	}
 
-	pr_debug("%s: Panal data initialized\n", __func__);
+	pr_err("%s: Panal data initialized\n", __func__);
 	return 0;
 }
 

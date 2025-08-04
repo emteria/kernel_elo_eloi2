@@ -227,7 +227,7 @@
 /*20161228 Jack W Lu: mini USB OTG device VBUS enable---Mini_USB_EN }*/
 
 /*20161212 Jack W Lu: Add for USB switch control {*/
-&pmi8950_charger {
+&qpnp_smbcharger {
 	qcom,usb_switch_1_gpio = <&tlmm 7 0>;/*USB_Switch1_S: for ADB: L, for HOST: H*/
 	qcom,usb_switch_2_gpio = <&tlmm 61 0>;/*USB_Switch2_S: for ADB: L, for HOST: H*/
 	qcom,uart_switch_3_gpio = <&tlmm 23 0>;/*USB_Switch3_S: for UART: H, for HOST: L*/
@@ -279,6 +279,10 @@
 &spmi_bus {
 
 	qcom,pmi8950@2 {
+		compatible ="qcom,spmi-pmic";
+		reg = <0x2 0>;
+		#address-cells = <1>;
+		#size-cells = <1>;
 
 		pmi8950_gpios: gpios {
 			/* OEM 2016/12/12, Lewis Lin, change PWM @GPIO_1 { */

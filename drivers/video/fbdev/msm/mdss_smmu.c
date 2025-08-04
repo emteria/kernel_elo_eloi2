@@ -89,6 +89,7 @@ static int mdss_smmu_util_parse_dt_clock(struct platform_device *pdev,
 	mp->clk_config = devm_kzalloc(&pdev->dev,
 			sizeof(struct mdss_clk) * mp->num_clk, GFP_KERNEL);
 	if (!mp->clk_config) {
+		pr_err("clock configuration allocation failed\n");
 		rc = -ENOMEM;
 		mp->num_clk = 0;
 		goto clk_err;
@@ -228,9 +229,17 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 			}
+
+			pr_err("mdss_smmu_attach_v2: setting handoff_pending = false\n");
 			mdss_smmu->handoff_pending = false;
 
+			if (mdss_smmu->mmu_mapping == NULL) {
+				pr_err("no mapping for domain:[%d]\n", i);
+				goto err;
+			}
+
 			if (!mdss_smmu->domain_attached) {
+				dev_err(mdss_smmu->dev, "iommu attaching device for domain %d\n", i);
 				rc = arm_iommu_attach_device(mdss_smmu->dev,
 						mdss_smmu->mmu_mapping);
 				if (rc) {
@@ -241,7 +250,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 				mdss_smmu->domain_attached = true;
-				pr_debug("iommu v2 domain[%i] attached\n", i);
+				pr_err("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
 			pr_err("iommu device not attached for domain[%d]\n", i);
@@ -415,6 +424,9 @@ static int mdss_smmu_map_v2(int domain, phys_addr_t iova, phys_addr_t phys,
 		return -EINVAL;
 	}
 
+	pr_err("passing map to iommu_map for domain=%d\n", domain);
+	pr_info("mdss_smmu->dev = %px\n", mdss_smmu->dev);
+
 	return iommu_map(mdss_smmu->mmu_mapping->domain,
 			iova, phys, gfp_order, prot);
 }
@@ -495,33 +507,26 @@ int mdss_smmu_fault_handler(struct iommu_domain *domain, struct device *dev,
 		(struct mdss_smmu_client *)user_data;
 	u32 fsynr1, mid, i;
 
-	if (!mdss_smmu)
+	if (!mdss_smmu || !mdss_smmu->mmu_base)
 		goto end;
 
-	if (mdss_smmu->mmu_base) {
-		fsynr1 = readl_relaxed(mdss_smmu->mmu_base + SMMU_CBN_FSYNR1);
-		mid = fsynr1 & 0xff;
-		pr_err("mdss_smmu: iova:0x%lx flags:0x%x fsynr1: 0x%x mid: 0x%x\n",
-			iova, flags, fsynr1, mid);
+	fsynr1 = readl_relaxed(mdss_smmu->mmu_base + SMMU_CBN_FSYNR1);
+	mid = fsynr1 & 0xff;
+	pr_err("mdss_smmu: iova:0x%lx flags:0x%x fsynr1: 0x%x mid: 0x%x\n",
+		iova, flags, fsynr1, mid);
 
-		/* get domain id information */
-		for (i = 0; i < MDSS_IOMMU_MAX_DOMAIN; i++) {
-			if (mdss_smmu == mdss_smmu_get_cb(i))
-				break;
-		}
-
-		if (i == MDSS_IOMMU_MAX_DOMAIN)
-			goto end;
-
-		mdss_mdp_debug_mid(mid);
-	} else {
-		pr_err("mdss_smmu: iova:0x%lx flags:0x%x\n",
-			iova, flags);
-		MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "dsi0_ctrl",
-				"dsi0_phy");
+	/* get domain id information */
+	for (i = 0; i < MDSS_IOMMU_MAX_DOMAIN; i++) {
+		if (mdss_smmu == mdss_smmu_get_cb(i))
+			break;
 	}
+
+	if (i == MDSS_IOMMU_MAX_DOMAIN)
+		goto end;
+
+	mdss_mdp_debug_mid(mid);
 end:
-	return -ENODEV;
+	return -ENOSYS;
 }
 
 static void mdss_smmu_deinit_v2(struct mdss_data_type *mdata)
@@ -721,13 +726,13 @@ int mdss_smmu_init(struct mdss_data_type *mdata, struct device *dev)
 }
 
 static struct mdss_smmu_domain mdss_mdp_unsec = {
-	"mdp_0", MDSS_IOMMU_DOMAIN_UNSECURE, SZ_128M, (SZ_4G - SZ_128M)};
+	"mdp_0", MDSS_IOMMU_DOMAIN_UNSECURE, SZ_1M, (SZ_4G - SZ_1M)};
 static struct mdss_smmu_domain mdss_rot_unsec = {
-	NULL, MDSS_IOMMU_DOMAIN_ROT_UNSECURE, SZ_128M, (SZ_4G - SZ_128M)};
+	NULL, MDSS_IOMMU_DOMAIN_ROT_UNSECURE, SZ_1M, (SZ_4G - SZ_1M)};
 static struct mdss_smmu_domain mdss_mdp_sec = {
-	"mdp_1", MDSS_IOMMU_DOMAIN_SECURE, SZ_128M, (SZ_4G - SZ_128M)};
+	"mdp_1", MDSS_IOMMU_DOMAIN_SECURE, SZ_1M, (SZ_4G - SZ_1M)};
 static struct mdss_smmu_domain mdss_rot_sec = {
-	NULL, MDSS_IOMMU_DOMAIN_ROT_SECURE, SZ_128M, (SZ_4G - SZ_128M)};
+	NULL, MDSS_IOMMU_DOMAIN_ROT_SECURE, SZ_1M, (SZ_4G - SZ_1M)};
 
 static const struct of_device_id mdss_smmu_dt_match[] = {
 	{ .compatible = "qcom,smmu_mdp_unsec", .data = &mdss_mdp_unsec},
@@ -863,20 +868,20 @@ int mdss_smmu_probe(struct platform_device *pdev)
 
 	if (!mdata->handoff_pending)
 		mdss_smmu_enable_power(mdss_smmu, false);
-	else
+	else {
+		pr_err("mdss_smmu_probe: setting handoff_pending = true\n");
 		mdss_smmu->handoff_pending = true;
+	}
 
 	mdss_smmu->dev = dev;
 
-	iommu_set_fault_handler(mdss_smmu->mmu_mapping->domain,
-			mdss_smmu_fault_handler, mdss_smmu);
 	address = of_get_address_by_name(pdev->dev.of_node, "mmu_cb", 0, 0);
 	if (address) {
 		size = address + 1;
 		mdss_smmu->mmu_base = ioremap(be32_to_cpu(*address),
 			be32_to_cpu(*size));
 	} else {
-		pr_debug("unable to map context bank base\n");
+		pr_err("unable to map context bank base\n");
 	}
 
 	pr_info("iommu v2 domain[%d] mapping and clk register successful!\n",

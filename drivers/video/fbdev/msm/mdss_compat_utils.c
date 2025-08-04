@@ -546,7 +546,7 @@ static int mdss_fb_compat_buf_sync(struct fb_info *info, unsigned int cmd,
 			sizeof(int))) {
 		if (buf_sync->flags & MDP_BUF_SYNC_FLAG_RETIRE_FENCE)
 			return -EFAULT;
-		pr_debug("%s: no retire fence fd for wb\n",
+		pr_err("%s: no retire fence fd for wb\n",
 			__func__);
 	}
 
@@ -673,7 +673,7 @@ static int mdss_fb_compat_set_lut(struct fb_info *info, unsigned long arg,
 
 	ret = mdss_fb_do_ioctl(info, MSMFB_SET_LUT, (unsigned long) cmap, file);
 	if (!ret)
-		pr_debug("%s: compat ioctl successful\n", __func__);
+		pr_err("%s: compat ioctl successful\n", __func__);
 
 	return ret;
 }
@@ -944,7 +944,7 @@ static int __from_user_pcc_cfg_data(
 		}
 		break;
 	default:
-		pr_debug("pcc version %d not supported use legacy\n", version);
+		pr_err("pcc version %d not supported use legacy\n", version);
 		if (__from_user_pcc_coeff(
 				compat_ptr((uintptr_t)&pcc_cfg32->r),
 				&pcc_cfg->r) ||
@@ -1026,7 +1026,7 @@ static int __to_user_pcc_cfg_data(
 	}
 
 	if (!(ops & MDP_PP_OPS_READ)) {
-		pr_debug("Read op is not set. Skipping compat copyback\n");
+		pr_err("Read op is not set. Skipping compat copyback\n");
 		return 0;
 	}
 
@@ -1043,7 +1043,7 @@ static int __to_user_pcc_cfg_data(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 
 		if (__to_user_pcc_coeff(
 				compat_ptr((uintptr_t)&pcc_cfg32->r),
@@ -1210,7 +1210,7 @@ static int __from_user_igc_lut_data(
 				version, ret);
 		break;
 	default:
-		pr_debug("version not supported fallback to legacy %d\n",
+		pr_err("version not supported fallback to legacy %d\n",
 			 version);
 		if (get_user(data, &igc_lut32->c0_c1_data) ||
 		    put_user(compat_ptr(data), &igc_lut->c0_c1_data) ||
@@ -1412,7 +1412,7 @@ static int __from_user_pgc_lut_data(
 			pr_err("failed to copy pgc v17\n");
 		break;
 	default:
-		pr_debug("version %d not supported fallback to legacy\n",
+		pr_err("version %d not supported fallback to legacy\n",
 			 version);
 		ret = __from_user_pgc_lut_data_legacy(pgc_lut32, pgc_lut);
 		if (ret)
@@ -1562,7 +1562,7 @@ static int __from_user_hist_lut_data(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 		if (get_user(data, &hist_lut32->data) ||
 		    put_user(compat_ptr(data), &hist_lut->data))
 			return -EFAULT;
@@ -2131,7 +2131,7 @@ static int __from_user_pa_v2_cfg_data(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 		if (__from_user_pa_v2_data(
 				compat_ptr((uintptr_t)&pa_v2_cfg32->pa_v2_data),
 				&pa_v2_cfg->pa_v2_data))
@@ -2224,7 +2224,7 @@ static int __to_user_pa_v2_cfg_data(
 		}
 
 		if (!(flags & MDP_PP_OPS_READ)) {
-			pr_debug("Read op not set. Skipping compat copyback\n");
+			pr_err("Read op not set. Skipping compat copyback\n");
 			return 0;
 		}
 
@@ -2235,7 +2235,7 @@ static int __to_user_pa_v2_cfg_data(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 
 		if (copy_from_user(&flags,
 				&pa_v2_cfg32->pa_v2_data.flags,
@@ -2245,7 +2245,7 @@ static int __to_user_pa_v2_cfg_data(
 		}
 
 		if (!(flags & MDP_PP_OPS_READ)) {
-			pr_debug("Read op not set. Skipping compat copyback\n");
+			pr_err("Read op not set. Skipping compat copyback\n");
 			return 0;
 		}
 
@@ -2384,7 +2384,7 @@ static int __from_user_gamut_cfg_data(
 		}
 		break;
 	default:
-		pr_debug("version invalid fallback to legacy\n");
+		pr_err("version invalid fallback to legacy\n");
 	/* The Gamut LUT data contains 3 static arrays for R, G, and B
 	 * gamut data. Each these arrays contains pointers dynamic arrays
 	 * which hold the gamut LUTs for R, G, and B. Must copy the array of
@@ -3532,7 +3532,7 @@ static int __copy_layer_pp_info_igc_params(
 		}
 		break;
 	default:
-		pr_debug("No version set, fallback to legacy IGC version\n");
+		pr_err("No version set, fallback to legacy IGC version\n");
 		pp_info->igc_cfg.len = pp_info32->igc_cfg.len;
 		pp_info->igc_cfg.c0_c1_data =
 			compat_ptr(pp_info32->igc_cfg.c0_c1_data);
@@ -3607,7 +3607,7 @@ static int __copy_layer_pp_info_hist_lut_params(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 		pp_info->hist_lut_cfg.len = pp_info32->hist_lut_cfg.len;
 		pp_info->hist_lut_cfg.data =
 				compat_ptr(pp_info32->hist_lut_cfg.data);
@@ -3700,7 +3700,7 @@ static int __copy_layer_pp_info_pa_v2_params(
 		}
 		break;
 	default:
-		pr_debug("version invalid\n");
+		pr_err("version invalid\n");
 		kfree(cfg_payload);
 		cfg_payload = NULL;
 		break;
@@ -3784,7 +3784,7 @@ static int __copy_layer_pp_info_pcc_params(
 		}
 		break;
 	default:
-		pr_debug("version invalid, fallback to legacy\n");
+		pr_err("version invalid, fallback to legacy\n");
 		kfree(cfg_payload);
 		cfg_payload = NULL;
 		break;
@@ -4269,7 +4269,7 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 	case MSMFB_METADATA_SET:
 	case MSMFB_METADATA_GET:
 	default:
-		pr_debug("%s: overlay ioctl cmd=[%u]\n", __func__, cmd);
+		pr_err("%s: overlay ioctl cmd=[%u]\n", __func__, cmd);
 		ret = mdss_fb_do_ioctl(info, cmd, (unsigned long) arg, file);
 		break;
 	}
@@ -4335,7 +4335,7 @@ int mdss_fb_compat_ioctl(struct fb_info *info, unsigned int cmd,
 	if (ret == -ENOTSUPP)
 		pr_err("%s: unsupported ioctl\n", __func__);
 	else if (ret)
-		pr_debug("%s: ioctl err cmd=%u ret=%d\n", __func__, cmd, ret);
+		pr_err("%s: ioctl err cmd=%u ret=%d\n", __func__, cmd, ret);
 
 	return ret;
 }

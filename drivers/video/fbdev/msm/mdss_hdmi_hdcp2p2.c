@@ -143,7 +143,7 @@ static int hdmi_hdcp2p2_wakeup(struct hdcp_wakeup_data *data)
 
 	mutex_lock(&ctrl->wakeup_mutex);
 
-	pr_debug("cmd: %s, timeout %dms, tethered %d\n",
+	pr_err("cmd: %s, timeout %dms, tethered %d\n",
 		hdcp_cmd_to_str(data->cmd),
 		data->timeout, ctrl->tethered);
 
@@ -431,7 +431,7 @@ static ssize_t hdmi_hdcp2p2_sysfs_wta_min_level_change(struct device *dev,
 		enc_notify = false;
 	}
 
-	pr_debug("enc level changed %d\n", min_enc_lvl);
+	pr_err("enc level changed %d\n", min_enc_lvl);
 
 	cdata.context = ctrl->lib_ctx;
 	hdmi_hdcp2p2_wakeup_lib(ctrl, &cdata);
@@ -486,7 +486,7 @@ static int hdmi_hdcp2p2_ddc_read_message(struct hdmi_hdcp2p2_ctrl *ctrl,
 
 	ctrl->init_data.ddc_ctrl->ddc_data = ddc_data;
 
-	pr_debug("read msg timeout %dms\n", timeout);
+	pr_err("read msg timeout %dms\n", timeout);
 
 	rc = hdmi_ddc_read(ctrl->init_data.ddc_ctrl);
 	if (rc)
@@ -545,7 +545,7 @@ static int hdmi_hdcp2p2_read_version(struct hdmi_hdcp2p2_ctrl *ctrl,
 		return rc;
 	}
 
-	pr_debug("Read HDCP2Version as %u\n", *hdcp2version);
+	pr_err("Read HDCP2Version as %u\n", *hdcp2version);
 	return rc;
 }
 
@@ -656,7 +656,7 @@ static void hdmi_hdcp2p2_link_cb(void *data)
 	struct hdmi_hdcp2p2_ctrl *ctrl = data;
 
 	if (!ctrl) {
-		pr_debug("invalid input\n");
+		pr_err("invalid input\n");
 		return;
 	}
 
@@ -705,7 +705,7 @@ static void hdmi_hdcp2p2_recv_msg(struct hdmi_hdcp2p2_ctrl *ctrl)
 		timeout_hsync = HDMI_DEFAULT_TIMEOUT_HSYNC;
 	}
 
-	pr_debug("timeout for rxstatus %dms, %d hsync\n",
+	pr_err("timeout for rxstatus %dms, %d hsync\n",
 		ctrl->timeout, timeout_hsync);
 
 	ddc_data->intr_mask = RXSTATUS_MESSAGE_SIZE | RXSTATUS_REAUTH_REQ;
@@ -724,14 +724,14 @@ static void hdmi_hdcp2p2_recv_msg(struct hdmi_hdcp2p2_ctrl *ctrl)
 	if (ddc_data->reauth_req) {
 		ddc_data->reauth_req = false;
 
-		pr_debug("reauth triggered by sink\n");
+		pr_err("reauth triggered by sink\n");
 		rc = -EINVAL;
 		goto exit;
 	}
 
 	ctrl->timeout_left = ddc_data->timeout_left;
 
-	pr_debug("timeout left after rxstatus %dms, msg size %d\n",
+	pr_err("timeout left after rxstatus %dms, msg size %d\n",
 		ctrl->timeout_left, ddc_data->message_size);
 
 	if (!ddc_data->message_size) {
@@ -798,7 +798,7 @@ static int hdmi_hdcp2p2_link_check(struct hdmi_hdcp2p2_ctrl *ctrl)
 		pr_err("err in timeout hsync calc\n");
 		timeout_hsync = HDMI_DEFAULT_TIMEOUT_HSYNC;
 	}
-	pr_debug("timeout for rxstatus %d hsyncs\n", timeout_hsync);
+	pr_err("timeout for rxstatus %d hsyncs\n", timeout_hsync);
 
 	ddc_data->intr_mask = RXSTATUS_READY | RXSTATUS_MESSAGE_SIZE |
 		RXSTATUS_REAUTH_REQ;
@@ -879,7 +879,7 @@ static void hdmi_hdcp2p2_link_work(struct kthread_work *work)
 	ddc_data = &ddc_ctrl->hdcp2p2_ddc_data;
 
 	if (ddc_data->reauth_req) {
-		pr_debug("reauth triggered by sink\n");
+		pr_err("reauth triggered by sink\n");
 
 		ddc_data->reauth_req = false;
 		rc = -ENOLINK;
@@ -888,7 +888,7 @@ static void hdmi_hdcp2p2_link_work(struct kthread_work *work)
 	}
 
 	if (ddc_data->ready && ddc_data->message_size) {
-		pr_debug("topology changed. rxstatus msg size %d\n",
+		pr_err("topology changed. rxstatus msg size %d\n",
 			ddc_data->message_size);
 
 		ddc_data->ready  = false;
@@ -1000,7 +1000,7 @@ void *hdmi_hdcp2p2_init(struct hdmi_hdcp_init_data *init_data)
 	static struct hdcp_txmtr_ops txmtr_ops;
 	struct hdcp_register_data register_data;
 
-	pr_debug("HDCP2P2 feature initialization\n");
+	pr_err("HDCP2P2 feature initialization\n");
 
 	if (!init_data || !init_data->core_io || !init_data->mutex ||
 		!init_data->ddc_ctrl || !init_data->notify_status ||
@@ -1085,12 +1085,12 @@ static bool hdmi_hdcp2p2_supported(struct hdmi_hdcp2p2_ctrl *ctrl)
 		goto error;
 
 	if (hdcp2version & BIT(2)) {
-		pr_debug("Sink is HDCP 2.2 capable\n");
+		pr_err("Sink is HDCP 2.2 capable\n");
 		return true;
 	}
 
 error:
-	pr_debug("Sink is not HDCP 2.2 capable\n");
+	pr_err("Sink is not HDCP 2.2 capable\n");
 	return false;
 }
 
@@ -1098,7 +1098,7 @@ struct hdmi_hdcp_ops *hdmi_hdcp2p2_start(void *input)
 {
 	struct hdmi_hdcp2p2_ctrl *ctrl = input;
 
-	pr_debug("Checking sink capability\n");
+	pr_err("Checking sink capability\n");
 	if (hdmi_hdcp2p2_supported(ctrl))
 		return ctrl->ops;
 	else

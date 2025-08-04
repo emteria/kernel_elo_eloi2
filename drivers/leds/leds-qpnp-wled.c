@@ -2832,7 +2832,7 @@ static int __init qpnp_wled_init(void)
 {
 	return platform_driver_register(&qpnp_wled_driver);
 }
-subsys_initcall(qpnp_wled_init);
+device_initcall(qpnp_wled_init);
 
 static void __exit qpnp_wled_exit(void)
 {

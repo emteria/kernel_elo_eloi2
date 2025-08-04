@@ -511,7 +511,7 @@ u32 mdp3_clk_calc(struct msm_fb_data_type *mfd,
 	mdp_clk_rate += (ppp_res.solid_fill_pixel * fps);
 	mdp_clk_rate = fudge_factor(mdp_clk_rate,
 				CLK_FUDGE_NUM, CLK_FUDGE_DEN);
-	pr_debug("mdp_clk_rate for ppp = %llu\n", mdp_clk_rate);
+	pr_err("mdp_clk_rate for ppp = %llu\n", mdp_clk_rate);
 	mdp_clk_rate = mdp3_clk_round_off(mdp_clk_rate);
 
 	return mdp_clk_rate;
@@ -575,7 +575,7 @@ int mdp3_calc_ppp_res(struct msm_fb_data_type *mfd,
 						bpp.bpp_num / bpp.bpp_den;
 		if ((old_solid_fill_pixel >= new_solid_fill_pixel) ||
 			(mdp3_res->solid_fill_vote_en)) {
-			pr_debug("Last fill pixels are higher or fill_en %d\n",
+			pr_err("Last fill pixels are higher or fill_en %d\n",
 				mdp3_res->solid_fill_vote_en);
 			ATRACE_END(__func__);
 			return 0;
@@ -653,7 +653,7 @@ int mdp3_calc_ppp_res(struct msm_fb_data_type *mfd,
 
 	if (lreq->req_list[0].flags & MDP_SOLID_FILL) {
 		honest_ppp_ab = ppp_res.solid_fill_byte * 4;
-		pr_debug("solid fill honest_ppp_ab %llu\n", honest_ppp_ab);
+		pr_err("solid fill honest_ppp_ab %llu\n", honest_ppp_ab);
 	} else {
 		honest_ppp_ab += ppp_res.solid_fill_byte;
 		mdp3_res->solid_fill_vote_en = true;
@@ -664,9 +664,9 @@ int mdp3_calc_ppp_res(struct msm_fb_data_type *mfd,
 		ppp_res.next_ab = honest_ppp_ab;
 		ppp_res.next_ib = honest_ppp_ab;
 		ppp_stat->bw_update = true;
-		pr_debug("solid fill ab = %llx, total ab = %llx ",
+		pr_err("solid fill ab = %llx, total ab = %llx ",
 			(ppp_res.solid_fill_byte * fps), honest_ppp_ab);
-		pr_debug("(%d fps) Solid_fill_vote %d\n",
+		pr_err("(%d fps) Solid_fill_vote %d\n",
 			fps, mdp3_res->solid_fill_vote_en);
 		ATRACE_INT("mdp3_ppp_bus_quota", honest_ppp_ab);
 	}
@@ -733,7 +733,7 @@ void mdp3_start_ppp(struct ppp_blit_op *blit_op)
 	}
 	/* Skip PPP kickoff for SMART_BLIT BG layer */
 	if (blit_op->mdp_op & MDPOP_SMART_BLIT)
-		pr_debug("Skip mdp3_ppp_kickoff\n");
+		pr_err("Skip mdp3_ppp_kickoff\n");
 	else
 	mdp3_ppp_kickoff();
 
@@ -1417,7 +1417,7 @@ static bool is_blit_optimization_possible(struct blit_req_list *req, int indx)
 	struct mdp_blit_req fg_req;
 
 	if (!(mdp3_res->smart_blit_en)) {
-		pr_debug("Smart BLIT disabled from sysfs\n");
+		pr_err("Smart BLIT disabled from sysfs\n");
 		return status;
 	}
 	if (next < req->count) {
@@ -1452,7 +1452,7 @@ static bool is_blit_optimization_possible(struct blit_req_list *req, int indx)
 			(!(hw_woraround_active))) {
 			status = true;
 			req->req_list[indx].flags |= MDP_SMART_BLIT;
-			pr_debug("Optimize RGB Blit for Req Indx %d\n", indx);
+			pr_err("Optimize RGB Blit for Req Indx %d\n", indx);
 		}
 		/*
 		 * Swap BG and FG layer to enable SMART blit between request
@@ -1474,7 +1474,7 @@ static bool is_blit_optimization_possible(struct blit_req_list *req, int indx)
 			if ((is_scaling_needed(bg_req)) && (
 				bg_req.flags & MDP_ROT_90) &&
 				(bg_req.flags & MDP_FLIP_UD)) {
-				pr_debug("YUV layer with ROT+UD_FLIP+Scaling Not supported\n");
+				pr_err("YUV layer with ROT+UD_FLIP+Scaling Not supported\n");
 				return false;
 			}
 			/*
@@ -1502,7 +1502,7 @@ static bool is_blit_optimization_possible(struct blit_req_list *req, int indx)
 				req->dst_data[indx] = tmp_data;
 				status = true;
 				req->req_list[indx].flags |= MDP_SMART_BLIT;
-				pr_debug("Optimize YUV Blit for Req Indx %d\n",
+				pr_err("Optimize YUV Blit for Req Indx %d\n",
 					indx);
 			}
 		}

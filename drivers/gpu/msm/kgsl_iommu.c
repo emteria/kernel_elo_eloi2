@@ -1364,6 +1364,7 @@ static int _init_per_process_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 	if (IS_ERR(iommu_pt))
 		return PTR_ERR(iommu_pt);
 
+	pr_err("setting DOMAIN_ATTR_DYNAMIC\n");
 	ret = iommu_domain_set_attr(iommu_pt->domain,
 				DOMAIN_ATTR_DYNAMIC, &dynamic);
 	if (ret) {

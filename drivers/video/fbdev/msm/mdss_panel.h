@@ -1088,7 +1088,7 @@ static inline void mdss_panel_update_clk_rate(struct mdss_panel_info *pinfo,
 
 		pinfo->clk_rate = mult_frac(htotal * vtotal, fps, 1000);
 
-		pr_debug("vtotal %d, htotal %d, rate %llu\n",
+		pr_err("vtotal %d, htotal %d, rate %llu\n",
 			vtotal, htotal, pinfo->clk_rate);
 	}
 }

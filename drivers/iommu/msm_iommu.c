@@ -379,6 +379,8 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct msm_priv *priv = to_msm_priv(domain);
 	struct msm_iommu_ctx_dev *master;
 
+	dev_err(dev, "start attaching device to domain\n");
+
 	priv->dev = dev;
 	msm_iommu_domain_config(priv);
 
@@ -415,6 +417,7 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 fail:
+	dev_err(dev, "msm_iommu_attach_dev failed");
 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
 
 	return ret;
