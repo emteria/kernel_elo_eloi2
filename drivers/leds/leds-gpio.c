@@ -21,14 +21,137 @@
 #include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
+#include <linux/uaccess.h>
+
+#include <linux/qpnp/pwm.h>
+#include <linux/delay.h>
+#include <linux/proc_fs.h>
+
+#define TORCH_BRIGHT_TO_BL(out, v, bl_max, max_bright)	\
+	do {						\
+		out = (2 * (v) * (bl_max) + max_bright);\
+		do_div(out, 2 * max_bright);		\
+	} while (0)
+
+
+#define TIMER_50MS_WQ		50
+
+#define TORCH_DEBUG_ENABLE	1
+
+#if TORCH_DEBUG_ENABLE
+#define TORCH_DEBUG		pr_err
+#else
+#define TORCH_DEBUG
+#endif
 
 struct gpio_led_data {
 	struct led_classdev cdev;
 	struct gpio_desc *gpiod;
 	u8 can_sleep;
 	u8 blinking;
+	struct pwm_device *pwm_bl;
+	u32 pwm_period;
+	u32 pwm_freq_min;
+	u32 pwm_freq_max;
+	u32 pwm_freq;
+	u32 pwm_level;
+	u32 pwm_level_dt;
+	u32 brightness_max;
+	u32 tl_max;
+	u32 tl_min;
+	u32 pwm_enabled;
+	bool use_pwm;
 	gpio_blink_set_t platform_gpio_blink_set;
+	struct workqueue_struct *torch_work_queue;
+	struct delayed_work torch_work;
 };
+
+static u32 torch_switch_freq_to_period(u32 freq)
+{
+	return (u32)(USEC_PER_SEC / freq);
+}
+
+static void torch_config_pwm(struct gpio_led_data *led, u32 level)
+{
+	int ret;
+	u64 duty_ns;
+	u64 period_ns;
+	struct pwm_state pstate;
+	int rc;
+
+	if (led->pwm_bl == NULL) {
+		pr_err("%s: no PWM\n", __func__);
+		return;
+	}
+
+	if (level == 0) {
+		if (led->pwm_enabled) {
+			pr_err("%s: disable pwm\n", __func__);
+			ret = pwm_config(led->pwm_bl, 0, led->pwm_period * NSEC_PER_USEC);
+			if (ret)
+				pr_err("%s: pwm_config() failed err=%d.\n", __func__, ret);
+			pwm_disable(led->pwm_bl);
+		}
+		led->pwm_enabled = 0;
+		return;
+	}
+
+	//duty:pwm duty cycle
+	led->pwm_period = torch_switch_freq_to_period(led->pwm_freq);
+	period_ns = led->pwm_period * NSEC_PER_USEC;
+	duty_ns = level * period_ns;
+	duty_ns /= led->tl_max;
+
+	TORCH_DEBUG("[%s]:level=%d period_ns=%lld tl_max=%d duty=%lld\n",
+		    __func__, level, period_ns, led->tl_max, duty_ns);
+
+	pwm_get_state(led->pwm_bl, &pstate);
+	pstate.period = period_ns;
+	pstate.duty_cycle = duty_ns;
+	pstate.output_type = PWM_OUTPUT_FIXED;
+
+	pstate.output_pattern = NULL;
+	rc = pwm_apply_state(led->pwm_bl, &pstate);
+	if (rc < 0) {
+		pr_err("%s: config pwm error!!\n", __func__);
+		return;
+	}
+
+	if (!led->pwm_enabled) {
+		ret = pwm_enable(led->pwm_bl);
+		if (ret)
+			pr_err("%s: pwm_enable() failed err=%d\n", __func__, ret);
+		led->pwm_enabled = 1;
+	}
+}
+
+static void torch_set_brightness(struct gpio_led_data *led,
+				     u32 value)
+{
+	u64 bl_lvl;
+
+	if (value > led->brightness_max)
+		value = led->brightness_max;
+
+	/* This maps torch light level 0 to 255 into
+	 * driver backlight level 0 to bl_max with rounding
+	 */
+	TORCH_BRIGHT_TO_BL(bl_lvl, value, led->tl_max, led->brightness_max);
+
+	if (!bl_lvl && value)
+		bl_lvl = 1;
+	torch_config_pwm(led, bl_lvl);
+}
+
+static void torch_work_handler(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct gpio_led_data *led_dat = container_of(dwork, struct gpio_led_data, torch_work);
+
+	TORCH_DEBUG("[%s] led_dat->pwm_level:%d\n", __func__, led_dat->pwm_level);
+	TORCH_DEBUG("[%s] led_dat->pwm_freq:%d\n", __func__, led_dat->pwm_freq);
+	torch_set_brightness(led_dat, led_dat->pwm_level);
+}
 
 static inline struct gpio_led_data *
 			cdev_to_gpio_led_data(struct led_classdev *led_cdev)
@@ -41,6 +164,12 @@ static void gpio_led_set(struct led_classdev *led_cdev,
 {
 	struct gpio_led_data *led_dat = cdev_to_gpio_led_data(led_cdev);
 	int level;
+
+	if (led_dat->use_pwm) {
+		led_dat->pwm_level = value;
+		queue_delayed_work(led_dat->torch_work_queue, &led_dat->torch_work, msecs_to_jiffies(TIMER_50MS_WQ));
+		return;
+	}
 
 	if (value == LED_OFF)
 		level = 0;
@@ -58,6 +187,37 @@ static void gpio_led_set(struct led_classdev *led_cdev,
 			gpiod_set_value(led_dat->gpiod, level);
 	}
 }
+
+static ssize_t pwm_freq_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct gpio_led_data *led_dat = cdev_to_gpio_led_data(led_cdev);
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", led_dat->pwm_freq);
+}
+
+static ssize_t pwm_freq_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct gpio_led_data *led_dat = cdev_to_gpio_led_data(led_cdev);
+	u32 freq;
+	int ret;
+
+	ret = kstrtou32(buf, 10, &freq);
+	if (ret)
+		return ret;
+
+	led_dat->pwm_freq = freq;
+	queue_delayed_work(led_dat->torch_work_queue, &led_dat->torch_work, msecs_to_jiffies(TIMER_50MS_WQ));
+	return count;
+}
+
+static DEVICE_ATTR(pwm_freq, 0644, pwm_freq_show, pwm_freq_store);
+
+static const struct attribute *pwm_attributes[] = {
+	&dev_attr_pwm_freq.attr,
+	NULL,
+};
 
 static int gpio_led_set_blocking(struct led_classdev *led_cdev,
 	enum led_brightness value)
@@ -161,6 +321,9 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 	struct fwnode_handle *child;
 	struct gpio_leds_priv *priv;
 	int count, ret, error;
+	int rc = 0;
+	u32 tmp;
+
 	count = device_get_child_node_count(dev);
 	if (!count)
 		return ERR_PTR(-ENODEV);
@@ -173,6 +336,7 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 		struct gpio_led_data *led_dat = &priv->leds[priv->num_leds];
 		struct gpio_led led = {};
 		const char *state = NULL;
+		const char *use_pwm = NULL;
 		struct device_node *np = to_of_node(child);
 
 		led.gpiod = devm_get_gpiod_from_child(dev, NULL, child);
@@ -187,6 +351,124 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 		if (!led.name) {
 			fwnode_handle_put(child);
 			return ERR_PTR(-EINVAL);
+		}
+
+		if (!fwnode_property_read_string(child, "use-pwm", &use_pwm)) {
+			if (!strcmp(use_pwm, "true")) {
+				led_dat->use_pwm = true;
+				led_dat->pwm_bl = of_pwm_get(np, NULL);
+				if (IS_ERR(led_dat->pwm_bl)) {
+					pr_err("%s: Error, pwm device!!\n", __func__);
+					led_dat->pwm_bl = NULL;
+					led_dat->use_pwm = false;
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				TORCH_DEBUG("\n %s get pwm success!!\n", __func__);
+
+				led_dat->pwm_enabled = 0;
+
+				//get torch-pwm-frequency-min
+				rc = of_property_read_u32(np, "torch-pwm-frequency-min", &tmp);
+				if (rc) {
+					pr_err("%s:%d, Error, torch-pwm-frequency-min\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				led_dat->pwm_freq_min = tmp;
+				TORCH_DEBUG("\n %s get torch-pwm-frequency-min(%d) success!!\n", __func__, tmp);
+
+				rc = of_property_read_u32(np, "torch-pwm-frequency-max", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-pwm-frequency-max\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				led_dat->pwm_freq_max = tmp;
+				TORCH_DEBUG("\n %s get torch-pwm-frequency-max(%d) success!!\n", __func__, tmp);
+
+				//get period
+				rc = of_property_read_u32(np, "torch-pwm-frequency-default", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-pwm-frequency-default\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				if (tmp < led_dat->pwm_freq_min)
+					led_dat->pwm_freq = led_dat->pwm_freq_min;
+				else if (tmp > led_dat->pwm_freq_max)
+					led_dat->pwm_freq = led_dat->pwm_freq_max;
+				else
+					led_dat->pwm_freq = tmp;
+				led_dat->pwm_period = torch_switch_freq_to_period(led_dat->pwm_freq);
+				TORCH_DEBUG("\n %s get torch-pwm-period(%d) success!!\n", __func__, led_dat->pwm_period);
+
+				//get min level
+				rc = of_property_read_u32(np, "torch-min-level", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-min-level\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				TORCH_DEBUG("\n %s get torch-min-level(%d) success!!\n", __func__, tmp);
+				led_dat->tl_min = tmp;
+
+				//get max level
+				rc = of_property_read_u32(np, "torch-max-level", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-max-level\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				TORCH_DEBUG("\n %s get torch-max-level(%d) success!!\n", __func__, tmp);
+				led_dat->tl_max = tmp;
+
+				//get bright_max
+				rc = of_property_read_u32(np, "torch-brightness-max-level", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-brightness-max-level\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				TORCH_DEBUG("\n %s get torch-brightness-max-level(%d) success!!\n", __func__, tmp);
+				led_dat->brightness_max = tmp;
+
+				//get default pwm level
+				rc = of_property_read_u32(np, "torch-default-level", &tmp);
+				if (rc) {
+					pr_err("%s: %d, Error, torch-default-level\n", __func__, __LINE__);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+				TORCH_DEBUG("\n %s get torch-default-level(%d) success!!\n", __func__, tmp);
+				led_dat->pwm_level_dt = tmp;
+
+				if (!strcmp(led.name, "sdm450:rear:torch")) {
+					led_dat->torch_work_queue = create_singlethread_workqueue("torch_work");
+					if (led_dat->torch_work_queue == NULL) {
+						pr_err("%s: could not create workqueue\n", __func__);
+						fwnode_handle_put(child);
+						return ERR_PTR(-ENODEV);
+					}
+
+					INIT_DELAYED_WORK(&led_dat->torch_work, torch_work_handler);
+				} else if (!strcmp(led.name, "sdm450:rear:irtorch")) {
+					led_dat->torch_work_queue = create_singlethread_workqueue("irtorch_work");
+					if (led_dat->torch_work_queue == NULL) {
+						pr_err("%s: could not create workqueue\n", __func__);
+						fwnode_handle_put(child);
+						return ERR_PTR(-ENODEV);
+					}
+
+					INIT_DELAYED_WORK(&led_dat->torch_work, torch_work_handler);
+				} else {
+					pr_err("%s: Unknown torch led: %s\n", __func__, led.name);
+					fwnode_handle_put(child);
+					return ERR_PTR(-ENODEV);
+				}
+			} else if (!strcmp(use_pwm, "false")) {
+				TORCH_DEBUG("%s: no not use pwm!!\n", __func__);
+			}
 		}
 
 		fwnode_property_read_string(child, "linux,default-trigger",
@@ -212,6 +494,14 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
 			fwnode_handle_put(child);
 			return ERR_PTR(ret);
 		}
+		if (led_dat->use_pwm) {
+			ret = sysfs_create_files(&led_dat->cdev.dev->kobj, pwm_attributes);
+			if (ret) {
+				pr_err("%s: sysfs_create_files error rc=%d\n", __func__, ret);
+				return ERR_PTR(ret);
+			}
+		}
+
 		led_dat->cdev.dev->of_node = np;
 		priv->num_leds++;
 	}
@@ -252,6 +542,7 @@ static int gpio_led_probe(struct platform_device *pdev)
 	struct gpio_led_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	struct gpio_leds_priv *priv;
 	int i, ret = 0;
+
 	if (pdata && pdata->num_leds) {
 		priv = devm_kzalloc(&pdev->dev,
 				sizeof_gpio_leds_priv(pdata->num_leds),
