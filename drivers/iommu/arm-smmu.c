@@ -1638,10 +1638,12 @@ static int arm_smmu_set_pt_format(struct arm_smmu_domain *smmu_domain,
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
 	int ret = 0;
 
+	pr_err("evaluating set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 	if ((smmu->version > ARM_SMMU_V1) &&
 	    (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64) &&
 	    !arm_smmu_has_secure_vmid(smmu_domain) &&
 	    arm_smmu_is_static_cb(smmu)) {
+		pr_err("calling set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 		ret = msm_tz_set_cb_format(smmu->sec_id, cfg->cbndx);
 	}
 	return ret;
@@ -1994,6 +1996,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	if (arm_smmu_is_slave_side_secure(smmu_domain))
 		tlb = &msm_smmu_gather_ops;
 
+	dev_err(smmu->dev, "Before allocating CB\n");
 	ret = arm_smmu_alloc_cb(domain, smmu, dev);
 	if (ret < 0)
 		goto out_unlock;
@@ -2050,6 +2053,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	domain->pgsize_bitmap = smmu_domain->pgtbl_cfg.pgsize_bitmap;
 	domain->geometry.aperture_end = (1UL << ias) - 1;
 	domain->geometry.force_aperture = true;
+
+	dev_err(smmu->dev, "inside arm_smmu_init_domain_context with CB %d and ID %d with secure=%d, static=%d, dynamic=%d\n", cfg->cbndx, smmu->sec_id, arm_smmu_has_secure_vmid(smmu_domain), arm_smmu_is_static_cb(smmu), dynamic);
 
 	/* Assign an asid */
 	ret = arm_smmu_init_asid(domain, smmu);
@@ -2631,24 +2636,40 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	 * domains, just say no (but more politely than by dereferencing NULL).
 	 * This should be at least a WARN_ON once that's sorted.
 	 */
-	if (!fwspec->iommu_priv)
+	if (!fwspec->iommu_priv) {
+		dev_err(dev, "ignoring non-priv iommu\n");
 		return -ENODEV;
+	}
 
 	smmu = fwspec_smmu(fwspec);
 
 	/* Enable Clocks and Power */
 	ret = arm_smmu_power_on(smmu->pwr);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed arm_smmu_power_on\n");
 		return ret;
+	}
+
+	dev_err(dev, "starting arm_smmu_attach_dev with attributes %d and features %d\n", smmu_domain->attributes, smmu->features);
+
+	if (is_dynamic_domain(domain)) {
+		dev_err(dev, "this domain is dynamic!\n");
+	} else {
+		dev_err(dev, "this domain is NOT dynamic!\n");
+	}
 
 	/* Ensure that the domain is finalised */
+	dev_err(dev, "before calling arm_smmu_init_domain_context\n");
 	ret = arm_smmu_init_domain_context(domain, smmu, dev);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(dev, "arm_smmu_init_domain_context failed\n");
 		goto out_power_off;
+	}
 
 	/* Do not modify the SIDs, HW is still running */
 	if (is_dynamic_domain(domain)) {
 		ret = 0;
+		dev_err(dev, "ignoring dynamic domain\n");
 		goto out_power_off;
 	}
 
@@ -2666,6 +2687,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	/* Looks ok, so add the device to the domain */
 	ret = arm_smmu_domain_add_master(smmu_domain, fwspec);
+	dev_err(dev, "calling arm_smmu_domain_add_master returned %d\n", ret);
 
 out_power_off:
 	/*
@@ -2679,6 +2701,7 @@ out_power_off:
 
 	arm_smmu_power_off(smmu->pwr);
 
+	dev_err(dev, "returning %d from arm_smmu_attach_dev\n", ret);
 	return ret;
 }
 
@@ -2691,11 +2714,20 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
 	LIST_HEAD(nonsecure_pool);
 
-	if (!ops)
-		return -ENODEV;
+	pr_err("inside arm_smmu_map for domain %px with name %s\n", domain, domain->name);
+	pr_info("mdss_smmu: smmu_domain = %px\n", smmu_domain);
+	pr_info("mdss_smmu: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_info("mdss_smmu: smmu_domain->smmu = %px\n", smmu_domain->smmu);
 
-	if (arm_smmu_is_slave_side_secure(smmu_domain))
+	if (!ops) {
+		pr_err("no ops found\n");
+		return -ENODEV;
+	}
+
+	if (arm_smmu_is_slave_side_secure(smmu_domain)) {
+		pr_err("before returning secure map\n");
 		return msm_secure_smmu_map(domain, iova, paddr, size, prot);
+	}
 
 	arm_smmu_prealloc_memory(smmu_domain, size, &nonsecure_pool);
 	arm_smmu_secure_domain_lock(smmu_domain);
@@ -2710,6 +2742,8 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 	arm_smmu_secure_domain_unlock(smmu_domain);
 
 	arm_smmu_release_prealloc_memory(smmu_domain, &nonsecure_pool);
+
+	pr_err("arm_smmu_map returns %d\n", ret);
 	return ret;
 }
 
@@ -4705,7 +4739,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to allocate arm_smmu_device\n");
 		return -ENOMEM;
 	}
+
 	smmu->dev = dev;
+	dev_err(dev, "allocated smmu device\n");
+
 	spin_lock_init(&smmu->atos_lock);
 	idr_init(&smmu->asid_idr);
 	mutex_init(&smmu->idr_mutex);
@@ -5707,6 +5744,7 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 	if (ret)
 		return -EPROBE_DEFER;
 
+	dev_err(dev, "Finish loading\n");
 	return 0;
 }
 
