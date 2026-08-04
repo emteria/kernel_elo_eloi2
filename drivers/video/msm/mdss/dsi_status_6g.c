@@ -45,7 +45,7 @@ static bool mdss_check_te_status(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	if (ret) {
 		schedule_delayed_work(&pstatus_data->check_status,
 			msecs_to_jiffies(interval));
-		pr_debug("%s: TE IRQ line not enabled yet\n", __func__);
+		pr_err("%s: TE IRQ line not enabled yet\n", __func__);
 	}
 
 	return ret;
@@ -94,7 +94,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	}
 
 	if (!pdata->panel_info.esd_rdy) {
-		pr_debug("%s: unblank not complete, reschedule check status\n",
+		pr_err("%s: unblank not complete, reschedule check status\n",
 			__func__);
 		schedule_delayed_work(&pstatus_data->check_status,
 				msecs_to_jiffies(interval));
@@ -156,7 +156,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	if (ctl->ops.wait_pingpong && !ctrl_pdata->burst_mode_enabled)
 		ctl->ops.wait_pingpong(ctl, NULL);
 
-	pr_debug("%s: DSI ctrl wait for ping pong done\n", __func__);
+	pr_err("%s: DSI ctrl wait for ping pong done\n", __func__);
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 	ret = ctrl_pdata->check_status(ctrl_pdata);
@@ -175,7 +175,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	}
 
 	if (pdata->panel_info.panel_force_dead) {
-		pr_debug("force_dead=%d\n", pdata->panel_info.panel_force_dead);
+		pr_err("force_dead=%d\n", pdata->panel_info.panel_force_dead);
 		pdata->panel_info.panel_force_dead--;
 		if (!pdata->panel_info.panel_force_dead)
 			goto status_dead;

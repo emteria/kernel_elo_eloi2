@@ -102,7 +102,7 @@ static ssize_t panel_debug_base_offset_write(struct file *file,
 	dbg->cnt = cnt;
 	mutex_unlock(&mdss_debug_lock);
 
-	pr_debug("offset=%x cnt=%d\n", off, cnt);
+	pr_err("offset=%x cnt=%d\n", off, cnt);
 
 	return count;
 }
@@ -432,7 +432,7 @@ static ssize_t mdss_debug_base_offset_write(struct file *file,
 	dbg->cnt = cnt;
 	mutex_unlock(&mdss_debug_lock);
 
-	pr_debug("offset=%x cnt=%x\n", off, cnt);
+	pr_err("offset=%x cnt=%x\n", off, cnt);
 
 	return count;
 }
@@ -507,7 +507,7 @@ static ssize_t mdss_debug_base_reg_write(struct file *file,
 	if (mdata->debug_inf.debug_enable_clock)
 		mdata->debug_inf.debug_enable_clock(0);
 
-	pr_debug("addr=%zx data=%x\n", off, data);
+	pr_err("addr=%zx data=%x\n", off, data);
 
 	return count;
 }
@@ -807,7 +807,7 @@ static ssize_t mdss_debug_factor_write(struct file *file,
 		factor->denom = denom;
 	}
 
-	pr_debug("numer=%d  denom=%d\n", numer, denom);
+	pr_err("numer=%d  denom=%d\n", numer, denom);
 
 	return count;
 }
@@ -948,7 +948,7 @@ static int mdss_debug_set_panic_signal(struct mdss_mdp_pipe *pipe_pool,
 		if (pipe && (atomic_read(&pipe->kref.refcount) != 0) &&
 			mdss_mdp_panic_signal_support_mode(mdata)) {
 			mdss_mdp_pipe_panic_signal_ctrl(pipe, enable);
-			pr_debug("pnum:%d count:%d img:%dx%d ",
+			pr_err("pnum:%d count:%d img:%dx%d ",
 				pipe->num, pipe->play_cnt, pipe->img_width,
 				pipe->img_height);
 			pr_cont("src[%d,%d,%d,%d] dst[%d,%d,%d,%d]\n",
@@ -957,7 +957,7 @@ static int mdss_debug_set_panic_signal(struct mdss_mdp_pipe *pipe_pool,
 				pipe->dst.w, pipe->dst.h);
 			cnt++;
 		} else if (pipe) {
-			pr_debug("Inactive pipe num:%d supported:%d\n",
+			pr_err("Inactive pipe num:%d supported:%d\n",
 			       atomic_read(&pipe->kref.refcount),
 			       mdss_mdp_panic_signal_support_mode(mdata));
 		}
@@ -968,18 +968,18 @@ static int mdss_debug_set_panic_signal(struct mdss_mdp_pipe *pipe_pool,
 static void mdss_debug_set_panic_state(struct mdss_data_type *mdata,
 	bool enable)
 {
-	pr_debug("VIG:\n");
+	pr_err("VIG:\n");
 	if (!mdss_debug_set_panic_signal(mdata->vig_pipes, mdata->nvig_pipes,
 		mdata, enable))
-		pr_debug("no active pipes found\n");
-	pr_debug("RGB:\n");
+		pr_err("no active pipes found\n");
+	pr_err("RGB:\n");
 	if (!mdss_debug_set_panic_signal(mdata->rgb_pipes, mdata->nrgb_pipes,
 		mdata, enable))
-		pr_debug("no active pipes found\n");
-	pr_debug("DMA:\n");
+		pr_err("no active pipes found\n");
+	pr_err("DMA:\n");
 	if (!mdss_debug_set_panic_signal(mdata->vig_pipes, mdata->ndma_pipes,
 		mdata, enable))
-		pr_debug("no active pipes found\n");
+		pr_err("no active pipes found\n");
 }
 
 static ssize_t mdss_debug_perf_panic_write(struct file *file,
@@ -1005,12 +1005,12 @@ static ssize_t mdss_debug_perf_panic_write(struct file *file,
 
 	if (disable_panic) {
 		/* Disable panic signal for all active pipes */
-		pr_debug("Disabling panic:\n");
+		pr_err("Disabling panic:\n");
 		mdss_debug_set_panic_state(mdata, false);
 		mdata->has_panic_ctrl = false;
 	} else {
 		/* Enable panic signal for all active pipes */
-		pr_debug("Enabling panic:\n");
+		pr_err("Enabling panic:\n");
 		mdata->has_panic_ctrl = true;
 		mdss_debug_set_panic_state(mdata, true);
 	}
@@ -1058,7 +1058,7 @@ static ssize_t mdss_debug_perf_bw_limit_read(struct file *file,
 	if (*ppos)
 		return 0;	/* the end */
 
-	pr_debug("mdata->max_bw_settings_cnt = %d\n",
+	pr_err("mdata->max_bw_settings_cnt = %d\n",
 			mdata->max_bw_settings_cnt);
 
 	temp_settings = mdata->max_bw_settings;
@@ -1430,7 +1430,7 @@ static bool switch_mdp_misr_offset(struct mdss_mdp_misr_map *map, u32 mdp_rev,
 		map->value_reg = MDSS_MDP_UP_MISR_SIGN_MDP;
 		use_mdp_up_misr = true;
 	}
-	pr_debug("MISR Module(%d) Offset of MISR_CTRL = 0x%x MISR_SIG = 0x%x\n",
+	pr_err("MISR Module(%d) Offset of MISR_CTRL = 0x%x MISR_SIG = 0x%x\n",
 			block_id, map->ctrl_reg, map->value_reg);
 	return use_mdp_up_misr;
 }
@@ -1481,7 +1481,7 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 			mdata, req, ctl);
 		return -EINVAL;
 	}
-	pr_debug("req[block:%d frame:%d op_mode:%d]\n",
+	pr_err("req[block:%d frame:%d op_mode:%d]\n",
 		req->block_id, req->frame_count, req->crc_op_mode);
 
 	map = mdss_misr_get_map(req->block_id, ctl, mdata,
@@ -1502,19 +1502,19 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 			return -EINVAL;
 		}
 		mixer_num = mixer->num;
-		pr_debug("SET MDP MISR BLK to MDSS_MDP_LP_MISR_SEL_LMIX%d_GC\n",
+		pr_err("SET MDP MISR BLK to MDSS_MDP_LP_MISR_SEL_LMIX%d_GC\n",
 			mixer_num);
 		switch (mixer_num) {
 		case MDSS_MDP_INTF_LAYERMIXER0:
-			pr_debug("Use Layer Mixer 0 for WB CRC\n");
+			pr_err("Use Layer Mixer 0 for WB CRC\n");
 			val = MDSS_MDP_LP_MISR_SEL_LMIX0_GC;
 			break;
 		case MDSS_MDP_INTF_LAYERMIXER1:
-			pr_debug("Use Layer Mixer 1 for WB CRC\n");
+			pr_err("Use Layer Mixer 1 for WB CRC\n");
 			val = MDSS_MDP_LP_MISR_SEL_LMIX1_GC;
 			break;
 		case MDSS_MDP_INTF_LAYERMIXER2:
-			pr_debug("Use Layer Mixer 2 for WB CRC\n");
+			pr_err("Use Layer Mixer 2 for WB CRC\n");
 			val = MDSS_MDP_LP_MISR_SEL_LMIX2_GC;
 			break;
 		default:
@@ -1557,7 +1557,7 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 
 		writel_relaxed(config,
 				mdata->mdp_base + map->ctrl_reg);
-		pr_debug("MISR_CTRL=0x%x [base:0x%pK reg:0x%x config:0x%x]\n",
+		pr_err("MISR_CTRL=0x%x [base:0x%pK reg:0x%x config:0x%x]\n",
 				readl_relaxed(mdata->mdp_base + map->ctrl_reg),
 				mdata->mdp_base, map->ctrl_reg, config);
 	}
@@ -1589,7 +1589,7 @@ int mdss_misr_get(struct mdss_data_type *mdata,
 	int ret = -1;
 	int i;
 
-	pr_debug("req[block:%d frame:%d op_mode:%d]\n",
+	pr_err("req[block:%d frame:%d op_mode:%d]\n",
 		resp->block_id, resp->frame_count, resp->crc_op_mode);
 
 	map = mdss_misr_get_map(resp->block_id, ctl, mdata,
@@ -1612,12 +1612,12 @@ int mdss_misr_get(struct mdss_data_type *mdata,
 		if (ret == 0) {
 			resp->crc_value[0] = readl_relaxed(mdata->mdp_base +
 				map->value_reg);
-			pr_debug("CRC %s=0x%x\n",
+			pr_err("CRC %s=0x%x\n",
 				get_misr_block_name(resp->block_id),
 				resp->crc_value[0]);
 			writel_relaxed(0, mdata->mdp_base + map->ctrl_reg);
 		} else {
-			pr_debug("Get MISR TimeOut %s\n",
+			pr_err("Get MISR TimeOut %s\n",
 				get_misr_block_name(resp->block_id));
 
 			ret = readl_poll_timeout(mdata->mdp_base +
@@ -1628,7 +1628,7 @@ int mdss_misr_get(struct mdss_data_type *mdata,
 				resp->crc_value[0] =
 					readl_relaxed(mdata->mdp_base +
 					map->value_reg);
-				pr_debug("Retry CRC %s=0x%x\n",
+				pr_err("Retry CRC %s=0x%x\n",
 					get_misr_block_name(resp->block_id),
 					resp->crc_value[0]);
 			} else {
@@ -1652,9 +1652,9 @@ int mdss_misr_get(struct mdss_data_type *mdata,
 			map->is_pong_full = false;
 			ret = 0;
 		} else {
-			pr_debug("mdss_mdp_misr_crc_get PING BUF %s\n",
+			pr_err("mdss_mdp_misr_crc_get PING BUF %s\n",
 				map->is_ping_full ? "FULL" : "EMPTRY");
-			pr_debug("mdss_mdp_misr_crc_get PONG BUF %s\n",
+			pr_err("mdss_mdp_misr_crc_get PONG BUF %s\n",
 				map->is_pong_full ? "FULL" : "EMPTRY");
 		}
 		resp->crc_op_mode = map->crc_op_mode;
@@ -1717,11 +1717,11 @@ void mdss_misr_crc_collect(struct mdss_data_type *mdata, int block_id,
 					map->is_pong_full = true;
 					map->use_ping = true;
 				}
-				pr_debug("USE BUFF %s\n", map->use_ping ?
+				pr_err("USE BUFF %s\n", map->use_ping ?
 					"PING" : "PONG");
-				pr_debug("mdss_misr_crc_collect PING BUF %s\n",
+				pr_err("mdss_misr_crc_collect PING BUF %s\n",
 					map->is_ping_full ? "FULL" : "EMPTRY");
-				pr_debug("mdss_misr_crc_collect PONG BUF %s\n",
+				pr_err("mdss_misr_crc_collect PONG BUF %s\n",
 					map->is_pong_full ? "FULL" : "EMPTRY");
 			}
 		} else {
@@ -1745,15 +1745,15 @@ void mdss_misr_crc_collect(struct mdss_data_type *mdata, int block_id,
 					MDSS_MDP_LP_MISR_CTRL_FREE_RUN_MASK,
 					mdata->mdp_base + map->ctrl_reg);
 
-		pr_debug("$$ Batch CRC Start $$\n");
+		pr_err("$$ Batch CRC Start $$\n");
 	}
 
-	pr_debug("$$ Vsync Count = %d, CRC=0x%x Indx = %d$$\n",
+	pr_err("$$ Vsync Count = %d, CRC=0x%x Indx = %d$$\n",
 		vsync_count, crc, map->crc_index);
 	trace_mdp_misr_crc(block_id, vsync_count, crc);
 
 	if (MAX_VSYNC_COUNT == vsync_count) {
-		pr_debug("RESET vsync_count(%d)\n", vsync_count);
+		pr_err("RESET vsync_count(%d)\n", vsync_count);
 		vsync_count = 0;
 	} else {
 		vsync_count += 1;

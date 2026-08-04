@@ -417,7 +417,7 @@ void mdss_dump_reg(const char *dump_name, u32 reg_dump_flag, char *addr,
 	in_log = (reg_dump_flag & MDSS_DBG_DUMP_IN_LOG);
 	in_mem = (reg_dump_flag & MDSS_DBG_DUMP_IN_MEM);
 
-	pr_debug("reg_dump_flag=%d in_log=%d in_mem=%d\n",
+	pr_err("reg_dump_flag=%d in_log=%d in_mem=%d\n",
 		reg_dump_flag, in_log, in_mem);
 
 	if (len % 16)
@@ -490,7 +490,7 @@ static void mdss_dump_reg_by_ranges(struct mdss_debug_base *dbg,
 			len = get_dump_range(&xlog_node->offset,
 				dbg->max_offset);
 			addr = dbg->base + xlog_node->offset.start;
-			pr_debug("%s: range_base=0x%pK start=0x%x end=0x%x\n",
+			pr_err("%s: range_base=0x%pK start=0x%x end=0x%x\n",
 				xlog_node->range_name,
 				addr, xlog_node->offset.start,
 				xlog_node->offset.end);

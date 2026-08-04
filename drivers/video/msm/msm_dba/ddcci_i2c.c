@@ -64,10 +64,10 @@ uint32 content_len, const uint8 *content_buf, const char *what)
         checksum = checksum ^ buffer[i];
     }
 
-    pr_debug("ddc_ci_write_cmd checksum is %x\n",checksum);
+    pr_err("ddc_ci_write_cmd checksum is %x\n",checksum);
     buffer[content_len+2]=checksum;
 
-    pr_debug("write data length is %d\n",content_len+3);
+    pr_err("write data length is %d\n",content_len+3);
     for(i=0;i<content_len+3;i++)
         printk("write buffer is %x\n",buffer[i]);
 
@@ -75,7 +75,7 @@ uint32 content_len, const uint8 *content_buf, const char *what)
         pr_err("%s: Invalid params\n", __func__);
         return -EINVAL;
     }
-    pr_debug("%s: [%s:0x02%x] : W %d bytes\n", __func__,
+    pr_err("%s: [%s:0x02%x] : W %d bytes\n", __func__,
          ddcci_bak->client->name, dest_addr, content_len);
 
     ddcci_bak->client->addr = dest_addr;
@@ -122,7 +122,7 @@ uint32 content_len, uint8 *content_buf, const char *what)
         rc = -EIO;
     }
 
-    pr_debug("%s: [%s:0x02%x] : R[0x%02x, 0x%02x]\n", __func__,
+    pr_err("%s: [%s:0x02%x] : R[0x%02x, 0x%02x]\n", __func__,
          ddcci_bak->client->name, dest_addr, content_len, *content_buf);
     return rc;
 }
@@ -155,7 +155,7 @@ static ssize_t ddcci_cdev_read(struct file *file, char __user *buf,
 
 static int ddcci_cdev_open(struct inode *inode, struct file *filp)
 {
-    pr_debug("ddcci_cdev_open.\n");
+    pr_err("ddcci_cdev_open.\n");
     if (ddcci_bak == 0)
         return DDCCI_ERR_CLIENT;
 
@@ -164,7 +164,7 @@ static int ddcci_cdev_open(struct inode *inode, struct file *filp)
 
 static int ddcci_cdev_release(struct inode *inode, struct file *filp)
 {
-    pr_debug("ddcci_cdev_release.\\n");
+    pr_err("ddcci_cdev_release.\\n");
     return 0;
 }
 
@@ -282,7 +282,7 @@ EXPORT_SYMBOL(ddcci_i2c_switch);
 
 static void ddcci_iodev_deferred_ioctl(struct deferred_ioctl *ioctl)
 {
-    pr_debug("+++++ %s ++++++\n", __func__);
+    pr_err("+++++ %s ++++++\n", __func__);
 
 
 

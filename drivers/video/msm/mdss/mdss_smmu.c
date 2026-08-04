@@ -189,9 +189,17 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 			}
+
+			pr_err("mdss_smmu_attach_v2: setting handoff_pending = false\n");
 			mdss_smmu->handoff_pending = false;
 
+			if (mdss_smmu->mmu_mapping == NULL) {
+				pr_err("no mapping for domain:[%d]\n", i);
+				goto err;
+			}
+
 			if (!mdss_smmu->domain_attached) {
+				dev_err(mdss_smmu->dev, "iommu attaching device for domain %d\n", i);
 				rc = arm_iommu_attach_device(mdss_smmu->dev,
 						mdss_smmu->mmu_mapping);
 				if (rc) {
@@ -202,7 +210,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 				mdss_smmu->domain_attached = true;
-				pr_debug("iommu v2 domain[%i] attached\n", i);
+				pr_err("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
 			pr_err("iommu device not attached for domain[%d]\n", i);
@@ -688,8 +696,10 @@ int mdss_smmu_probe(struct platform_device *pdev)
 
 	if (!mdata->handoff_pending)
 		mdss_smmu_enable_power(mdss_smmu, false);
-	else
+	else {
+		pr_err("mdss_smmu_probe: setting handoff_pending = true\n");
 		mdss_smmu->handoff_pending = true;
+	}
 
 	mdss_smmu->dev = dev;
 
@@ -702,7 +712,7 @@ int mdss_smmu_probe(struct platform_device *pdev)
 			iommu_set_fault_handler(mdss_smmu->mmu_mapping->domain,
 				mdss_smmu_fault_handler, mdss_smmu);
 	} else {
-		pr_debug("unable to map context bank base\n");
+		pr_err("unable to map context bank base\n");
 	}
 
 	pr_info("iommu v2 domain[%d] mapping and clk register successful!\n",

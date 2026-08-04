@@ -1154,17 +1154,22 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		return -EINVAL;
 	}
 
-	pr_debug("map: iova 0x%lx pa %pa size 0x%zx\n", iova, &paddr, size);
+	pr_err("map: iova 0x%lx pa %pa size 0x%zx\n", iova, &paddr, size);
 
 	while (size) {
 		size_t pgsize = iommu_pgsize(pgsize_bitmap, iova | paddr, size);
 
-		pr_debug("mapping: iova 0x%lx pa %pa pgsize 0x%zx\n",
+		pr_err("mapping: iova 0x%lx pa %pa pgsize 0x%zx\n",
 			 iova, &paddr, pgsize);
 
 		ret = domain->ops->map(domain, iova, paddr, pgsize, prot);
-		if (ret)
+		if (iova == 0x90001000) {
+			//ret = 1;
+		}
+		if (ret) {
+			pr_err("iommu_map failed #3\n");
 			break;
+		}
 
 		iova += pgsize;
 		paddr += pgsize;

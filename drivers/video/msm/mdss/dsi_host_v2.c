@@ -168,7 +168,7 @@ static void msm_dsi_set_irq(struct mdss_dsi_ctrl_pdata *ctrl, u32 mask)
 	}
 	if (ctrl->dsi_irq_mask == 0) {
 		ctrl->mdss_util->enable_irq(ctrl->dsi_hw);
-		pr_debug("%s: IRQ Enable, mask=%x term=%x\n", __func__,
+		pr_err("%s: IRQ Enable, mask=%x term=%x\n", __func__,
 			(int)ctrl->dsi_irq_mask, (int)mask);
 	}
 
@@ -189,7 +189,7 @@ static void msm_dsi_clear_irq(struct mdss_dsi_ctrl_pdata *ctrl, u32 mask)
 	ctrl->dsi_irq_mask &= ~mask;
 	if (ctrl->dsi_irq_mask == 0) {
 		ctrl->mdss_util->disable_irq(ctrl->dsi_hw);
-		pr_debug("%s: IRQ Disable, mask=%x term=%x\n", __func__,
+		pr_err("%s: IRQ Disable, mask=%x term=%x\n", __func__,
 			(int)ctrl->dsi_irq_mask, (int)mask);
 	}
 	msm_dsi_clear_irq_mask(ctrl, mask);
@@ -213,7 +213,7 @@ irqreturn_t msm_dsi_isr_handler(int irq, void *ptr)
 	isr = MIPI_INP(dsi_host_private->dsi_base + DSI_INT_CTRL);
 	MIPI_OUTP(dsi_host_private->dsi_base + DSI_INT_CTRL, isr);
 
-	pr_debug("%s: isr=%x", __func__, isr);
+	pr_err("%s: isr=%x", __func__, isr);
 
 	if (isr & DSI_INTR_ERROR) {
 		pr_err("%s: isr=%x %x", __func__, isr, (int)DSI_INTR_ERROR);
@@ -341,7 +341,7 @@ void msm_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 
 	dsi_status = MIPI_INP(ctrl_base + DSI_STATUS);
 	if (dsi_status & 0x04) {
-		pr_debug("dsi command engine is busy\n");
+		pr_err("dsi command engine is busy\n");
 		rc = msm_dsi_wait4mdp_done(ctrl);
 		if (rc)
 			pr_err("Timed out waiting for mdp done");
@@ -384,7 +384,7 @@ static int msm_dsi_wait4video_eng_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 
 	dsi_status = MIPI_INP(ctrl_base + DSI_STATUS);
 	if (dsi_status & 0x08) {
-		pr_debug("dsi command in video mode wait for active region\n");
+		pr_err("dsi command in video mode wait for active region\n");
 		rc = msm_dsi_wait4video_done(ctrl);
 		/* delay 4-5 ms to skip BLLP */
 		if (!rc)
@@ -400,7 +400,7 @@ void msm_dsi_host_init(struct mdss_panel_data *pdata)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mipi_panel_info *pinfo;
 
-	pr_debug("msm_dsi_host_init\n");
+	pr_err("msm_dsi_host_init\n");
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -537,7 +537,7 @@ void msm_dsi_sw_reset(void)
 	u32 dsi_ctrl;
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 
-	pr_debug("msm_dsi_sw_reset\n");
+	pr_err("msm_dsi_sw_reset\n");
 
 	dsi_ctrl = MIPI_INP(ctrl_base + DSI_CTRL);
 	dsi_ctrl &= ~0x01;
@@ -559,7 +559,7 @@ void msm_dsi_controller_cfg(int enable)
 	u32 dsi_ctrl, status;
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 
-	pr_debug("msm_dsi_controller_cfg\n");
+	pr_err("msm_dsi_controller_cfg\n");
 
 	/* Check for CMD_MODE_DMA_BUSY */
 	if (readl_poll_timeout((ctrl_base + DSI_STATUS),
@@ -603,7 +603,7 @@ void msm_dsi_op_mode_config(int mode, struct mdss_panel_data *pdata)
 	u32 dsi_ctrl;
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 
-	pr_debug("msm_dsi_op_mode_config\n");
+	pr_err("msm_dsi_op_mode_config\n");
 
 	dsi_ctrl = MIPI_INP(ctrl_base + DSI_CTRL);
 
@@ -621,7 +621,7 @@ void msm_dsi_op_mode_config(int mode, struct mdss_panel_data *pdata)
 			dsi_ctrl |= DSI_VIDEO_MODE_EN;
 	}
 
-	pr_debug("%s: dsi_ctrl=%x\n", __func__, dsi_ctrl);
+	pr_err("%s: dsi_ctrl=%x\n", __func__, dsi_ctrl);
 
 	MIPI_OUTP(ctrl_base + DSI_CTRL, dsi_ctrl);
 	wmb();
@@ -702,7 +702,7 @@ int msm_dsi_cmd_dma_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 	for (i = 0; i < cnt; i++) {
 		data = (u32)MIPI_INP(ctrl_base + off);
 		*lp++ = ntohl(data); /* to network byte order */
-		pr_debug("%s: data = 0x%x and ntohl(data) = 0x%x\n",
+		pr_err("%s: data = 0x%x and ntohl(data) = 0x%x\n",
 					 __func__, data, ntohl(data));
 		off -= 4;
 		rp->len += sizeof(*lp);
@@ -773,7 +773,7 @@ static int msm_dsi_parse_rx_response(struct dsi_buf *rp)
 	cmd = rp->data[0];
 	switch (cmd) {
 	case DTYPE_ACK_ERR_RESP:
-		pr_debug("%s: rx ACK_ERR_PACLAGE\n", __func__);
+		pr_err("%s: rx ACK_ERR_PACLAGE\n", __func__);
 		rc = -EINVAL;
 		break;
 	case DTYPE_GEN_READ1_RESP:
@@ -832,7 +832,7 @@ static int msm_dsi_set_max_packet_size(struct mdss_dsi_ctrl_pdata *ctrl,
 		pr_err("%s: failed to tx max_pkt_size\n", __func__);
 		return rc;
 	}
-	pr_debug("%s: max_pkt_size=%d sent\n", __func__, size);
+	pr_err("%s: max_pkt_size=%d sent\n", __func__, size);
 	return rc;
 }
 
@@ -1081,7 +1081,7 @@ static int msm_dsi_cal_clk_rate(struct mdss_panel_data *pdata,
 	*dsiclk_rate = *byteclk_rate * lanes;
 	*pclk_rate = *byteclk_rate * lanes * 8 / pdata->panel_info.bpp;
 
-	pr_debug("dsiclk_rate=%u, byteclk=%u, pck_=%u\n",
+	pr_err("dsiclk_rate=%u, byteclk=%u, pck_=%u\n",
 		*dsiclk_rate, *byteclk_rate, *pclk_rate);
 	return 0;
 }
@@ -1100,7 +1100,7 @@ static int msm_dsi_on(struct mdss_panel_data *pdata)
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
-	pr_debug("msm_dsi_on\n");
+	pr_err("msm_dsi_on\n");
 
 	pinfo = &pdata->panel_info;
 
@@ -1236,7 +1236,7 @@ static int msm_dsi_off(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("msm_dsi_off\n");
+	pr_err("msm_dsi_off\n");
 	mutex_lock(&ctrl_pdata->mutex);
 	msm_dsi_clear_irq(ctrl_pdata, ctrl_pdata->dsi_irq_mask);
 	msm_dsi_controller_cfg(0);
@@ -1277,7 +1277,7 @@ static int msm_dsi_cont_on(struct mdss_panel_data *pdata)
 	}
 
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -1356,7 +1356,7 @@ int msm_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 		return 0;
 	}
 
-	pr_debug("%s: Checking Register status\n", __func__);
+	pr_err("%s: Checking Register status\n", __func__);
 
 	msm_dsi_clk_ctrl(&ctrl_pdata->panel_data, 1);
 
@@ -1382,7 +1382,7 @@ int msm_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	}
 
 	msm_dsi_clk_ctrl(&ctrl_pdata->panel_data, 0);
-	pr_debug("%s: Read register done with ret: %d\n", __func__, ret);
+	pr_err("%s: Read register done with ret: %d\n", __func__, ret);
 
 	return ret;
 }
@@ -1425,7 +1425,7 @@ static int msm_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	if (ret <= 0)
 		pr_err("%s: DSI BTA error: %i\n", __func__, __LINE__);
 
-	pr_debug("%s: BTA done with ret: %d\n", __func__, ret);
+	pr_err("%s: BTA done with ret: %d\n", __func__, ret);
 	return ret;
 }
 
@@ -1478,7 +1478,7 @@ static int dsi_get_panel_cfg(char *panel_cfg)
 		return 0;
 	}
 
-	pr_debug("%s:%d: cfg:[%s]\n", __func__, __LINE__,
+	pr_err("%s:%d: cfg:[%s]\n", __func__, __LINE__,
 		 pan_cfg->arg_cfg);
 	rc = strlcpy(panel_cfg, pan_cfg->arg_cfg,
 				MDSS_MAX_PANEL_LEN);
@@ -1490,7 +1490,7 @@ static struct device_node *dsi_pref_prim_panel(
 {
 	struct device_node *dsi_pan_node = NULL;
 
-	pr_debug("%s:%d: Select primary panel from dt\n",
+	pr_err("%s:%d: Select primary panel from dt\n",
 					__func__, __LINE__);
 	dsi_pan_node = of_parse_phandle(pdev->dev.of_node,
 					"qcom,dsi-pref-prim-pan", 0);
@@ -1527,7 +1527,7 @@ static struct device_node *dsi_find_panel_of_node(
 	l = strlen(panel_cfg);
 	if (!l) {
 		/* no panel cfg chg, parse dt */
-		pr_debug("%s:%d: no cmd line cfg present\n",
+		pr_err("%s:%d: no cmd line cfg present\n",
 			 __func__, __LINE__);
 		dsi_pan_node = dsi_pref_prim_panel(pdev);
 	} else {
@@ -1541,7 +1541,7 @@ static struct device_node *dsi_find_panel_of_node(
 		 * ':' to get to the panel name
 		 */
 		panel_name = panel_cfg + 2;
-		pr_debug("%s:%d:%s:%s\n", __func__, __LINE__,
+		pr_err("%s:%d:%s:%s\n", __func__, __LINE__,
 			 panel_cfg, panel_name);
 
 		mdss_node = of_parse_phandle(pdev->dev.of_node,
@@ -1568,7 +1568,7 @@ static int msm_dsi_clk_ctrl(struct mdss_panel_data *pdata, int enable)
 	u32 bitclk_rate = 0, byteclk_rate = 0, pclk_rate = 0, dsiclk_rate = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
-	pr_debug("%s:\n", __func__);
+	pr_err("%s:\n", __func__);
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -1663,7 +1663,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 	struct resource *mdss_dsi_mres;
 	int i;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 
 	rc = msm_dsi_init();
 	if (rc)
@@ -1768,7 +1768,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 		}
 	}
 
-	pr_debug("%s: Dsi Ctrl->0 initialized\n", __func__);
+	pr_err("%s: Dsi Ctrl->0 initialized\n", __func__);
 
 	dsi_host_private->dis_dev = pdev->dev;
 	intf.on = msm_dsi_on;
@@ -1797,7 +1797,7 @@ static int msm_dsi_probe(struct platform_device *pdev)
 		pr_err("%s: dsi panel dev reg failed\n", __func__);
 		goto error_device_register;
 	}
-	pr_debug("%s success\n", __func__);
+	pr_err("%s success\n", __func__);
 	return 0;
 error_device_register:
 	kfree(ctrl_pdata->dsi_hw->irq_info);

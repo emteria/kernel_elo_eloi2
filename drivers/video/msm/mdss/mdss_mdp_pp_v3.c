@@ -344,7 +344,7 @@ static int pp_hist_lut_set_config(char __iomem *base_addr,
 	}
 	if (lut_cfg_data->ops & MDP_PP_OPS_DISABLE ||
 		!(lut_cfg_data->ops & MDP_PP_OPS_WRITE)) {
-		pr_debug("non write ops set %d\n", lut_cfg_data->ops);
+		pr_err("non write ops set %d\n", lut_cfg_data->ops);
 		goto hist_lut_set_sts;
 	}
 	lut_data = lut_cfg_data->cfg_payload;
@@ -458,7 +458,7 @@ static int pp_pa_set_config(char __iomem *base_addr,
 
 	if (pa_cfg_data->flags & MDP_PP_OPS_DISABLE ||
 		!(pa_cfg_data->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("pa_cfg_data->flags = %d\n", pa_cfg_data->flags);
+		pr_err("pa_cfg_data->flags = %d\n", pa_cfg_data->flags);
 		goto pa_set_sts;
 	}
 
@@ -536,7 +536,7 @@ static int pp_dither_set_config(char __iomem *base_addr,
 
 	if (dither_cfg_data->flags & MDP_PP_OPS_DISABLE ||
 		!(dither_cfg_data->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("non write ops set %d\n", dither_cfg_data->flags);
+		pr_err("non write ops set %d\n", dither_cfg_data->flags);
 		goto dither_set_sts;
 	}
 
@@ -611,7 +611,7 @@ static void pp_opmode_config(int location, struct pp_sts_type *pp_sts,
 		break;
 	case LM:
 		if (pp_sts->argc_sts & PP_STS_ENABLE)
-			pr_debug("pgc in LM enabled\n");
+			pr_err("pgc in LM enabled\n");
 		break;
 	default:
 		pr_err("Invalid block type %d\n", location);

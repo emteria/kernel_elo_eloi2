@@ -2724,7 +2724,7 @@ static int mhl_tx_discover_mhl_device(void *mhl_ctx, int id,
 		&dev_context->sem_mhl_discovery_complete, 2 * HZ);
 	dev_context->mhl_discovery_in_progress = false;
 	if (dev_context->mhl_detected) {
-		pr_debug("mhl driver detected mhl connection\n");
+		pr_err("mhl driver detected mhl connection\n");
 		return 1;
 	} else
 		return 0;
@@ -2742,7 +2742,7 @@ static void mhl_tx_register_mhl_discovery(struct mhl_dev_context *dev_context)
 {
 	if (otg_register_mhl_discovery((void *)dev_context,
 		mhl_tx_discover_mhl_device))
-		pr_debug("%s: USB callback registration failed\n", __func__);
+		pr_err("%s: USB callback registration failed\n", __func__);
 }
 #endif
 #define MAX_EVENT_STRING_LEN 128

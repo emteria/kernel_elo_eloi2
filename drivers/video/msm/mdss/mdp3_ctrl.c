@@ -142,7 +142,7 @@ static void mdp3_dispatch_dma_done(struct work_struct *work)
 	struct mdp3_session_data *session;
 	int cnt = 0;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 	session = container_of(work, struct mdp3_session_data,
 				dma_done_work);
 	if (!session)
@@ -164,7 +164,7 @@ static void mdp3_dispatch_clk_off(struct work_struct *work)
 	bool dmap_busy;
 	int retry_count = 2;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 	session = container_of(work, struct mdp3_session_data,
 				clk_off_work);
 	if (!session)
@@ -174,7 +174,7 @@ static void mdp3_dispatch_clk_off(struct work_struct *work)
 	if (session->vsync_enabled ||
 		atomic_read(&session->vsync_countdown) != 0) {
 		mutex_unlock(&session->lock);
-		pr_debug("Ignoring clk shut down\n");
+		pr_err("Ignoring clk shut down\n");
 		return;
 	}
 
@@ -186,7 +186,7 @@ retry_dma_done:
 			struct mdss_panel_data *panel;
 
 			panel = session->panel;
-			pr_debug("cmd kickoff timed out (%d)\n", rc);
+			pr_err("cmd kickoff timed out (%d)\n", rc);
 			dmap_busy = session->dma->busy();
 			if (dmap_busy) {
 				if (--retry_count) {
@@ -197,7 +197,7 @@ retry_dma_done:
 				pr_err("dmap is still busy, bug_on\n");
 				BUG_ON(1);
 			} else {
-				pr_debug("dmap is not busy, continue\n");
+				pr_err("dmap is not busy, continue\n");
 			}
 		}
 	}
@@ -244,14 +244,14 @@ static int mdp3_ctrl_vsync_enable(struct msm_fb_data_type *mfd, int enable)
 	struct mdp3_notification vsync_client;
 	struct mdp3_notification *arg = NULL;
 
-	pr_debug("mdp3_ctrl_vsync_enable =%d\n", enable);
+	pr_err("mdp3_ctrl_vsync_enable =%d\n", enable);
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->panel || !mdp3_session->dma ||
 		!mdp3_session->intf)
 		return -ENODEV;
 
 	if (!mdp3_session->status) {
-		pr_debug("fb%d is not on yet", mfd->index);
+		pr_err("fb%d is not on yet", mfd->index);
 		return -EINVAL;
 	}
 	if (enable) {
@@ -298,7 +298,7 @@ void mdp3_vsync_timer_func(unsigned long arg)
 	struct mdp3_session_data *session = (struct mdp3_session_data *)arg;
 	if (session->status == 1 && (session->vsync_before_commit ||
 			!session->intf->active)) {
-		pr_debug("mdp3_vsync_timer_func trigger\n");
+		pr_err("mdp3_vsync_timer_func trigger\n");
 		vsync_notify_handler(session);
 		mod_timer(&session->vsync_timer,
 			jiffies + msecs_to_jiffies(session->vsync_period));
@@ -358,7 +358,7 @@ static ssize_t mdp3_vsync_show_event(struct device *dev,
 
 	vsync_ticks = ktime_to_ns(mdp3_session->vsync_time);
 
-	pr_debug("fb%d vsync=%llu\n", mfd->index, vsync_ticks);
+	pr_err("fb%d vsync=%llu\n", mfd->index, vsync_ticks);
 	rc = scnprintf(buf, PAGE_SIZE, "VSYNC=%llu\n", vsync_ticks);
 	return rc;
 }
@@ -383,7 +383,7 @@ static ssize_t mdp3_packpattern_show(struct device *dev,
 	if (!pattern)
 		pattern = mdp3_ctrl_get_pack_pattern(mfd->fb_imgType);
 
-	pr_debug("fb%d pack_pattern c= %d.", mfd->index, pattern);
+	pr_err("fb%d pack_pattern c= %d.", mfd->index, pattern);
 	rc = scnprintf(buf, PAGE_SIZE, "packpattern=%d\n", pattern);
 	return rc;
 }
@@ -460,7 +460,7 @@ static int mdp3_ctrl_clk_enable(struct msm_fb_data_type *mfd, int enable)
 	struct dsi_panel_clk_ctrl clk_ctrl;
 	int rc = 0;
 
-	pr_debug("mdp3_ctrl_clk_enable %d\n", enable);
+	pr_err("mdp3_ctrl_clk_enable %d\n", enable);
 
 	session = mfd->mdp.private1;
 	panel = session->panel;
@@ -476,7 +476,7 @@ static int mdp3_ctrl_clk_enable(struct msm_fb_data_type *mfd, int enable)
 			MDSS_EVENT_PANEL_CLK_CTRL, (void *)&clk_ctrl);
 		rc |= mdp3_res_update(enable, 1, MDP3_CLIENT_DMA_P);
 	} else {
-		pr_debug("enable = %d, clk_on=%d\n", enable, session->clk_on);
+		pr_err("enable = %d, clk_on=%d\n", enable, session->clk_on);
 	}
 
 	session->clk_on = enable;
@@ -740,7 +740,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 	struct mdp3_session_data *mdp3_session;
 	struct mdss_panel_data *panel;
 
-	pr_debug("mdp3_ctrl_on\n");
+	pr_err("mdp3_ctrl_on\n");
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->panel || !mdp3_session->dma ||
 		!mdp3_session->intf) {
@@ -754,7 +754,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 		mdp3_session->in_splash_screen);
 	/* make sure DSI host is initialized properly */
 	if (panel) {
-		pr_debug("%s : dsi host init, power state = %d Splash %d\n",
+		pr_err("%s : dsi host init, power state = %d Splash %d\n",
 			__func__, mfd->panel_power_state,
 			mdp3_session->in_splash_screen);
 		if (mdss_fb_is_power_on_lp(mfd) ||
@@ -778,7 +778,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 	}
 
 	if (mdp3_session->intf->active) {
-		pr_debug("continuous splash screen, initialized already\n");
+		pr_err("continuous splash screen, initialized already\n");
 		mdp3_session->status = 1;
 		goto end;
 	}
@@ -881,7 +881,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	struct mdp3_session_data *mdp3_session;
 	struct mdss_panel_data *panel;
 
-	pr_debug("mdp3_ctrl_off\n");
+	pr_err("mdp3_ctrl_off\n");
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->panel || !mdp3_session->dma ||
 		!mdp3_session->intf) {
@@ -900,7 +900,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	panel = mdp3_session->panel;
 	mutex_lock(&mdp3_session->lock);
 
-	pr_debug("Requested power state = %d\n", mfd->panel_power_state);
+	pr_err("Requested power state = %d\n", mfd->panel_power_state);
 	if (mdss_fb_is_power_on_lp(mfd)) {
 		/*
 		* Transition to low power
@@ -911,7 +911,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	} else {
 		/* Transition to display off */
 		if (!mdp3_session->status) {
-			pr_debug("fb%d is off already", mfd->index);
+			pr_err("fb%d is off already", mfd->index);
 			goto off_error;
 		}
 		if (panel && panel->set_backlight)
@@ -942,7 +942,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 		rc = mdp3_session->dma->stop(mdp3_session->dma,
 					mdp3_session->intf);
 		if (rc)
-			pr_debug("fail to stop the MDP3 dma\n");
+			pr_err("fail to stop the MDP3 dma\n");
 		/* Wait to ensure TG to turn off */
 		msleep(20);
 		mfd->panel_info->cont_splash_enabled = 0;
@@ -962,7 +962,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 
 	if (intf_stopped) {
 		if (mdp3_session->clk_on) {
-			pr_debug("mdp3_ctrl_off stop clock\n");
+			pr_err("mdp3_ctrl_off stop clock\n");
 			if (panel->event_handler &&
 				(panel->panel_info.type == MIPI_CMD_PANEL)) {
 				struct dsi_panel_clk_ctrl clk_ctrl;
@@ -1027,7 +1027,7 @@ static int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 	struct mdss_panel_data *panel;
 	struct mdp3_notification vsync_client;
 
-	pr_debug("mdp3_ctrl_reset\n");
+	pr_err("mdp3_ctrl_reset\n");
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->panel || !mdp3_session->dma ||
 		!mdp3_session->intf) {
@@ -1201,7 +1201,7 @@ static int mdp3_overlay_play(struct msm_fb_data_type *mfd,
 	struct mdp3_session_data *mdp3_session = mfd->mdp.private1;
 	int rc = 0;
 
-	pr_debug("mdp3_overlay_play req id=%x mem_id=%d\n",
+	pr_err("mdp3_overlay_play req id=%x mem_id=%d\n",
 		req->id, req->data.memory_id);
 
 	mutex_lock(&mdp3_session->lock);
@@ -1256,7 +1256,7 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 		return -EINVAL;
 
 	if (mdp3_bufq_count(&mdp3_session->bufq_in) == 0) {
-		pr_debug("no buffer in queue yet\n");
+		pr_err("no buffer in queue yet\n");
 		return -EPERM;
 	}
 
@@ -1268,7 +1268,7 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 			mdp3_session->dma->roi.w = cmt_data->l_roi.w;
 			mdp3_session->dma->roi.h = cmt_data->l_roi.h;
 			mdp3_session->dma->update_src_cfg = true;
-			pr_debug("%s: ROI: x=%d y=%d w=%d h=%d\n", __func__,
+			pr_err("%s: ROI: x=%d y=%d w=%d h=%d\n", __func__,
 				mdp3_session->dma->roi.x,
 				mdp3_session->dma->roi.y,
 				mdp3_session->dma->roi.w,
@@ -1278,7 +1278,7 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 	panel = mdp3_session->panel;
 	if (mdp3_session->in_splash_screen ||
 		mdp3_res->idle_pc) {
-		pr_debug("%s: reset- in_splash = %d, idle_pc = %d", __func__,
+		pr_err("%s: reset- in_splash = %d, idle_pc = %d", __func__,
 			mdp3_session->in_splash_screen, mdp3_res->idle_pc);
 		rc = mdp3_ctrl_reset(mfd);
 		if (rc) {
@@ -1384,7 +1384,7 @@ static int mdp3_map_pan_buff_immediate(struct msm_fb_data_type *mfd)
 	else
 		mfd->iova = addr;
 
-	pr_debug("%s : smmu map dma buf VA: (%llx) MFD->iova %llx\n",
+	pr_err("%s : smmu map dma buf VA: (%llx) MFD->iova %llx\n",
 			__func__, (u64) addr, (u64) mfd->iova);
 	return rc;
 
@@ -1409,7 +1409,7 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 
 	int rc;
 
-	pr_debug("mdp3_ctrl_pan_display\n");
+	pr_err("mdp3_ctrl_pan_display\n");
 	if (!mfd || !mfd->mdp.private1)
 		return;
 
@@ -1420,7 +1420,7 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 
 	if (mdp3_session->in_splash_screen ||
 		mdp3_res->idle_pc) {
-		pr_debug("%s: reset- in_splash = %d, idle_pc = %d", __func__,
+		pr_err("%s: reset- in_splash = %d, idle_pc = %d", __func__,
 			mdp3_session->in_splash_screen, mdp3_res->idle_pc);
 		rc = mdp3_ctrl_reset(mfd);
 		if (rc) {
@@ -1475,7 +1475,7 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 		init_completion(&mdp3_session->dma_completion);
 		mdp3_ctrl_notify(mdp3_session, MDP_NOTIFY_FRAME_FLUSHED);
 	} else {
-		pr_debug("mdp3_ctrl_pan_display no memory, stop interface");
+		pr_err("mdp3_ctrl_pan_display no memory, stop interface");
 		mdp3_clk_enable(1, 0);
 		mdp3_session->dma->stop(mdp3_session->dma, mdp3_session->intf);
 		mdp3_clk_enable(0, 0);
@@ -1656,7 +1656,7 @@ static int mdp3_histogram_start(struct mdp3_session_data *session,
 		return -EPERM;
 	}
 
-	pr_debug("mdp3_histogram_start\n");
+	pr_err("mdp3_histogram_start\n");
 
 	ret = mdp3_validate_start_req(req);
 	if (ret)
@@ -1712,7 +1712,7 @@ static int mdp3_histogram_stop(struct mdp3_session_data *session,
 					u32 block)
 {
 	int ret;
-	pr_debug("mdp3_histogram_stop\n");
+	pr_err("mdp3_histogram_stop\n");
 
 	if (!session->dma->histo_op || block != MDP_BLOCK_DMA_P) {
 		pr_err("mdp3_histogram_stop not supported\n");
@@ -1722,7 +1722,7 @@ static int mdp3_histogram_stop(struct mdp3_session_data *session,
 	mutex_lock(&session->histo_lock);
 
 	if (!session->histo_status) {
-		pr_debug("mdp3_histogram_stop already stopped!");
+		pr_err("mdp3_histogram_stop already stopped!");
 		ret = 0;
 		goto histogram_stop_err;
 	}
@@ -1746,7 +1746,7 @@ static int mdp3_histogram_collect(struct mdp3_session_data *session,
 	int ret;
 	struct mdp3_dma_histogram_data *mdp3_histo;
 
-	pr_debug("%s\n", __func__);
+	pr_err("%s\n", __func__);
 	if (!session->dma->get_histo) {
 		pr_err("mdp3_histogram_collect not supported\n");
 		return -EINVAL;
@@ -1755,7 +1755,7 @@ static int mdp3_histogram_collect(struct mdp3_session_data *session,
 	mutex_lock(&session->histo_lock);
 
 	if (!session->histo_status) {
-		pr_debug("mdp3_histogram_collect not started\n");
+		pr_err("mdp3_histogram_collect not started\n");
 		mutex_unlock(&session->histo_lock);
 		return -EPROTO;
 	}
@@ -1763,7 +1763,7 @@ static int mdp3_histogram_collect(struct mdp3_session_data *session,
 	mutex_unlock(&session->histo_lock);
 
 	if (!session->clk_on) {
-		pr_debug("mdp/dsi clock off currently\n");
+		pr_err("mdp/dsi clock off currently\n");
 		return -EPERM;
 	}
 
@@ -1771,7 +1771,7 @@ static int mdp3_histogram_collect(struct mdp3_session_data *session,
 	ret = session->dma->get_histo(session->dma);
 	mdp3_clk_enable(0, 0);
 	if (ret) {
-		pr_debug("mdp3_histogram_collect error = %d\n", ret);
+		pr_err("mdp3_histogram_collect error = %d\n", ret);
 		return ret;
 	}
 
@@ -1811,7 +1811,7 @@ static int mdp3_bl_scale_config(struct msm_fb_data_type *mfd,
 	curr_bl = mfd->bl_level;
 	mfd->bl_scale = data->scale;
 	mfd->bl_min_lvl = data->min_lvl;
-	pr_debug("update scale = %d, min_lvl = %d\n", mfd->bl_scale,
+	pr_err("update scale = %d, min_lvl = %d\n", mfd->bl_scale,
 							mfd->bl_min_lvl);
 
 	/* update current backlight to use new scaling*/
@@ -1893,7 +1893,7 @@ static int mdp3_pp_ioctl(struct msm_fb_data_type *mfd,
 	case mdp_op_csc_cfg:
 		/* Checking state of dyn_pu before programming CSC block */
 		if (mdp3_session->dyn_pu_state) {
-			pr_debug("Partial update feature is enabled.\n");
+			pr_err("Partial update feature is enabled.\n");
 			return -EPERM;
 		}
 		ret = mdp3_validate_csc_data(&(mdp_pp.data.csc_cfg_data));
@@ -2732,7 +2732,7 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	pm_runtime_enable(&mdp3_res->pdev->dev);
 
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
-	pr_debug("vsync kobject_uevent(KOBJ_ADD)\n");
+	pr_err("vsync kobject_uevent(KOBJ_ADD)\n");
 
 	if (mdp3_get_cont_spash_en()) {
 		mdp3_session->clk_on = 1;

@@ -200,7 +200,7 @@ int ili9341_on(struct qpic_panel_io_desc *qpic_panel_io)
 
 	/* test */
 	param[0] = qpic_read_data(OP_GET_PIXEL_FORMAT, 1);
-	pr_debug("Pixel format =%x", param[0]);
+	pr_err("Pixel format =%x", param[0]);
 
 	return 0;
 }

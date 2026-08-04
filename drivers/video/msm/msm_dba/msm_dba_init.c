@@ -53,7 +53,7 @@ int msm_dba_add_probed_device(struct msm_dba_device_info *dev)
 	node->dev = dev;
 	list_add(&node->list, &device_list);
 
-	pr_debug("%s: Added new device (%s, %d)\n", __func__, dev->chip_name,
+	pr_err("%s: Added new device (%s, %d)\n", __func__, dev->chip_name,
 						dev->instance_id);
 	mutex_unlock(&init_mutex);
 
@@ -79,7 +79,7 @@ int msm_dba_get_probed_device(struct msm_dba_reg_info *reg,
 		node = list_entry(position, struct msm_dba_device_list, list);
 		if (!strcmp(reg->chip_name, node->dev->chip_name) &&
 		    reg->instance_id == node->dev->instance_id) {
-			pr_debug("%s: Found device (%s, %d)\n", __func__,
+			pr_err("%s: Found device (%s, %d)\n", __func__,
 							reg->chip_name,
 							reg->instance_id);
 			*dev = node->dev;
@@ -116,7 +116,7 @@ int msm_dba_remove_probed_device(struct msm_dba_device_info *dev)
 		node = list_entry(position, struct msm_dba_device_list, list);
 		if (node->dev == dev) {
 			list_del(&node->list);
-			pr_debug("%s: Removed device (%s, %d)\n", __func__,
+			pr_err("%s: Removed device (%s, %d)\n", __func__,
 							    dev->chip_name,
 							    dev->instance_id);
 			kfree(node);

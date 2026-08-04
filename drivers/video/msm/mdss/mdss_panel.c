@@ -511,7 +511,7 @@ int mdss_panel_debugfs_init(struct mdss_panel_info *panel_info,
 		pdata = pdata->next;
 	} while (pdata && intf_index < NUM_INTF);
 
-	pr_debug("Initilized mdss_panel_debugfs_info\n");
+	pr_err("Initilized mdss_panel_debugfs_info\n");
 	return 0;
 }
 
@@ -529,7 +529,7 @@ void mdss_panel_debugfs_cleanup(struct mdss_panel_info *panel_info)
 		pdata = pdata->next;
 	} while (pdata);
 	debugfs_remove_recursive(parent);
-	pr_debug("Cleaned up mdss_panel_debugfs_info\n");
+	pr_err("Cleaned up mdss_panel_debugfs_info\n");
 }
 
 void mdss_panel_override_te_params(struct mdss_panel_info *pinfo)
@@ -538,7 +538,7 @@ void mdss_panel_override_te_params(struct mdss_panel_info *pinfo)
 	pinfo->te.vsync_init_val = pinfo->yres;
 	pinfo->te.start_pos = pinfo->yres;
 	pinfo->te.rd_ptr_irq = pinfo->yres + 1;
-	pr_debug("SW TE override: read_ptr:%d,start_pos:%d,height:%d,init_val:%d\n",
+	pr_err("SW TE override: read_ptr:%d,start_pos:%d,height:%d,init_val:%d\n",
 		pinfo->te.rd_ptr_irq, pinfo->te.start_pos,
 		pinfo->te.sync_cfg_height,
 		pinfo->te.vsync_init_val);
@@ -780,20 +780,20 @@ void mdss_panel_dsc_parameters_calc(struct dsc_desc *dsc)
 	dsc->scale_decrement_interval = groups_per_line /
 		(dsc->initial_scale_value - 8);
 
-	pr_debug("initial_xmit_delay=%d\n", dsc->initial_xmit_delay);
-	pr_debug("bpg_offset, nfl=%d slice=%d\n",
+	pr_err("initial_xmit_delay=%d\n", dsc->initial_xmit_delay);
+	pr_err("bpg_offset, nfl=%d slice=%d\n",
 		dsc->nfl_bpg_offset, dsc->slice_bpg_offset);
-	pr_debug("groups_per_line=%d chunk_size=%d\n",
+	pr_err("groups_per_line=%d chunk_size=%d\n",
 		groups_per_line, dsc->chunk_size);
-	pr_debug("min_rate_buffer_size=%d hrd_delay=%d\n",
+	pr_err("min_rate_buffer_size=%d hrd_delay=%d\n",
 		min_rate_buffer_size, hrd_delay);
-	pr_debug("initial_dec_delay=%d initial_scale_value=%d\n",
+	pr_err("initial_dec_delay=%d initial_scale_value=%d\n",
 		dsc->initial_dec_delay, dsc->initial_scale_value);
-	pr_debug("slice_bits=%d, groups_total=%d\n", slice_bits, groups_total);
-	pr_debug("first_line_bgp_offset=%d slice_height=%d\n",
+	pr_err("slice_bits=%d, groups_total=%d\n", slice_bits, groups_total);
+	pr_err("first_line_bgp_offset=%d slice_height=%d\n",
 		dsc->first_line_bpg_offset, dsc->slice_height);
-	pr_debug("final_value=%d final_scale=%d\n", final_value, final_scale);
-	pr_debug("sacle_increment_interval=%d scale_decrement_interval=%d\n",
+	pr_err("final_value=%d final_scale=%d\n", final_value, final_scale);
+	pr_err("sacle_increment_interval=%d scale_decrement_interval=%d\n",
 		dsc->scale_increment_interval, dsc->scale_decrement_interval);
 }
 
@@ -872,7 +872,7 @@ void mdss_panel_dsc_pclk_param_calc(struct dsc_desc *dsc, int intf_width)
 	dsc->bytes_per_pkt = bytes_in_slice * slice_per_pkt;
 	dsc->pkt_per_line = slice_per_intf / slice_per_pkt;
 
-	pr_debug("slice_per_pkt=%d slice_per_intf=%d bytes_in_slice=%d total_bytes_per_intf=%d\n",
+	pr_err("slice_per_pkt=%d slice_per_intf=%d bytes_in_slice=%d total_bytes_per_intf=%d\n",
 		slice_per_pkt, slice_per_intf,
 		bytes_in_slice, total_bytes_per_intf);
 }

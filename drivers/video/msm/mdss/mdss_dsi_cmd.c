@@ -634,7 +634,7 @@ int mdss_dsi_cmd_dma_add(struct dsi_buf *dp, struct dsi_cmd_desc *cm)
 		len = mdss_dsi_peripheral_off(dp, cm);
 		break;
 	default:
-		pr_debug("%s: dtype=%x NOT supported\n",
+		pr_err("%s: dtype=%x NOT supported\n",
 					__func__, dchdr->dtype);
 		break;
 
@@ -743,7 +743,7 @@ struct dcs_cmd_req *mdss_dsi_cmdlist_get(struct mdss_dsi_ctrl_pdata *ctrl,
 		clist->get++;
 		clist->get %= CMD_REQ_MAX;
 		clist->tot--;
-		pr_debug("%s: tot=%d put=%d get=%d\n", __func__,
+		pr_err("%s: tot=%d put=%d get=%d\n", __func__,
 		clist->tot, clist->put, clist->get);
 	}
 	mutex_unlock(&ctrl->cmdlist_mutex);
@@ -767,14 +767,14 @@ int mdss_dsi_cmdlist_put(struct mdss_dsi_ctrl_pdata *ctrl,
 	clist->tot++;
 	if (clist->put == clist->get) {
 		/* drop the oldest one */
-		pr_debug("%s: DROP, tot=%d put=%d get=%d\n", __func__,
+		pr_err("%s: DROP, tot=%d put=%d get=%d\n", __func__,
 			clist->tot, clist->put, clist->get);
 		clist->get++;
 		clist->get %= CMD_REQ_MAX;
 		clist->tot--;
 	}
 
-	pr_debug("%s: tot=%d put=%d get=%d\n", __func__,
+	pr_err("%s: tot=%d put=%d get=%d\n", __func__,
 		clist->tot, clist->put, clist->get);
 
 	mutex_unlock(&ctrl->cmdlist_mutex);

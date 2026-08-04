@@ -135,7 +135,7 @@ static int pp_hist_lut_cache_params_v1_7(struct mdp_hist_lut_data *config,
 			return ret;
 		}
 		if ((config->ops & MDP_PP_OPS_DISABLE)) {
-			pr_debug("disable hist_lut\n");
+			pr_err("disable hist_lut\n");
 			ret = 0;
 			return ret;
 		}
@@ -171,7 +171,7 @@ static int pp_hist_lut_cache_params_pipe_v1_7(struct mdp_hist_lut_data *config,
 	}
 
 	if (config->ops & MDP_PP_OPS_DISABLE) {
-		pr_debug("Disable Hist LUT on pipe %d\n", pipe->num);
+		pr_err("Disable Hist LUT on pipe %d\n", pipe->num);
 		goto hist_lut_cache_pipe_exit;
 	}
 
@@ -320,13 +320,13 @@ int pp_dither_cache_params_v1_7(struct mdp_dither_cfg_data *config,
 	mdss_pp_res->dither_disp_cfg[disp_num] = *config;
 
 	if (config->flags & MDP_PP_OPS_DISABLE) {
-		pr_debug("disable dither\n");
+		pr_err("disable dither\n");
 		ret = 0;
 		goto dither_config_exit;
 	}
 
 	if (!(config->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("op for dither %d\n", config->flags);
+		pr_err("op for dither %d\n", config->flags);
 		goto dither_config_exit;
 	}
 
@@ -423,7 +423,7 @@ static int pp_gamut_cache_params_v1_7(struct mdp_gamut_cfg_data *config,
 	tbl_gamut = v17_cache_data->c0_data[0];
 
 	if ((config->flags & MDP_PP_OPS_DISABLE)) {
-		pr_debug("disable gamut\n");
+		pr_err("disable gamut\n");
 		ret = 0;
 		goto gamut_config_exit;
 	}
@@ -440,7 +440,7 @@ static int pp_gamut_cache_params_v1_7(struct mdp_gamut_cfg_data *config,
 		return -EINVAL;
 	}
 	if (!(config->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("op for gamut %d\n", config->flags);
+		pr_err("op for gamut %d\n", config->flags);
 		goto gamut_config_exit;
 	}
 	tbl_sz = (v17_usr_config.mode == mdp_gamut_fine_mode) ?
@@ -587,7 +587,7 @@ static int pp_pcc_cache_params_pipe_v1_7(struct mdp_pcc_cfg_data *config,
 	}
 
 	if (config->ops & MDP_PP_OPS_DISABLE) {
-		pr_debug("disable ops set cleanup payload\n");
+		pr_err("disable ops set cleanup payload\n");
 		goto cleanup;
 	}
 
@@ -609,7 +609,7 @@ static int pp_pcc_cache_params_pipe_v1_7(struct mdp_pcc_cfg_data *config,
 	}
 
 	if (!(config->ops & MDP_PP_OPS_WRITE)) {
-		pr_debug("write ops not set value of flag is %d\n",
+		pr_err("write ops not set value of flag is %d\n",
 			config->ops);
 		goto cleanup;
 	}
@@ -676,12 +676,12 @@ static int pp_pcc_cache_params_v1_7(struct mdp_pcc_cfg_data *config,
 			goto pcc_config_exit;
 		}
 		if ((config->ops & MDP_PP_OPS_DISABLE)) {
-			pr_debug("disable pcc\n");
+			pr_err("disable pcc\n");
 			ret = 0;
 			goto pcc_config_exit;
 		}
 		if (!(config->ops & MDP_PP_OPS_WRITE)) {
-			pr_debug("op for pcc %d\n", config->ops);
+			pr_err("op for pcc %d\n", config->ops);
 			goto pcc_config_exit;
 		}
 		memcpy(v17_cache_data, &v17_usr_config, sizeof(v17_usr_config));
@@ -784,7 +784,7 @@ static int pp_igc_lut_cache_params_v1_7(struct mdp_igc_lut_data *config,
 			       sizeof(v17_usr_config));
 		}
 		if (!(config->ops & MDP_PP_OPS_WRITE)) {
-			pr_debug("op for gamut %d\n", config->ops);
+			pr_err("op for gamut %d\n", config->ops);
 			goto igc_config_exit;
 		}
 		if (copy_from_kernel && (!v17_usr_config.c0_c1_data ||
@@ -868,7 +868,7 @@ static int pp_igc_lut_cache_params_pipe_v1_7(struct mdp_igc_lut_data *config,
 	}
 
 	if (!(config->ops & MDP_PP_OPS_WRITE)) {
-		pr_debug("op for gamut %d\n", config->ops);
+		pr_err("op for gamut %d\n", config->ops);
 		goto igc_config_exit;
 	}
 
@@ -1051,7 +1051,7 @@ static int pp_pgc_lut_cache_params_v1_7(struct mdp_pgc_lut_data *config,
 		return -EINVAL;
 	}
 	if (!(config->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("ops write not set flags %d\n", config->flags);
+		pr_err("ops write not set flags %d\n", config->flags);
 		if (location == DSPP)
 			mdss_pp_res->pgc_disp_cfg[disp_num].flags =
 				config->flags;
@@ -1176,13 +1176,13 @@ static int pp_pa_cache_params_v1_7(struct mdp_pa_v2_cfg_data *config,
 	}
 
 	if ((config->flags & MDP_PP_OPS_DISABLE)) {
-		pr_debug("Disable PA\n");
+		pr_err("Disable PA\n");
 		ret = 0;
 		goto pa_config_exit;
 	}
 
 	if (!(config->flags & MDP_PP_OPS_WRITE)) {
-		pr_debug("op for PA %d\n", config->flags);
+		pr_err("op for PA %d\n", config->flags);
 		ret = 0;
 		goto pa_config_exit;
 	}
@@ -1246,7 +1246,7 @@ static int pp_pa_cache_params_pipe_v1_7(struct mdp_pa_v2_cfg_data *config,
 	}
 
 	if (config->flags & MDP_PP_OPS_DISABLE) {
-		pr_debug("Disable PA on pipe %d\n", pipe->num);
+		pr_err("Disable PA on pipe %d\n", pipe->num);
 		goto pa_cache_pipe_exit;
 	}
 
@@ -1369,7 +1369,7 @@ int pp_copy_layer_igc_payload(struct mdp_overlay_pp_params *pp_info)
 		}
 		break;
 	default:
-		pr_debug("No version set, fallback to legacy IGC version\n");
+		pr_err("No version set, fallback to legacy IGC version\n");
 		cfg_payload = NULL;
 		break;
 	}
@@ -1407,7 +1407,7 @@ int pp_copy_layer_hist_lut_payload(struct mdp_overlay_pp_params *pp_info)
 		}
 		break;
 	default:
-		pr_debug("No version set, fallback to legacy Hist LUT version\n");
+		pr_err("No version set, fallback to legacy Hist LUT version\n");
 		cfg_payload = NULL;
 		break;
 	}
@@ -1445,7 +1445,7 @@ int pp_copy_layer_pa_payload(struct mdp_overlay_pp_params *pp_info)
 		}
 		break;
 	default:
-		pr_debug("No version set, fallback to legacy PA version\n");
+		pr_err("No version set, fallback to legacy PA version\n");
 		cfg_payload = NULL;
 		break;
 	}
@@ -1483,7 +1483,7 @@ int pp_copy_layer_pcc_payload(struct mdp_overlay_pp_params *pp_info)
 		}
 		break;
 	default:
-		pr_debug("No version set, fallback to legacy PCC version\n");
+		pr_err("No version set, fallback to legacy PCC version\n");
 		cfg_payload = NULL;
 		break;
 	}

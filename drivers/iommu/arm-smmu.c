@@ -1421,6 +1421,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
 	reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
 
+	pr_err("evaluating set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
+
 	if (smmu->version > ARM_SMMU_V1) {
 		/* CBA2R */
 #ifdef CONFIG_64BIT
@@ -1694,6 +1696,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 		arm_smmu_assign_table(smmu_domain);
 		arm_smmu_secure_domain_unlock(smmu_domain);
 	}
+
+	dev_err(smmu->dev, "inside arm_smmu_init_domain_context with CB %d and ID %d with secure=%d, dynamic=%d\n", cfg->cbndx, smmu->sec_id, !arm_smmu_has_secure_vmid(smmu_domain), arm_smmu_is_static_cb(smmu));
 
 	/* Initialise the context bank with our page table cfg */
 	arm_smmu_init_context_bank(smmu_domain, &smmu_domain->pgtbl_cfg);
@@ -1972,11 +1976,14 @@ static int arm_smmu_attach_dynamic(struct iommu_domain *domain,
 	}
 
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_NESTED) {
+		dev_err(smmu->dev, "using ARM_SMMU_FEAT_TRANS_NESTED\n");
 		smmu_domain->cfg.cbar = CBAR_TYPE_S1_TRANS_S2_BYPASS;
 	} else if (smmu->features & ARM_SMMU_FEAT_TRANS_S1) {
+		dev_err(smmu->dev, "using ARM_SMMU_FEAT_TRANS_S1\n");
 		smmu_domain->cfg.cbar = CBAR_TYPE_S1_TRANS_S2_BYPASS;
 	} else {
 		/* dynamic only makes sense for S1. */
+		dev_err(smmu->dev, "unknown feature requested, exiting\n");
 		return -EINVAL;
 	}
 
@@ -1989,10 +1996,13 @@ static int arm_smmu_attach_dynamic(struct iommu_domain *domain,
 
 	fmt = IS_ENABLED(CONFIG_64BIT) ? ARM_64_LPAE_S1 : ARM_32_LPAE_S1;
 
+	dev_err(smmu->dev, "allocating pgtable ops\n");
 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &smmu_domain->pgtbl_cfg,
 					 smmu_domain);
-	if (!pgtbl_ops)
+	if (!pgtbl_ops) {
+		dev_err(smmu->dev, "failed allocating pgtable ops\n");
 		return -ENOMEM;
+	}
 
 	/*
 	 * assign any page table memory that might have been allocated
@@ -2013,11 +2023,11 @@ static int arm_smmu_attach_dynamic(struct iommu_domain *domain,
 				smmu->num_context_banks + 2,
 				MAX_ASID + 1, GFP_KERNEL);
 	if (ret < 0) {
-		dev_err_ratelimited(smmu->dev,
-			"dynamic ASID allocation failed: %d\n", ret);
+		dev_err(smmu->dev, "dynamic ASID allocation failed: %d\n", ret);
 		goto out;
 	}
 
+	dev_err(smmu->dev, "ret value before override %d\n", ret);
 	smmu_domain->cfg.asid = ret;
 	smmu_domain->smmu = smmu;
 	smmu_domain->pgtbl_ops = pgtbl_ops;
@@ -2027,6 +2037,7 @@ out:
 		free_io_pgtable_ops(pgtbl_ops);
 	mutex_unlock(&smmu->attach_lock);
 
+	dev_err(smmu->dev, "returning %d\n", ret);
 	return ret;
 }
 
@@ -2080,8 +2091,17 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -ENXIO;
 	}
 
+	dev_err(dev, "starting arm_smmu_attach_dev with attributes %d and features %d\n", smmu_domain->attributes, smmu->features);
+
+	if (smmu_domain->attributes & (1 << DOMAIN_ATTR_DYNAMIC)) {
+		dev_err(dev, "this domain is dynamic!\n");
+	} else {
+		dev_err(dev, "this domain is NOT dynamic!\n");
+	}
+
 	if (smmu_domain->attributes & (1 << DOMAIN_ATTR_DYNAMIC)) {
 		ret = arm_smmu_attach_dynamic(domain, smmu);
+		dev_err(dev, "ignoring dynamic domain after return from dynamic attach with %d\n", ret);
 		mutex_unlock(&smmu_domain->init_mutex);
 		return ret;
 	}
@@ -2095,6 +2115,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	if (!smmu->attach_count) {
+		dev_err(dev, "no attach count\n");
 		/*
 		 * We need an extra power vote if we can't retain register
 		 * settings across a power collapse, or if this is an
@@ -2107,18 +2128,24 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		if (!(smmu->options & ARM_SMMU_OPT_REGISTER_SAVE) ||
 		    atomic_ctx) {
 			ret = arm_smmu_enable_regulators(smmu);
-			if (ret)
+			if (ret) {
+				dev_err(dev, "failed enabling regulators\n");
 				goto err_unlock;
+			}
 		}
 		ret = arm_smmu_enable_clocks(smmu);
-		if (ret)
+		if (ret) {
+			dev_err(dev, "failed enabling clocks\n");
 			goto err_disable_regulators;
+		}
 		arm_smmu_device_reset(smmu);
 		arm_smmu_impl_def_programming(smmu);
 	} else {
 		ret = arm_smmu_enable_clocks(smmu);
-		if (ret)
+		if (ret) {
+			dev_err(dev, "failed enabling clocks #2\n");
 			goto err_unlock;
+		}
 	}
 	smmu->attach_count++;
 
@@ -2133,6 +2160,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	/* Ensure that the domain is finalised */
+	dev_err(dev, "before calling arm_smmu_init_domain_context\n");
 	ret = arm_smmu_init_domain_context(domain, smmu);
 	if (IS_ERR_VALUE(ret))
 		goto err_disable_clocks;

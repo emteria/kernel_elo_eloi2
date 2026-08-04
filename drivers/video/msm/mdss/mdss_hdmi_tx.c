@@ -2321,30 +2321,30 @@ static int hdmi_tx_pinctrl_init(struct platform_device *pdev)
 	hdmi_ctrl->pin_res.state_active =
 		pinctrl_lookup_state(hdmi_ctrl->pin_res.pinctrl, "hdmi_active");
 	if (IS_ERR_OR_NULL(hdmi_ctrl->pin_res.state_active))
-		pr_debug("%s: cannot get active pinstate\n", __func__);
+		pr_err("%s: cannot get active pinstate\n", __func__);
 
 	hdmi_ctrl->pin_res.state_hpd_active =
 		pinctrl_lookup_state(hdmi_ctrl->pin_res.pinctrl,
 							"hdmi_hpd_active");
 	if (IS_ERR_OR_NULL(hdmi_ctrl->pin_res.state_hpd_active))
-		pr_debug("%s: cannot get hpd active pinstate\n", __func__);
+		pr_err("%s: cannot get hpd active pinstate\n", __func__);
 
 	hdmi_ctrl->pin_res.state_cec_active =
 		pinctrl_lookup_state(hdmi_ctrl->pin_res.pinctrl,
 							"hdmi_cec_active");
 	if (IS_ERR_OR_NULL(hdmi_ctrl->pin_res.state_cec_active))
-		pr_debug("%s: cannot get cec active pinstate\n", __func__);
+		pr_err("%s: cannot get cec active pinstate\n", __func__);
 
 	hdmi_ctrl->pin_res.state_ddc_active =
 		pinctrl_lookup_state(hdmi_ctrl->pin_res.pinctrl,
 							"hdmi_ddc_active");
 	if (IS_ERR_OR_NULL(hdmi_ctrl->pin_res.state_ddc_active))
-		pr_debug("%s: cannot get ddc active pinstate\n", __func__);
+		pr_err("%s: cannot get ddc active pinstate\n", __func__);
 
 	hdmi_ctrl->pin_res.state_suspend =
 		pinctrl_lookup_state(hdmi_ctrl->pin_res.pinctrl, "hdmi_sleep");
 	if (IS_ERR_OR_NULL(hdmi_ctrl->pin_res.state_suspend))
-		pr_debug("%s: cannot get sleep pinstate\n", __func__);
+		pr_err("%s: cannot get sleep pinstate\n", __func__);
 
 	return 0;
 }
@@ -4601,7 +4601,7 @@ static int set_hdcp_feature_on(const char *val, const struct kernel_param *kp)
 
 	rc = param_set_bool(val, kp);
 	if (!rc)
-		pr_debug("%s: HDCP feature = %d\n", __func__, hdcp_feature_on);
+		pr_err("%s: HDCP feature = %d\n", __func__, hdcp_feature_on);
 
 	return rc;
 }

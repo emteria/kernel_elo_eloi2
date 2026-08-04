@@ -357,7 +357,7 @@ void mdss_rect_split(struct mdss_rect *in_roi, struct mdss_rect *l_roi,
 		}
 	}
 
-	pr_debug("left: %d,%d,%d,%d right: %d,%d,%d,%d\n",
+	pr_err("left: %d,%d,%d,%d right: %d,%d,%d,%d\n",
 		l_roi->x, l_roi->y, l_roi->w, l_roi->h,
 		r_roi->x, r_roi->y, r_roi->w, r_roi->h);
 }
@@ -396,7 +396,7 @@ int mdss_mdp_get_rau_strides(u32 w, u32 h,
 	ps->ystride[1] *= ps->rau_cnt;
 	ps->num_planes = 2;
 
-	pr_debug("BWC rau_cnt=%d strides={%d,%d} heights={%d,%d}\n",
+	pr_err("BWC rau_cnt=%d strides={%d,%d} heights={%d,%d}\n",
 		ps->rau_cnt, ps->ystride[0], ps->ystride[1],
 		ps->rau_h[0], ps->rau_h[1]);
 
@@ -539,7 +539,7 @@ int mdss_mdp_get_plane_sizes(struct mdss_mdp_format_params *fmt, u32 w, u32 h,
 		ps->ystride[1] = 2;
 		ps->plane_size[1] = 2 * ps->rau_cnt * height;
 
-		pr_debug("BWC data stride=%d size=%d meta size=%d\n",
+		pr_err("BWC data stride=%d size=%d meta size=%d\n",
 			ps->ystride[0], ps->plane_size[0], ps->plane_size[1]);
 	} else {
 		if (fmt->fetch_planes == MDSS_MDP_PLANE_INTERLEAVED) {
@@ -737,7 +737,7 @@ int mdss_mdp_data_check(struct mdss_mdp_data *data,
 	if (mdss_mdp_is_ubwc_format(fmt))
 		return mdss_mdp_ubwc_data_check(data, ps, fmt);
 
-	pr_debug("srcp0=%pa len=%lu frame_size=%u\n", &data->p[0].addr,
+	pr_err("srcp0=%pa len=%lu frame_size=%u\n", &data->p[0].addr,
 		data->p[0].len, ps->total_size);
 
 	for (i = 0; i < ps->num_planes; i++) {
@@ -756,7 +756,7 @@ int mdss_mdp_data_check(struct mdss_mdp_data *data,
 			       curr->len, i, ps->plane_size[i]);
 			return -ENOMEM;
 		}
-		pr_debug("plane[%d] addr=%pa len=%lu\n", i,
+		pr_err("plane[%d] addr=%pa len=%lu\n", i,
 				&curr->addr, curr->len);
 	}
 	data->num_planes = ps->num_planes;
@@ -924,14 +924,14 @@ static int mdss_mdp_put_img(struct mdss_mdp_img_data *data, bool rotator,
 	u32 domain;
 
 	if (data->flags & MDP_MEMORY_ID_TYPE_FB) {
-		pr_debug("fb mem buf=0x%pa\n", &data->addr);
+		pr_err("fb mem buf=0x%pa\n", &data->addr);
 		fdput(data->srcp_f);
 		memset(&data->srcp_f, 0, sizeof(struct fd));
 	} else if (data->srcp_f.file) {
-		pr_debug("pmem buf=0x%pa\n", &data->addr);
+		pr_err("pmem buf=0x%pa\n", &data->addr);
 		memset(&data->srcp_f, 0, sizeof(struct fd));
 	} else if (!IS_ERR_OR_NULL(data->srcp_dma_buf)) {
-		pr_debug("ion hdl=%pK buf=0x%pa\n", data->srcp_dma_buf,
+		pr_err("ion hdl=%pK buf=0x%pa\n", data->srcp_dma_buf,
 							&data->addr);
 		if (!iclient) {
 			pr_err("invalid ion client\n");
@@ -964,7 +964,7 @@ static int mdss_mdp_put_img(struct mdss_mdp_img_data *data, bool rotator,
 		 * be filled due to map call which will be unmapped above.
 		 *
 		 */
-		pr_debug("skip memory unmapping for secure display content\n");
+		pr_err("skip memory unmapping for secure display content\n");
 	} else {
 		return -ENOMEM;
 	}
@@ -1096,7 +1096,7 @@ static int mdss_mdp_get_img(struct msmfb_data *img,
 		data->addr += data->offset;
 		data->len -= data->offset;
 
-		pr_debug("mem=%d ihdl=%pK buf=0x%pa len=0x%lx\n",
+		pr_err("mem=%d ihdl=%pK buf=0x%pa len=0x%lx\n",
 			 img->memory_id, data->srcp_dma_buf, &data->addr,
 			 data->len);
 	} else {
@@ -1162,7 +1162,7 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data, bool rotator,
 		data->addr += data->offset;
 		data->len -= data->offset;
 
-		pr_debug("ihdl=%pK buf=0x%pa len=0x%lx\n",
+		pr_err("ihdl=%pK buf=0x%pa len=0x%lx\n",
 			 data->srcp_dma_buf, &data->addr, data->len);
 	} else {
 		mdss_mdp_put_img(data, rotator, dir);

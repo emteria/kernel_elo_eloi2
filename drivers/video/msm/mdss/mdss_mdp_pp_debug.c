@@ -58,7 +58,7 @@ void pp_print_lut(void *data, int size, char *tab, uint32_t type)
 		}
 		snprintf(buf + read, MAX_LINE_BUFFER_SIZE - read, "\n");
 
-		pr_debug("%s", buf);
+		pr_err("%s", buf);
 		memset(buf, 0, sizeof(char) * MAX_LINE_BUFFER_SIZE);
 		read = 0;
 	}
@@ -76,7 +76,7 @@ void pp_print_lut(void *data, int size, char *tab, uint32_t type)
 					((uint16_t *)data)[last_start+i]);
 	}
 	snprintf(buf + read, MAX_LINE_BUFFER_SIZE - read, "\n");
-	pr_debug("%s", buf);
+	pr_err("%s", buf);
 }
 
 void pp_print_pcc_coeff(struct mdp_pcc_coeff *pcc_coeff, int tab_depth)
@@ -89,10 +89,10 @@ void pp_print_pcc_coeff(struct mdp_pcc_coeff *pcc_coeff, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pcc_coeff:\n", tab);
+	pr_err("%smdp_pcc_coeff:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sc: %x\n"
+	pr_err("%sc: %x\n"
 		"%sr: %x\n%sg: %x\n%sb: %x\n"
 		"%srr: %x\n%sgg: %x\n%sbb: %x\n"
 		"%srg: %x\n%sgb: %x\n%srb: %x\n"
@@ -121,10 +121,10 @@ void pp_print_pcc_cfg_data(struct mdp_pcc_cfg_data *pcc_data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pcc_cfg_data:\n", tab);
+	pr_err("%smdp_pcc_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n%sops: %x\n",
+	pr_err("%sblock: %x\n%sops: %x\n",
 		tab, pcc_data->block,
 		tab, pcc_data->ops);
 
@@ -143,21 +143,21 @@ void pp_print_csc_cfg(struct mdp_csc_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_csc_cfg:\n", tab);
+	pr_err("%smdp_csc_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sflags: %x\n",
+	pr_err("%sflags: %x\n",
 		tab, data->flags);
 
-	pr_debug("%scsc_mv[]:\n", tab);
+	pr_err("%scsc_mv[]:\n", tab);
 	pp_print_lut(&data->csc_mv[0], 9, tab, UINT32);
-	pr_debug("%scsc_pre_bv[]:\n", tab);
+	pr_err("%scsc_pre_bv[]:\n", tab);
 	pp_print_lut(&data->csc_pre_bv[0], 3, tab, UINT32);
-	pr_debug("%scsc_post_bv[]:\n", tab);
+	pr_err("%scsc_post_bv[]:\n", tab);
 	pp_print_lut(&data->csc_post_bv[0], 3, tab, UINT32);
-	pr_debug("%scsc_pre_lv[]:\n", tab);
+	pr_err("%scsc_pre_lv[]:\n", tab);
 	pp_print_lut(&data->csc_pre_lv[0], 6, tab, UINT32);
-	pr_debug("%scsc_post_lv[]:\n", tab);
+	pr_err("%scsc_post_lv[]:\n", tab);
 	pp_print_lut(&data->csc_post_lv[0], 6, tab, UINT32);
 }
 
@@ -171,10 +171,10 @@ void pp_print_csc_cfg_data(struct mdp_csc_cfg_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_csc_cfg_data:\n", tab);
+	pr_err("%smdp_csc_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n",
+	pr_err("%sblock: %x\n",
 		tab, data->block);
 
 	pp_print_csc_cfg(&data->csc_data, tab_depth + 1);
@@ -190,19 +190,19 @@ void pp_print_igc_lut_data(struct mdp_igc_lut_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_igc_lut_data:\n", tab);
+	pr_err("%smdp_igc_lut_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n"
+	pr_err("%sblock: %x\n"
 		"%slen: %x\n"
 		"%sops: %x\n",
 		tab, data->block,
 		tab, data->len,
 		tab, data->ops);
 
-	pr_debug("%sc0_c1_data[]:\n", tab);
+	pr_err("%sc0_c1_data[]:\n", tab);
 	pp_print_lut(&data->c0_c1_data[0], data->len, tab, UINT32);
-	pr_debug("%sc2_data[]:\n", tab);
+	pr_err("%sc2_data[]:\n", tab);
 	pp_print_lut(&data->c2_data[0], data->len, tab, UINT32);
 }
 
@@ -216,10 +216,10 @@ void pp_print_ar_gc_lut_data(struct mdp_ar_gc_lut_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_ar_gc_lut_data:\n", tab);
+	pr_err("%smdp_ar_gc_lut_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sx_start: %x\n"
+	pr_err("%sx_start: %x\n"
 		"%sslope: %x\n"
 		"%soffset: %x\n",
 		tab, data->x_start,
@@ -238,10 +238,10 @@ void pp_print_pgc_lut_data(struct mdp_pgc_lut_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pgc_lut_data:\n", tab);
+	pr_err("%smdp_pgc_lut_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n"
+	pr_err("%sblock: %x\n"
 		"%sflags: %x\n"
 		"%snum_r_stages: %x\n"
 		"%snum_g_stages: %x\n"
@@ -253,15 +253,15 @@ void pp_print_pgc_lut_data(struct mdp_pgc_lut_data *data, int tab_depth)
 		tab, data->num_b_stages);
 
 	for (i = 0; i < data->num_r_stages; i++) {
-		pr_debug("%sr_data[%d]\n", tab, i);
+		pr_err("%sr_data[%d]\n", tab, i);
 		pp_print_ar_gc_lut_data(&data->r_data[i], tab_depth + 1);
 	}
 	for (i = 0; i < data->num_g_stages; i++) {
-		pr_debug("%sg_data[%d]\n", tab, i);
+		pr_err("%sg_data[%d]\n", tab, i);
 		pp_print_ar_gc_lut_data(&data->g_data[i], tab_depth + 1);
 	}
 	for (i = 0; i < data->num_b_stages; i++) {
-		pr_debug("%sb_data[%d]\n", tab, i);
+		pr_err("%sb_data[%d]\n", tab, i);
 		pp_print_ar_gc_lut_data(&data->b_data[i], tab_depth + 1);
 	}
 }
@@ -276,17 +276,17 @@ void pp_print_hist_lut_data(struct mdp_hist_lut_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_hist_lut_data:\n", tab);
+	pr_err("%smdp_hist_lut_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n"
+	pr_err("%sblock: %x\n"
 		"%sops: %x\n"
 		"%slen: %x\n",
 		tab, data->block,
 		tab, data->ops,
 		tab, data->len);
 
-	pr_debug("%sdata[]:\n", tab);
+	pr_err("%sdata[]:\n", tab);
 	pp_print_lut(&data->data[0], data->len, tab, UINT32);
 }
 
@@ -300,10 +300,10 @@ void pp_print_lut_cfg_data(struct mdp_lut_cfg_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_lut_cfg_data:\n", tab);
+	pr_err("%smdp_lut_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%slut_type: %x\n",
+	pr_err("%slut_type: %x\n",
 		tab, data->lut_type);
 
 	switch (data->lut_type) {
@@ -332,17 +332,17 @@ void pp_print_qseed_cfg(struct mdp_qseed_cfg *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_qseed_cfg:\n", tab);
+	pr_err("%smdp_qseed_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%stable_num: %x\n"
+	pr_err("%stable_num: %x\n"
 		"%sops: %x\n"
 		"%slen: %x\n",
 		tab, data->table_num,
 		tab, data->ops,
 		tab, data->len);
 
-	pr_debug("%sdata[]:\n", tab);
+	pr_err("%sdata[]:\n", tab);
 	pp_print_lut(&data->data[0], data->len, tab, UINT32);
 }
 
@@ -356,10 +356,10 @@ void pp_print_qseed_cfg_data(struct mdp_qseed_cfg_data *data, int tab_depth)
 
 	tab[tab_depth] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_qseed_cfg_data:\n", tab);
+	pr_err("%smdp_qseed_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n",
+	pr_err("%sblock: %x\n",
 		tab, data->block);
 
 	pp_print_qseed_cfg(&data->qseed_data, tab_depth + 1);
@@ -375,10 +375,10 @@ void pp_print_pa_cfg(struct mdp_pa_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pa_cfg:\n", tab);
+	pr_err("%smdp_pa_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sflags: %x\n"
+	pr_err("%sflags: %x\n"
 		"%shue_adj: %x\n"
 		"%ssat_adj: %x\n"
 		"%sval_adj: %x\n"
@@ -400,10 +400,10 @@ void pp_print_pa_cfg_data(struct mdp_pa_cfg_data *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pa_cfg_data:\n", tab);
+	pr_err("%smdp_pa_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n",
+	pr_err("%sblock: %x\n",
 		tab, data->block);
 
 	pp_print_pa_cfg(&data->pa_data, tab_depth + 1);
@@ -419,10 +419,10 @@ void pp_print_mem_col_cfg(struct mdp_pa_mem_col_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pa_mem_col_cfg:\n", tab);
+	pr_err("%smdp_pa_mem_col_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%scolor_adjust_p0: %x\n"
+	pr_err("%scolor_adjust_p0: %x\n"
 		"%scolor_adjust_p1: %x\n"
 		"%shue_region: %x\n"
 		"%ssat_region: %x\n"
@@ -444,10 +444,10 @@ void pp_print_pa_v2_data(struct mdp_pa_v2_data *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pa_v2_data:\n", tab);
+	pr_err("%smdp_pa_v2_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sflags: %x\n"
+	pr_err("%sflags: %x\n"
 		"%sglobal_hue_adj: %x\n"
 		"%sglobal_sat_adj: %x\n"
 		"%sglobal_val_adj: %x\n"
@@ -462,15 +462,15 @@ void pp_print_pa_v2_data(struct mdp_pa_v2_data *data, int tab_depth)
 	pp_print_mem_col_cfg(&data->sky_cfg, tab_depth + 1);
 	pp_print_mem_col_cfg(&data->fol_cfg, tab_depth + 1);
 
-	pr_debug("%ssix_zone_len: %x\n"
+	pr_err("%ssix_zone_len: %x\n"
 		"%ssix_zone_thresh: %x\n",
 		tab, data->six_zone_len,
 		tab, data->six_zone_thresh);
 
-	pr_debug("%ssix_zone_curve_p0[]:\n", tab);
+	pr_err("%ssix_zone_curve_p0[]:\n", tab);
 	pp_print_lut(&data->six_zone_curve_p0[0], data->six_zone_len, tab,
 			UINT32);
-	pr_debug("%ssix_zone_curve_p1[]:\n", tab);
+	pr_err("%ssix_zone_curve_p1[]:\n", tab);
 	pp_print_lut(&data->six_zone_curve_p1[0], data->six_zone_len, tab,
 			UINT32);
 }
@@ -485,10 +485,10 @@ void pp_print_pa_v2_cfg_data(struct mdp_pa_v2_cfg_data *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_pa_v2_cfg_data:\n", tab);
+	pr_err("%smdp_pa_v2_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n",
+	pr_err("%sblock: %x\n",
 		tab, data->block);
 
 	pp_print_pa_v2_data(&data->pa_v2_data, tab_depth + 1);
@@ -504,10 +504,10 @@ void pp_print_dither_cfg_data(struct mdp_dither_cfg_data *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_dither_cfg_data:\n", tab);
+	pr_err("%smdp_dither_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n"
+	pr_err("%sblock: %x\n"
 		"%sflags: %x\n"
 		"%sg_y_depth: %x\n"
 		"%sr_cr_depth: %x\n"
@@ -530,33 +530,33 @@ void pp_print_gamut_cfg_data(struct mdp_gamut_cfg_data *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_gamut_cfg_data:\n", tab);
+	pr_err("%smdp_gamut_cfg_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sblock: %x\n"
+	pr_err("%sblock: %x\n"
 		"%sflags: %x\n"
 		"%sgamut_first: %x\n",
 		tab, data->block,
 		tab, data->flags,
 		tab, data->gamut_first);
 
-	pr_debug("%stbl_size[]:\n", tab);
+	pr_err("%stbl_size[]:\n", tab);
 	pp_print_lut(&data->tbl_size[0], MDP_GAMUT_TABLE_NUM, tab, UINT32);
 
 	for (i = 0; i < MDP_GAMUT_TABLE_NUM; i++) {
-		pr_debug("%sr_tbl[%d]:\n", tab, i);
+		pr_err("%sr_tbl[%d]:\n", tab, i);
 		pp_print_lut(&data->r_tbl[i][0], data->tbl_size[i], tab,
 				UINT16);
 	}
 
 	for (i = 0; i < MDP_GAMUT_TABLE_NUM; i++) {
-		pr_debug("%sg_tbl[%d]:\n", tab, i);
+		pr_err("%sg_tbl[%d]:\n", tab, i);
 		pp_print_lut(&data->g_tbl[i][0], data->tbl_size[i], tab,
 				UINT16);
 	}
 
 	for (i = 0; i < MDP_GAMUT_TABLE_NUM; i++) {
-		pr_debug("%sb_tbl[%d]:\n", tab, i);
+		pr_err("%sb_tbl[%d]:\n", tab, i);
 		pp_print_lut(&data->b_tbl[i][0], data->tbl_size[i], tab,
 				UINT16);
 	}
@@ -572,16 +572,16 @@ void pp_print_ad_init(struct mdss_ad_init *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdss_ad_init:\n", tab);
+	pr_err("%smdss_ad_init:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sasym_lut[]:\n", tab);
+	pr_err("%sasym_lut[]:\n", tab);
 	pp_print_lut(&data->asym_lut[0], 33, tab, UINT32);
 
-	pr_debug("%scolor_corr_lut[]:\n", tab);
+	pr_err("%scolor_corr_lut[]:\n", tab);
 	pp_print_lut(&data->color_corr_lut[0], 33, tab, UINT32);
 
-	pr_debug("%si_control[]:\n%s%x %x\n"
+	pr_err("%si_control[]:\n%s%x %x\n"
 		"%sblack_lvl: %x\n"
 		"%swhite_lvl: %x\n"
 		"%svar: %x\n"
@@ -614,10 +614,10 @@ void pp_print_ad_init(struct mdss_ad_init *data, int tab_depth)
 		tab, data->logo_h,
 		tab, data->bl_lin_len);
 
-	pr_debug("%sbl_lin[]:\n", tab);
+	pr_err("%sbl_lin[]:\n", tab);
 	pp_print_lut(&data->bl_lin[0], data->bl_lin_len, tab, UINT32);
 
-	pr_debug("%sbl_lin_inv[]:\n", tab);
+	pr_err("%sbl_lin_inv[]:\n", tab);
 	pp_print_lut(&data->bl_lin_inv[0], data->bl_lin_len, tab, UINT32);
 }
 
@@ -631,16 +631,16 @@ void pp_print_ad_cfg(struct mdss_ad_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdss_ad_cfg:\n", tab);
+	pr_err("%smdss_ad_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%smode: %x\n",
+	pr_err("%smode: %x\n",
 		tab, data->mode);
 
-	pr_debug("%sal_calib_lut[]:\n", tab);
+	pr_err("%sal_calib_lut[]:\n", tab);
 	pp_print_lut(&data->al_calib_lut[0], 33, tab, UINT32);
 
-	pr_debug("%sbacklight_min: %x\n"
+	pr_err("%sbacklight_min: %x\n"
 		"%sbacklight_max: %x\n"
 		"%sbacklight_scale: %x\n"
 		"%samb_light_min: %x\n",
@@ -652,7 +652,7 @@ void pp_print_ad_cfg(struct mdss_ad_cfg *data, int tab_depth)
 	pp_print_lut(&data->filter[0], 2, tab, UINT16);
 	pp_print_lut(&data->calib[0], 4, tab, UINT16);
 
-	pr_debug("%sstrength_limit: %x\n"
+	pr_err("%sstrength_limit: %x\n"
 		"%st_filter_recursion: %x\n"
 		"%sstab_itr: %x\n"
 		"%sbl_ctrl_mode: %x\n",
@@ -672,10 +672,10 @@ void pp_print_ad_init_cfg(struct mdss_ad_init_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdss_ad_init_cfg:\n", tab);
+	pr_err("%smdss_ad_init_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n",
+	pr_err("%sops: %x\n",
 		tab, data->ops);
 
 	if (data->ops & MDP_PP_AD_INIT)
@@ -694,32 +694,32 @@ void pp_print_ad_input(struct mdss_ad_input *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdss_ad_input:\n", tab);
+	pr_err("%smdss_ad_input:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%smode: %x\n",
+	pr_err("%smode: %x\n",
 		tab, data->mode);
 
 	switch (data->mode) {
 	case MDSS_AD_MODE_AUTO_BL:
 	case MDSS_AD_MODE_AUTO_STR:
-		pr_debug("%samb_light: %x\n",
+		pr_err("%samb_light: %x\n",
 			tab, data->in.amb_light);
 		break;
 	case MDSS_AD_MODE_TARG_STR:
 	case MDSS_AD_MODE_MAN_STR:
-		pr_debug("%sstrength: %x\n",
+		pr_err("%sstrength: %x\n",
 			tab, data->in.strength);
 		break;
 	case MDSS_AD_MODE_CALIB:
-		pr_debug("%scalib_bl: %x\n",
+		pr_err("%scalib_bl: %x\n",
 			tab, data->in.calib_bl);
 		break;
 	default:
 		break;
 	}
 
-	pr_debug("%soutput: %x\n",
+	pr_err("%soutput: %x\n",
 		tab, data->output);
 }
 
@@ -733,10 +733,10 @@ void pp_print_histogram_cfg(struct mdp_histogram_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_histogram_cfg:\n", tab);
+	pr_err("%smdp_histogram_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n"
+	pr_err("%sops: %x\n"
 		"%sblock: %x\n"
 		"%sframe_cnt: %x\n"
 		"%sbit_mask: %x\n"
@@ -758,10 +758,10 @@ void pp_print_sharp_cfg(struct mdp_sharp_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_sharp_cfg:\n", tab);
+	pr_err("%smdp_sharp_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sflags: %x\n"
+	pr_err("%sflags: %x\n"
 		"%sstrength: %x\n"
 		"%sedge_thr: %x\n"
 		"%ssmooth_thr: %x\n"
@@ -784,10 +784,10 @@ void pp_print_calib_config_data(struct mdp_calib_config_data *data,
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_calib_config_data:\n", tab);
+	pr_err("%smdp_calib_config_data:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n"
+	pr_err("%sops: %x\n"
 		"%saddr: %x\n"
 		"%sdata: %x\n",
 		tab, data->ops,
@@ -806,15 +806,15 @@ void pp_print_calib_config_buffer(struct mdp_calib_config_buffer *data,
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_calib_config_buffer:\n", tab);
+	pr_err("%smdp_calib_config_buffer:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n"
+	pr_err("%sops: %x\n"
 		"%ssize: %x\n",
 		tab, data->ops,
 		tab, data->size);
 
-	pr_debug("%sbuffer[]:\n", tab);
+	pr_err("%sbuffer[]:\n", tab);
 	pp_print_lut(&data->buffer[0], data->size, tab, UINT32);
 }
 
@@ -828,10 +828,10 @@ void pp_print_calib_dcm_state(struct mdp_calib_dcm_state *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdp_calib_dcm_state:\n", tab);
+	pr_err("%smdp_calib_dcm_state:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n"
+	pr_err("%sops: %x\n"
 		"%sdcm_state: %x\n",
 		tab, data->ops,
 		tab, data->dcm_state);
@@ -847,10 +847,10 @@ void pp_print_mdss_calib_cfg(struct mdss_calib_cfg *data, int tab_depth)
 
 	tab[0] = '\0';
 	tab_prefix(tab, tab_depth);
-	pr_debug("%smdss_calib_cfg:\n", tab);
+	pr_err("%smdss_calib_cfg:\n", tab);
 	tab_prefix(tab, tmp);
 
-	pr_debug("%sops: %x\n"
+	pr_err("%sops: %x\n"
 		"%scalib_mask: %x\n",
 		tab, data->ops,
 		tab, data->calib_mask);

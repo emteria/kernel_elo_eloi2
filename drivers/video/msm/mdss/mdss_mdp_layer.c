@@ -183,14 +183,14 @@ static int __layer_param_check(struct msm_fb_data_type *mfd,
 	if (ctl->mixer_left) {
 		yres = ctl->mixer_left->height;
 	} else {
-		pr_debug("Using fb var screen infor for height\n");
+		pr_err("Using fb var screen infor for height\n");
 		yres = mfd->fbi->var.yres;
 	}
 
 	content_secure = (layer->flags & MDP_LAYER_SECURE_SESSION);
 	if (!ctl->is_secure && content_secure &&
 				 (mfd->panel.type == WRITEBACK_PANEL)) {
-		pr_debug("return due to security concerns\n");
+		pr_err("return due to security concerns\n");
 		return -EPERM;
 	}
 	min_src_size = fmt->is_yuv ? 2 : 1;
@@ -380,7 +380,7 @@ static int __validate_single_layer(struct msm_fb_data_type *mfd,
 		goto exit_fail;
 	}
 
-	pr_debug("ctl=%u mux=%d z_order=%d flags=0x%x dst_x:%d\n",
+	pr_err("ctl=%u mux=%d z_order=%d flags=0x%x dst_x:%d\n",
 		mdp5_data->ctl->num, mixer_mux, layer->z_order,
 		layer->flags, layer->dst_rect.x);
 
@@ -534,10 +534,10 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 	if (mixer->ctl) {
 		pipe->dst.x += mixer->ctl->border_x_off;
 		pipe->dst.y += mixer->ctl->border_y_off;
-		pr_debug("border{%d,%d}\n", mixer->ctl->border_x_off,
+		pr_err("border{%d,%d}\n", mixer->ctl->border_x_off,
 				mixer->ctl->border_y_off);
 	}
-	pr_debug("src{%d,%d,%d,%d}, dst{%d,%d,%d,%d}\n",
+	pr_err("src{%d,%d,%d,%d}, dst{%d,%d,%d,%d}\n",
 		pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h,
 		pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h);
 
@@ -584,7 +584,7 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 				ret = -EPERM;
 				goto end;
 			} else {
-				pr_debug("pipe%d is a right_pipe\n", pipe->num);
+				pr_err("pipe%d is a right_pipe\n", pipe->num);
 				is_right_blend = true;
 			}
 		} else if (pipe->is_right_blend) {
@@ -647,7 +647,7 @@ static int __configure_pipe_params(struct msm_fb_data_type *mfd,
 
 	if (pipe->dst.x >= left_lm_w)
 		pipe->overfetch_disable |= OVERFETCH_DISABLE_RIGHT;
-		pr_debug("overfetch flags=%x\n", pipe->overfetch_disable);
+		pr_err("overfetch flags=%x\n", pipe->overfetch_disable);
 	} else {
 		pipe->overfetch_disable = 0;
 	}
@@ -1022,12 +1022,12 @@ static struct mdss_mdp_pipe *__find_and_move_cleanup_pipe(
 
 	if (__find_pipe_in_list(&mdp5_data->pipes_destroy,
 				pipe_ndx, &pipe, rect_num)) {
-		pr_debug("reuse destroy pipe id:%d ndx:%d rect:%d\n",
+		pr_err("reuse destroy pipe id:%d ndx:%d rect:%d\n",
 				pipe->num, pipe_ndx, rect_num);
 		list_move(&pipe->list, &mdp5_data->pipes_used);
 	} else if (__find_pipe_in_list(&mdp5_data->pipes_cleanup,
 				pipe_ndx, &pipe, rect_num)) {
-		pr_debug("reuse cleanup pipe id:%d ndx:%d rect:%d\n",
+		pr_err("reuse cleanup pipe id:%d ndx:%d rect:%d\n",
 				pipe->num, pipe_ndx, rect_num);
 		mdss_mdp_mixer_pipe_unstage(pipe, pipe->mixer_left);
 		mdss_mdp_mixer_pipe_unstage(pipe, pipe->mixer_right);
@@ -1081,7 +1081,7 @@ static struct mdss_mdp_pipe *__assign_pipe_for_layer(
 				pipe = ERR_PTR(-EINVAL);
 				goto end;
 			}
-			pr_debug("switching pipe%d mixer %d->%d\n",
+			pr_err("switching pipe%d mixer %d->%d\n",
 				pipe->num,
 				pipe->mixer_left ? pipe->mixer_left->num : -1,
 				mixer->num);
@@ -1168,7 +1168,7 @@ static int __validate_secure_display(struct mdss_overlay_private *mdp5_data)
 	}
 	mutex_unlock(&mdp5_data->list_lock);
 
-	pr_debug("pipe count:: secure display:%d non-secure:%d\n",
+	pr_err("pipe count:: secure display:%d non-secure:%d\n",
 		sd_pipes, nonsd_pipes);
 
 	mdp5_data->sd_transition_state = SD_TRANSITION_NONE;
@@ -1508,7 +1508,7 @@ static int __multirect_validate_mode(struct msm_fb_data_type *mfd,
 		pr_err("Invalid multirect mode %d\n", mode);
 	}
 
-	pr_debug("layer->pndx:%d mode=%d\n", layers[0]->pipe_ndx, mode);
+	pr_err("layer->pndx:%d mode=%d\n", layers[0]->pipe_ndx, mode);
 
 	return 0;
 }
@@ -1526,7 +1526,7 @@ static int __update_multirect_info(struct msm_fb_data_type *mfd,
 	if (IS_ERR_VALUE(mode))
 		return mode;
 
-	pr_debug("layer #%d pipe_ndx=%d multirect mode=%d\n",
+	pr_err("layer #%d pipe_ndx=%d multirect mode=%d\n",
 			ndx, layer_list[ndx].pipe_ndx, mode);
 
 	vinfo[0] = &validate_info_list[ndx];
@@ -1567,7 +1567,7 @@ static int __update_multirect_info(struct msm_fb_data_type *mfd,
 				return -EINVAL;
 			}
 
-			pr_debug("found matching pair for pipe_ndx=%d (%d %d)\n",
+			pr_err("found matching pair for pipe_ndx=%d (%d %d)\n",
 					layer_list[i].pipe_ndx, ndx, i);
 
 			vinfo[cnt] = &validate_info_list[i];
@@ -1910,7 +1910,7 @@ static int __validate_layers(struct msm_fb_data_type *mfd,
 		else
 			left_plist[left_cnt++] = pipe;
 
-		pr_debug("id:0x%x flags:0x%x dst_x:%d\n",
+		pr_err("id:0x%x flags:0x%x dst_x:%d\n",
 			layer->pipe_ndx, layer->flags, layer->dst_rect.x);
 		layer->z_order -= MDSS_MDP_STAGE_0;
 	}
@@ -1928,7 +1928,7 @@ validate_skip:
 	ret = __validate_secure_display(mdp5_data);
 
 validate_exit:
-	pr_debug("err=%d total_layer:%d left:%d right:%d rec0_rel_ndx=0x%x rec1_rel_ndx=0x%x rec0_destroy_ndx=0x%x rec1_destroy_ndx=0x%x processed=%d\n",
+	pr_err("err=%d total_layer:%d left:%d right:%d rec0_rel_ndx=0x%x rec1_rel_ndx=0x%x rec0_destroy_ndx=0x%x rec1_destroy_ndx=0x%x processed=%d\n",
 		ret, layer_count, left_lm_layers, right_lm_layers,
 		rec_release_ndx[0], rec_release_ndx[1],
 		rec_destroy_ndx[0], rec_destroy_ndx[1], i);
@@ -1964,7 +1964,7 @@ validate_exit:
 			}
 		} else {
 			pipe->file = file;
-			pr_debug("file pointer attached with pipe is %pK\n",
+			pr_err("file pointer attached with pipe is %pK\n",
 				file);
 		}
 	}
@@ -1973,7 +1973,7 @@ end:
 	kfree(validate_info_list);
 	mutex_unlock(&mdp5_data->ov_lock);
 
-	pr_debug("fb%d validated layers =%d\n", mfd->index, i);
+	pr_err("fb%d validated layers =%d\n", mfd->index, i);
 
 	return ret;
 }
@@ -2076,6 +2076,7 @@ int mdss_mdp_layer_pre_commit(struct msm_fb_data_type *mfd,
 	}
 	mutex_unlock(&mdp5_data->list_lock);
 
+	pr_err("calling mdss_mdp_overlay_start #1\n");
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
@@ -2303,7 +2304,7 @@ int mdss_mdp_async_position_update(struct msm_fb_data_type *mfd,
 		dst = (struct mdss_rect) {layer->dst.x, layer->dst.y,
 				pipe->src.w, pipe->src.h};
 
-		pr_debug("src:{%d,%d,%d,%d}, dst:{%d,%d,%d,%d}\n",
+		pr_err("src:{%d,%d,%d,%d}, dst:{%d,%d,%d,%d}\n",
 				src.x, src.y, src.w, src.h,
 				dst.x, dst.y, dst.w, dst.h);
 

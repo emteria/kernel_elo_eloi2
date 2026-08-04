@@ -1603,7 +1603,7 @@ int arm_iommu_attach_device(struct device *dev,
 	if (!s1_bypass)
 		set_dma_ops(dev, &iommu_ops);
 
-	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
+	pr_err("Attached IOMMU controller to %s device.\n", dev_name(dev));
 	return 0;
 }
 EXPORT_SYMBOL(arm_iommu_attach_device);
