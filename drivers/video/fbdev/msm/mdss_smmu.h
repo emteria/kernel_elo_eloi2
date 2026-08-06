@@ -83,12 +83,9 @@ static inline struct mdss_smmu_client *mdss_smmu_get_cb(u32 domain)
 {
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
-	if (!mdss_smmu_is_valid_domain_type(mdata, domain)) {
-		pr_err("mdss_smmu_is_valid_domain_type returned false for domain type %u\n", domain);
+	if (!mdss_smmu_is_valid_domain_type(mdata, domain))
 		return NULL;
-	}
 
-	pr_err("retrieving mdss_smmu for domain %u in mdss_smmu_get_cb with max=%u\n", domain, MDSS_IOMMU_MAX_DOMAIN);
 	return (domain >= MDSS_IOMMU_MAX_DOMAIN) ? NULL :
 			&mdata->mdss_smmu[domain];
 }
@@ -256,10 +253,8 @@ static inline int mdss_smmu_map(int domain, phys_addr_t iova, phys_addr_t phys,
 {
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
-	if (!mdata->smmu_ops.smmu_map) {
-		pr_err("no smuu_map available\n");
+	if (!mdata->smmu_ops.smmu_map)
 		return -ENODEV;
-	}
 
 	return mdata->smmu_ops.smmu_map(domain, iova, phys, gfp_order, prot);
 }
