@@ -500,7 +500,7 @@ int mdss_i2c_byte_read(struct i2c_client *client, uint8_t slave_addr,
 	struct i2c_msg msgs[2];
 	int ret = -1;
 
-	pr_err("%s: reading from slave_addr=[%x] and offset=[%x]\n",
+	pr_debug("%s: reading from slave_addr=[%x] and offset=[%x]\n",
 		 __func__, slave_addr, reg_offset);
 
 	msgs[0].addr = slave_addr >> 1;
@@ -518,7 +518,7 @@ int mdss_i2c_byte_read(struct i2c_client *client, uint8_t slave_addr,
 		pr_err("%s: I2C READ FAILED=[%d]\n", __func__, ret);
 		return -EACCES;
 	}
-	pr_err("%s: i2c buf is [%x]\n", __func__, *read_buf);
+	pr_debug("%s: i2c buf is [%x]\n", __func__, *read_buf);
 	return 0;
 }
 EXPORT_SYMBOL(mdss_i2c_byte_read);
@@ -530,7 +530,7 @@ int mdss_i2c_byte_write(struct i2c_client *client, uint8_t slave_addr,
 	uint8_t data[2];
 	int status = -EACCES;
 
-	pr_err("%s: writing from slave_addr=[%x] and offset=[%x]\n",
+	pr_debug("%s: writing from slave_addr=[%x] and offset=[%x]\n",
 		 __func__, slave_addr, reg_offset);
 
 	data[0] = reg_offset;
@@ -546,7 +546,7 @@ int mdss_i2c_byte_write(struct i2c_client *client, uint8_t slave_addr,
 		pr_err("I2C WRITE FAILED=[%d]\n", status);
 		return -EACCES;
 	}
-	pr_err("%s: I2C write status=%x\n", __func__, status);
+	pr_debug("%s: I2C write status=%x\n", __func__, status);
 	return status;
 }
 EXPORT_SYMBOL(mdss_i2c_byte_write);

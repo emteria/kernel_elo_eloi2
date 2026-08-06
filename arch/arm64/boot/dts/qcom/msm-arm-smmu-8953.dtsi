@@ -58,6 +58,23 @@
 		qcom,enable-static-cb;
 		qcom,use-3-lvl-tables;
 		qcom,disable-atos;
+		/*
+		 * EloI2 migration: this device's TZ only implements
+		 * SMMU_PROGRAM/CHANGE_PAGETABLE_FORMAT for the GPU SMMU, so an
+		 * APPS context bank can never be switched to the AArch64 (V8L)
+		 * page table format. Stay on AArch32-LPAE (V7L, 32-bit IOVA),
+		 * which needs no TZ call and matches the format TZ hands the
+		 * context banks over in. All 8953 APPS clients fit in 32 bits
+		 * (MDSS 1M..0xF0000000, venus pools 0x01000000..0xA1000000).
+		 * kgsl_smmu is deliberately left on AArch64 - TZ supports it.
+		 */
+		qcom,force-aarch32-pgtbl;
+		/*
+		 * Debug aid for the migration: log context faults instead of
+		 * BUG()ing, so a single boot shows every fault. Remove once the
+		 * display is up.
+		 */
+		qcom,non-fatal-faults;
 		#global-interrupts = <0>;
 		#size-cells = <1>;
 		#address-cells = <1>;

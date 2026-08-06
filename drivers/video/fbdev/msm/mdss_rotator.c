@@ -85,7 +85,7 @@ static int mdss_rotator_bus_scale_set_quota(struct mdss_rot_bus_data_type *bus,
 	}
 
 	if (bus->curr_quota_val == quota) {
-		pr_err("bw request already requested\n");
+		pr_debug("bw request already requested\n");
 		return 0;
 	}
 
@@ -118,7 +118,7 @@ static int mdss_rotator_bus_scale_set_quota(struct mdss_rot_bus_data_type *bus,
 	bus->curr_bw_uc_idx = new_uc_idx;
 	bus->curr_quota_val = quota;
 
-	pr_err("uc_idx=%d quota=%llu\n", new_uc_idx, quota);
+	pr_debug("uc_idx=%d quota=%llu\n", new_uc_idx, quota);
 	MDSS_XLOG(new_uc_idx, ((quota >> 32) & 0xFFFFFFFF),
 		(quota & 0xFFFFFFFF));
 	ATRACE_BEGIN("msm_bus_scale_req_rot");
@@ -144,7 +144,7 @@ static int mdss_rotator_enable_reg_bus(struct mdss_rot_mgr *mgr, u64 quota)
 		changed++;
 	}
 
-	pr_err("%s, changed=%d register bus %s\n", __func__, changed,
+	pr_debug("%s, changed=%d register bus %s\n", __func__, changed,
 		quota ? "Enable":"Disable");
 
 	if (changed) {
@@ -203,7 +203,7 @@ static unsigned long mdss_rotator_clk_rate_calc(
 	for (i = 0; i < mgr->queue_count; i++)
 		total_clk_rate = max(clk_rate[i], total_clk_rate);
 
-	pr_err("Total clk rate calc=%lu\n", total_clk_rate);
+	pr_debug("Total clk rate calc=%lu\n", total_clk_rate);
 	return total_clk_rate;
 }
 
@@ -234,7 +234,7 @@ static void mdss_rotator_set_clk_rate(struct mdss_rot_mgr *mgr,
 			if (IS_ERR_VALUE((unsigned long)ret)) {
 				pr_err("clk_set_rate failed, err:%d\n", ret);
 			} else {
-				pr_err("rotator clk rate=%lu\n", clk_rate);
+				pr_debug("rotator clk rate=%lu\n", clk_rate);
 				MDSS_XLOG(clk_rate);
 			}
 		}
@@ -253,7 +253,7 @@ static void mdss_rotator_footswitch_ctrl(struct mdss_rot_mgr *mgr, bool on)
 		return;
 	}
 
-	pr_err("%s: rotator regulators", on ? "Enable" : "Disable");
+	pr_debug("%s: rotator regulators", on ? "Enable" : "Disable");
 	ret = msm_mdss_enable_vreg(mgr->module_power.vreg_config,
 		mgr->module_power.num_vreg, on);
 	if (ret) {
@@ -287,7 +287,7 @@ static int mdss_rotator_clk_ctrl(struct mdss_rot_mgr *mgr, int enable)
 	}
 
 	if (changed) {
-		pr_err("Rotator clk %s\n", enable ? "enable" : "disable");
+		pr_debug("Rotator clk %s\n", enable ? "enable" : "disable");
 		for (i = 0; i < MDSS_CLK_ROTATOR_END_IDX; i++) {
 			clk = mgr->rot_clk[i];
 			if (enable) {
@@ -346,7 +346,7 @@ int mdss_rotator_resource_ctrl(struct mdss_rot_mgr *mgr, int enable)
 		}
 	}
 
-	pr_err("%s: res_cnt=%d changed=%d enable=%d\n",
+	pr_debug("%s: res_cnt=%d changed=%d enable=%d\n",
 		__func__, mgr->res_ref_cnt, changed, enable);
 	MDSS_XLOG(mgr->res_ref_cnt, changed, enable);
 
@@ -368,7 +368,7 @@ static bool mdss_rotator_is_work_pending(struct mdss_rot_mgr *mgr,
 
 	for (i = 0; i < mgr->queue_count; i++) {
 		if (perf->work_distribution[i]) {
-			pr_err("Work is still scheduled to complete\n");
+			pr_debug("Work is still scheduled to complete\n");
 			return true;
 		}
 	}
@@ -427,7 +427,7 @@ static int mdss_rotator_create_fence(struct mdss_rot_entry *entry)
 
 	entry->output_fence_fd = fd;
 	entry->output_fence = fence;
-	pr_err("output sync point created at %s:val=%u\n",
+	pr_debug("output sync point created at %s:val=%u\n",
 		mdss_get_sync_fence_name(fence), val);
 
 	return 0;
@@ -472,7 +472,7 @@ static int mdss_rotator_signal_output(struct mdss_rot_entry *entry)
 	rot_timeline = &entry->queue->timeline;
 
 	if (entry->output_signaled) {
-		pr_err("output already signaled\n");
+		pr_debug("output already signaled\n");
 		return 0;
 	}
 
@@ -490,7 +490,7 @@ static int mdss_rotator_wait_for_input(struct mdss_rot_entry *entry)
 	int ret;
 
 	if (!entry->input_fence) {
-		pr_err("invalid input fence, no wait\n");
+		pr_debug("invalid input fence, no wait\n");
 		return 0;
 	}
 
@@ -858,7 +858,7 @@ static int mdss_rotator_init_queue(struct mdss_rot_mgr *mgr)
 
 	for (i = 0; i < mgr->queue_count; i++) {
 		snprintf(name, sizeof(name), "rot_workq_%d", i);
-		pr_err("work queue name=%s\n", name);
+		pr_debug("work queue name=%s\n", name);
 		mgr->queues[i].rot_work_queue = alloc_ordered_workqueue("%s",
 				WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_HIGHPRI, name);
 		if (!mgr->queues[i].rot_work_queue) {
@@ -867,7 +867,7 @@ static int mdss_rotator_init_queue(struct mdss_rot_mgr *mgr)
 		}
 
 		snprintf(name, sizeof(name), "rot_timeline_%d", i);
-		pr_err("timeline name=%s\n", name);
+		pr_debug("timeline name=%s\n", name);
 		mgr->queues[i].timeline.timeline =
 			mdss_create_timeline(name);
 		if (!mgr->queues[i].timeline.timeline) {
@@ -1297,7 +1297,7 @@ static bool mdss_rotator_verify_format(struct mdss_rot_mgr *mgr,
 		}
 	}
 
-	pr_err("in_fmt=%0d, out_fmt=%d, has_ubwc=%d\n",
+	pr_debug("in_fmt=%0d, out_fmt=%d, has_ubwc=%d\n",
 		in_fmt->format, out_fmt->format, mgr->has_ubwc);
 	return true;
 }
@@ -1551,7 +1551,7 @@ static int mdss_rotator_add_request(struct mdss_rot_mgr *mgr,
 		}
 		item->output.fence = entry->output_fence_fd;
 
-		pr_err("Entry added. wbidx=%u, src{%u,%u,%u,%u}f=%u\n"
+		pr_debug("Entry added. wbidx=%u, src{%u,%u,%u,%u}f=%u\n"
 			"dst{%u,%u,%u,%u}f=%u session_id=%u\n", item->wb_idx,
 			item->src_rect.x, item->src_rect.y,
 			item->src_rect.w, item->src_rect.h, item->input.format,
@@ -1612,7 +1612,7 @@ static void mdss_rotator_cancel_all_requests(struct mdss_rot_mgr *mgr,
 {
 	struct mdss_rot_entry_container *req, *req_next;
 
-	pr_err("Canceling all rotator requests\n");
+	pr_debug("Canceling all rotator requests\n");
 
 	mutex_lock(&private->req_lock);
 	list_for_each_entry_safe(req, req_next, &private->req_list, list)
@@ -1641,7 +1641,7 @@ static void mdss_rotator_release_rotator_perf_session(
 {
 	struct mdss_rot_perf *perf, *perf_next;
 
-	pr_err("Releasing all rotator request\n");
+	pr_debug("Releasing all rotator request\n");
 	mdss_rotator_cancel_all_requests(mgr, private);
 
 	mutex_lock(&private->perf_lock);
@@ -1770,7 +1770,7 @@ static int mdss_rotator_config_hw(struct mdss_rot_hw_resource *hw,
 	}
 
 	ret = mdss_mdp_pipe_queue_data(pipe, &entry->src_buf);
-	pr_err("Config pipe. src{%u,%u,%u,%u}f=%u\n"
+	pr_debug("Config pipe. src{%u,%u,%u,%u}f=%u\n"
 		"dst{%u,%u,%u,%u}f=%u session_id=%u\n",
 		item->src_rect.x, item->src_rect.y,
 		item->src_rect.w, item->src_rect.h, item->input.format,
@@ -2003,7 +2003,7 @@ static int mdss_rotator_open_session(struct mdss_rot_mgr *mgr,
 		pr_err("fail to open session, not enough clk/bw\n");
 		goto perf_err;
 	}
-	pr_err("open session id=%u in{%u,%u}f:%u out{%u,%u}f:%u\n",
+	pr_debug("open session id=%u in{%u,%u}f:%u out{%u,%u}f:%u\n",
 		config.session_id, config.input.width, config.input.height,
 		config.input.format, config.output.width, config.output.height,
 		config.output.format);
@@ -2046,7 +2046,7 @@ static int mdss_rotator_close_session(struct mdss_rot_mgr *mgr,
 	ATRACE_BEGIN(__func__);
 	mutex_lock(&perf->work_dis_lock);
 	if (mdss_rotator_is_work_pending(mgr, perf)) {
-		pr_err("Work is still pending, offload free to wq\n");
+		pr_debug("Work is still pending, offload free to wq\n");
 		mutex_lock(&mgr->bus_lock);
 		mgr->pending_close_bw_vote += perf->bw;
 		mutex_unlock(&mgr->bus_lock);
@@ -2065,7 +2065,7 @@ static int mdss_rotator_close_session(struct mdss_rot_mgr *mgr,
 	mdss_rotator_update_perf(mgr);
 	mdss_rotator_clk_ctrl(rot_mgr, false);
 done:
-	pr_err("Closed session id:%u", id);
+	pr_debug("Closed session id:%u", id);
 	ATRACE_END(__func__);
 	mutex_unlock(&mgr->lock);
 	return 0;
@@ -2113,7 +2113,7 @@ static int mdss_rotator_config_session(struct mdss_rot_mgr *mgr,
 
 	ret = mdss_rotator_update_perf(mgr);
 
-	pr_err("reconfig session id=%u in{%u,%u}f:%u out{%u,%u}f:%u\n",
+	pr_debug("reconfig session id=%u in{%u,%u}f:%u out{%u,%u}f:%u\n",
 		config.session_id, config.input.width, config.input.height,
 		config.input.format, config.output.width, config.output.height,
 		config.output.format);
@@ -2771,7 +2771,7 @@ error:
 
 static void mdss_rotator_bus_scale_unregister(struct mdss_rot_mgr *mgr)
 {
-	pr_err("unregister bus_hdl=%x, reg_bus_hdl=%x\n",
+	pr_debug("unregister bus_hdl=%x, reg_bus_hdl=%x\n",
 		mgr->data_bus.bus_hdl, mgr->reg_bus.bus_hdl);
 
 	if (mgr->data_bus.bus_hdl)
@@ -2795,7 +2795,7 @@ static int mdss_rotator_bus_scale_register(struct mdss_rot_mgr *mgr)
 		pr_err("bus_client register failed\n");
 		return -EINVAL;
 	}
-	pr_err("registered bus_hdl=%x\n", mgr->data_bus.bus_hdl);
+	pr_debug("registered bus_hdl=%x\n", mgr->data_bus.bus_hdl);
 
 	if (mgr->reg_bus.bus_scale_pdata) {
 		mgr->reg_bus.bus_hdl =
@@ -2806,7 +2806,7 @@ static int mdss_rotator_bus_scale_register(struct mdss_rot_mgr *mgr)
 			mdss_rotator_bus_scale_unregister(mgr);
 			return -EINVAL;
 		}
-		pr_err("registered register bus_hdl=%x\n",
+		pr_debug("registered register bus_hdl=%x\n",
 			mgr->reg_bus.bus_hdl);
 	}
 
@@ -2818,7 +2818,7 @@ static int mdss_rotator_clk_register(struct platform_device *pdev,
 {
 	struct clk *tmp;
 
-	pr_err("registered clk_reg\n");
+	pr_debug("registered clk_reg\n");
 
 	if (clk_idx >= MDSS_CLK_ROTATOR_END_IDX) {
 		pr_err("invalid clk index %d\n", clk_idx);

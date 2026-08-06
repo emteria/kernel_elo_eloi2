@@ -183,7 +183,7 @@ static int hdmi_panel_get_vic(struct mdss_panel_info *pinfo,
 		h_total = timing.active_h + timing.back_porch_h +
 			timing.front_porch_h + timing.pulse_width_h;
 
-		pr_err("ah=%d bph=%d fph=%d pwh=%d ht=%d\n",
+		pr_debug("ah=%d bph=%d fph=%d pwh=%d ht=%d\n",
 			timing.active_h, timing.back_porch_h,
 			timing.front_porch_h, timing.pulse_width_h,
 			h_total);
@@ -196,7 +196,7 @@ static int hdmi_panel_get_vic(struct mdss_panel_info *pinfo,
 		v_total = timing.active_v + timing.back_porch_v +
 			timing.front_porch_v + timing.pulse_width_v;
 
-		pr_err("av=%d bpv=%d fpv=%d pwv=%d vt=%d\n",
+		pr_debug("av=%d bpv=%d fpv=%d pwv=%d vt=%d\n",
 			timing.active_v, timing.back_porch_v,
 			timing.front_porch_v, timing.pulse_width_v, v_total);
 
@@ -209,7 +209,7 @@ static int hdmi_panel_get_vic(struct mdss_panel_info *pinfo,
 			return -EPERM;
 		}
 
-		pr_err("pixel_freq=%d refresh_rate=%d\n",
+		pr_debug("pixel_freq=%d refresh_rate=%d\n",
 			timing.pixel_freq, timing.refresh_rate);
 
 		new_vic = hdmi_get_video_id_code(&timing, ds_data);
@@ -692,7 +692,7 @@ static int hdmi_panel_setup_scrambler(struct hdmi_panel *panel)
 
 	/* Scrambling is supported from HDMI TX 4.0 */
 	if (panel->version < HDMI_TX_SCRAMBLER_MIN_TX_VERSION) {
-		pr_err("scrambling not supported by tx\n");
+		pr_debug("scrambling not supported by tx\n");
 		return 0;
 	}
 
@@ -703,7 +703,7 @@ static int hdmi_panel_setup_scrambler(struct hdmi_panel *panel)
 		scrambler_on = panel->data->scrambler;
 	}
 
-	pr_err("scrambler %s\n", scrambler_on ? "on" : "off");
+	pr_debug("scrambler %s\n", scrambler_on ? "on" : "off");
 
 	if (scrambler_on) {
 		rc = hdmi_scdc_write(panel->ddc,
@@ -743,7 +743,7 @@ static int hdmi_panel_setup_scrambler(struct hdmi_panel *panel)
 			timeout_hsync = HDMI_DEFAULT_TIMEOUT_HSYNC;
 		}
 
-		pr_err("timeout for scrambling en: %d hsyncs\n",
+		pr_debug("timeout for scrambling en: %d hsyncs\n",
 			timeout_hsync);
 
 		rc = hdmi_setup_ddc_timers(panel->ddc,
@@ -822,7 +822,7 @@ static int hdmi_panel_power_on(void *input)
 	if (panel->vic != panel->data->vic) {
 		res_changed = true;
 
-		pr_err("switching from %d => %d\n",
+		pr_debug("switching from %d => %d\n",
 			panel->vic, panel->data->vic);
 
 		panel->vic = panel->data->vic;
@@ -837,7 +837,7 @@ static int hdmi_panel_power_on(void *input)
 			hdmi_panel_set_vendor_specific_infoframe(panel);
 			hdmi_panel_set_spd_infoframe(panel);
 
-			pr_err("handoff done\n");
+			pr_debug("handoff done\n");
 
 			goto end;
 		}
@@ -870,7 +870,7 @@ end:
 	panel->on = true;
 
 	info = panel->vid_cfg.timing;
-	pr_err("%dx%d%s@%dHz %dMHz %s (%d)\n",
+	pr_debug("%dx%d%s@%dHz %dMHz %s (%d)\n",
 		info->active_h, info->active_v,
 		info->interlaced ? "i" : "p",
 		info->refresh_rate / 1000,
@@ -887,7 +887,7 @@ static int hdmi_panel_power_off(void *input)
 
 	panel->on = false;
 
-	pr_err("panel off\n");
+	pr_debug("panel off\n");
 	return 0;
 }
 

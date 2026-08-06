@@ -273,7 +273,7 @@ static int adv7533_write(struct adv7533 *pdata, u8 offset, u8 reg, u8 val)
 	int ret = 0;
 
 	if (!pdata) {
-		pr_err("%s: Invalid argument\n", __func__);
+		pr_debug("%s: Invalid argument\n", __func__);
 		return -EINVAL;
 	}
 
@@ -298,7 +298,7 @@ static int adv7533_read(struct adv7533 *pdata, u8 offset,
 	int ret = 0;
 
 	if (!pdata) {
-		pr_err("%s: Invalid argument\n", __func__);
+		pr_debug("%s: Invalid argument\n", __func__);
 		return -EINVAL;
 	}
 
@@ -566,28 +566,28 @@ static int adv7533_parse_dt(struct device *dev,
 	int ret = 0;
 
 	ret = of_property_read_u32(np, "instance_id", &temp_val);
-	pr_err("%s: DT property %s is %X\n", __func__, "instance_id",
+	pr_debug("%s: DT property %s is %X\n", __func__, "instance_id",
 		temp_val);
 	if (ret)
 		goto end;
 	pdata->dev_info.instance_id = temp_val;
 
 	ret = of_property_read_u32(np, "adi,main-addr", &temp_val);
-	pr_err("%s: DT property %s is %X\n", __func__, "adi,main-addr",
+	pr_debug("%s: DT property %s is %X\n", __func__, "adi,main-addr",
 		temp_val);
 	if (ret)
 		goto end;
 	pdata->main_i2c_addr = (u8)temp_val;
 
 	ret = of_property_read_u32(np, "adi,cec-dsi-addr", &temp_val);
-	pr_err("%s: DT property %s is %X\n", __func__, "adi,cec-dsi-addr",
+	pr_debug("%s: DT property %s is %X\n", __func__, "adi,cec-dsi-addr",
 		temp_val);
 	if (ret)
 		goto end;
 	pdata->cec_dsi_i2c_addr = (u8)temp_val;
 
 	ret = of_property_read_u32(np, "adi,video-mode", &temp_val);
-	pr_err("%s: DT property %s is %X\n", __func__, "adi,video-mode",
+	pr_debug("%s: DT property %s is %X\n", __func__, "adi,video-mode",
 		temp_val);
 	if (ret)
 		goto end;
@@ -744,7 +744,7 @@ static void adv7533_notify_clients(struct msm_dba_device_info *dev,
 	list_for_each(pos, &dev->client_list) {
 		c = list_entry(pos, struct msm_dba_client_info, list);
 
-		pr_err("%s: notifying event %d to client %s\n", __func__,
+		pr_debug("%s: notifying event %d to client %s\n", __func__,
 			event, c->client_name);
 
 		if (c && c->cb)
@@ -761,11 +761,11 @@ u32 adv7533_read_edid(struct adv7533 *pdata, u32 size, char *edid_buf)
 	if (!pdata || !edid_buf)
 		return 0;
 
-	pr_err("%s: size %d\n", __func__, size);
+	pr_debug("%s: size %d\n", __func__, size);
 
 	adv7533_read(pdata, I2C_ADDR_MAIN, 0x43, &edid_addr, 1);
 
-	pr_err("%s: edid address 0x%x\n", __func__, edid_addr);
+	pr_debug("%s: edid address 0x%x\n", __func__, edid_addr);
 
 	adv7533_read(pdata, edid_addr >> 1, 0x00, edid_buf, read_size);
 
@@ -773,7 +773,7 @@ u32 adv7533_read_edid(struct adv7533 *pdata, u32 size, char *edid_buf)
 		edid_buf + read_size, read_size);
 
 	for (ndx = 0; ndx < size; ndx += 4)
-		pr_err("%s: EDID[%02x-%02x] %02x %02x %02x %02x\n",
+		pr_debug("%s: EDID[%02x-%02x] %02x %02x %02x %02x\n",
 			__func__, ndx, ndx + 3,
 			edid_buf[ndx + 0], edid_buf[ndx + 1],
 			edid_buf[ndx + 2], edid_buf[ndx + 3]);
@@ -807,7 +807,7 @@ static int adv7533_cec_prepare_msg(struct adv7533 *pdata, u8 *msg, u32 size)
 
 	/* write operands */
 	for (i = 0; i < op_sz && i < MAX_OPERAND_SIZE; i++) {
-		pr_err("%s: writing operands\n", __func__);
+		pr_debug("%s: writing operands\n", __func__);
 		ret = adv7533_write(pdata, I2C_ADDR_CEC_DSI, 0x72 + i, msg[i + 2]);
 	}
 
@@ -855,7 +855,7 @@ static void adv7533_handle_hdcp_intr(struct adv7533 *pdata, u8 hdcp_status)
 
 	/* HDCP ready for read */
 	if (hdcp_status & BIT(6))
-		pr_err("%s: BKSV FLAG\n", __func__);
+		pr_debug("%s: BKSV FLAG\n", __func__);
 
 	/* check for HDCP error */
 	if (hdcp_status & BIT(7)) {
@@ -866,7 +866,7 @@ static void adv7533_handle_hdcp_intr(struct adv7533 *pdata, u8 hdcp_status)
 
 		switch (ddc_status & 0xF0 >> 4) {
 		case 0:
-			pr_err("%s: DDC: NO ERROR\n", __func__);
+			pr_debug("%s: DDC: NO ERROR\n", __func__);
 			break;
 		case 1:
 			pr_err("%s: DDC: BAD RX BKSV\n", __func__);
@@ -887,7 +887,7 @@ static void adv7533_handle_hdcp_intr(struct adv7533 *pdata, u8 hdcp_status)
 			pr_err("%s: DDC: MAX CAS EXC\n", __func__);
 			break;
 		default:
-			pr_err("%s: DDC: UNKNOWN ERROR\n", __func__);
+			pr_debug("%s: DDC: UNKNOWN ERROR\n", __func__);
 		}
 	}
 end:
@@ -912,13 +912,13 @@ static void adv7533_handle_cec_intr(struct adv7533 *pdata, u8 cec_status)
 	}
 
 	if (cec_status & BIT(5))
-		pr_err("%s: CEC TX READY\n", __func__);
+		pr_debug("%s: CEC TX READY\n", __func__);
 
 	if (cec_status & BIT(4))
-		pr_err("%s: CEC TX Arbitration lost\n", __func__);
+		pr_debug("%s: CEC TX Arbitration lost\n", __func__);
 
 	if (cec_status & BIT(3))
-		pr_err("%s: CEC TX retry timout\n", __func__);
+		pr_debug("%s: CEC TX retry timout\n", __func__);
 
 	if (!cec_rx_intr)
 		return;
@@ -929,7 +929,7 @@ static void adv7533_handle_cec_intr(struct adv7533 *pdata, u8 cec_status)
 	adv7533_read(pdata, I2C_ADDR_CEC_DSI, 0x96, &cec_rx_timestamp, 1);
 
 	if (cec_rx_ready & BIT(0)) {
-		pr_err("%s: CEC Rx buffer 1 ready\n", __func__);
+		pr_debug("%s: CEC Rx buffer 1 ready\n", __func__);
 		adv7533_rd_cec_msg(pdata,
 			pdata->cec_msg[ADV7533_CEC_BUF1].buf,
 			ADV7533_CEC_BUF1);
@@ -944,7 +944,7 @@ static void adv7533_handle_cec_intr(struct adv7533 *pdata, u8 cec_status)
 	}
 
 	if (cec_rx_ready & BIT(1)) {
-		pr_err("%s: CEC Rx buffer 2 ready\n", __func__);
+		pr_debug("%s: CEC Rx buffer 2 ready\n", __func__);
 		adv7533_rd_cec_msg(pdata,
 			pdata->cec_msg[ADV7533_CEC_BUF2].buf,
 			ADV7533_CEC_BUF2);
@@ -959,7 +959,7 @@ static void adv7533_handle_cec_intr(struct adv7533 *pdata, u8 cec_status)
 	}
 
 	if (cec_rx_ready & BIT(2)) {
-		pr_err("%s: CEC Rx buffer 3 ready\n", __func__);
+		pr_debug("%s: CEC Rx buffer 3 ready\n", __func__);
 		adv7533_rd_cec_msg(pdata,
 			pdata->cec_msg[ADV7533_CEC_BUF3].buf,
 			ADV7533_CEC_BUF3);
@@ -1018,14 +1018,14 @@ static void *adv7533_handle_hpd_intr(struct adv7533 *pdata)
 	disconnected = !(hpd_state & (BIT(5) | BIT(6)));
 
 	if (connected) {
-		pr_err("%s: Rx CONNECTED\n", __func__);
+		pr_debug("%s: Rx CONNECTED\n", __func__);
 	} else if (disconnected) {
-		pr_err("%s: Rx DISCONNECTED\n", __func__);
+		pr_debug("%s: Rx DISCONNECTED\n", __func__);
 
 		adv7533_notify_clients(&pdata->dev_info,
 			MSM_DBA_CB_HPD_DISCONNECT);
 	} else {
-		pr_err("%s: HPD Intermediate state\n", __func__);
+		pr_debug("%s: HPD Intermediate state\n", __func__);
 	}
 
 	ret = connected ? 1 : 0;
@@ -1054,7 +1054,7 @@ static int adv7533_enable_interrupts(struct adv7533 *pdata, int interrupts)
 		reg_val |= EDID_INTERRUPTS;
 
 	if (reg_val != init_reg_val) {
-		pr_err("%s: enabling 0x94 interrupts\n", __func__);
+		pr_debug("%s: enabling 0x94 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x94, reg_val);
 	}
 
@@ -1066,7 +1066,7 @@ static int adv7533_enable_interrupts(struct adv7533 *pdata, int interrupts)
 		reg_val |= CEC_INTERRUPTS;
 
 	if (reg_val != init_reg_val) {
-		pr_err("%s: enabling 0x95 interrupts\n", __func__);
+		pr_debug("%s: enabling 0x95 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x95, reg_val);
 	}
 end:
@@ -1094,7 +1094,7 @@ static int adv7533_disable_interrupts(struct adv7533 *pdata, int interrupts)
 		reg_val &= ~EDID_INTERRUPTS;
 
 	if (reg_val != init_reg_val) {
-		pr_err("%s: disabling 0x94 interrupts\n", __func__);
+		pr_debug("%s: disabling 0x94 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x94, reg_val);
 	}
 
@@ -1106,7 +1106,7 @@ static int adv7533_disable_interrupts(struct adv7533 *pdata, int interrupts)
 		reg_val &= ~CEC_INTERRUPTS;
 
 	if (reg_val != init_reg_val) {
-		pr_err("%s: disabling 0x95 interrupts\n", __func__);
+		pr_debug("%s: disabling 0x95 interrupts\n", __func__);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x95, reg_val);
 	}
 end:
@@ -1148,7 +1148,7 @@ static void adv7533_intr_work(struct work_struct *work)
 
 	/* EDID ready for read */
 	if ((int_status & BIT(2)) && pdata->is_power_on) {
-		pr_err("%s: EDID READY\n", __func__);
+		pr_debug("%s: EDID READY\n", __func__);
 
 		ret = adv7533_read_edid(pdata, sizeof(pdata->edid_buf),
 			pdata->edid_buf);
@@ -1337,7 +1337,7 @@ static int adv7533_check_hpd(void *client, u32 flags)
 
 	connected  = (reg_val & BIT(6));
 	if (connected) {
-		pr_err("%s: cable is connected\n", __func__);
+		pr_debug("%s: cable is connected\n", __func__);
 		/* Clear the interrupts before initiating EDID read */
 		adv7533_read(pdata, I2C_ADDR_MAIN, 0x96, &intr_status, 1);
 		adv7533_write(pdata, I2C_ADDR_MAIN, 0x96, intr_status);
@@ -1362,7 +1362,7 @@ static int adv7533_power_on(void *client, bool on, u32 flags)
 		return ret;
 	}
 
-	pr_err("%s: %d\n", __func__, on);
+	pr_debug("%s: %d\n", __func__, on);
 	mutex_lock(&pdata->ops_mutex);
 
 	if (on && !pdata->is_power_on) {
@@ -1417,7 +1417,7 @@ static void adv7533_video_setup(struct adv7533 *pdata,
 		h_total, cfg->h_active, cfg->h_front_porch,
 		cfg->h_pulse_width, cfg->h_back_porch);
 
-	pr_err("v_total 0x%x, v_active 0x%x, vfp 0x%x, vpw 0x%x, vbp 0x%x\n",
+	pr_debug("v_total 0x%x, v_active 0x%x, vfp 0x%x, vpw 0x%x, vbp 0x%x\n",
 		v_total, cfg->v_active, cfg->v_front_porch,
 		cfg->v_pulse_width, cfg->v_back_porch);
 
@@ -2093,7 +2093,7 @@ static int adv7533_probe(struct i2c_client *client,
 	}
 
 	if (pdata->audio) {
-		pr_err("%s: enabling default audio configs\n", __func__);
+		pr_debug("%s: enabling default audio configs\n", __func__);
 		if (adv7533_write_array(pdata, I2S_cfg, sizeof(I2S_cfg)))
 			goto end;
 	}

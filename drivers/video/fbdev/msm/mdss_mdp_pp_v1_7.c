@@ -342,7 +342,7 @@ static void pp_opmode_config(int location, struct pp_sts_type *pp_sts,
 		break;
 	case LM:
 		if (pp_sts->argc_sts & PP_STS_ENABLE)
-			pr_err("pgc in LM enabled\n");
+			pr_debug("pgc in LM enabled\n");
 		break;
 	default:
 		pr_err("Invalid block type %d\n", location);
@@ -453,7 +453,7 @@ static int pp_hist_lut_set_config(char __iomem *base_addr,
 	}
 
 	if (lut_cfg_data->ops & MDP_PP_OPS_DISABLE) {
-		pr_err("Disable Hist LUT\n");
+		pr_debug("Disable Hist LUT\n");
 		goto bail_out;
 	}
 
@@ -462,7 +462,7 @@ static int pp_hist_lut_set_config(char __iomem *base_addr,
 		return ret;
 	}
 	if (!(lut_cfg_data->ops & MDP_PP_OPS_WRITE)) {
-		pr_err("non write ops set %d\n", lut_cfg_data->ops);
+		pr_debug("non write ops set %d\n", lut_cfg_data->ops);
 		goto bail_out;
 	}
 	lut_data = lut_cfg_data->cfg_payload;
@@ -554,12 +554,12 @@ static int pp_dither_set_config(char __iomem *base_addr,
 		return -EINVAL;
 	}
 	if (dither_cfg_data->flags & MDP_PP_OPS_DISABLE) {
-		pr_err("set disable dither\n");
+		pr_debug("set disable dither\n");
 		goto bail_out;
 	}
 
 	if (!(dither_cfg_data->flags & MDP_PP_OPS_WRITE)) {
-		pr_err("non write ops set %d\n", dither_cfg_data->flags);
+		pr_debug("non write ops set %d\n", dither_cfg_data->flags);
 		goto bail_out;
 	}
 
@@ -847,12 +847,12 @@ static int pp_gamut_set_config(char __iomem *base_addr,
 		return -EINVAL;
 	}
 	if (!(gamut_cfg_data->flags & ~(MDP_PP_OPS_READ))) {
-		pr_err("only read ops is set %d", gamut_cfg_data->flags);
+		pr_debug("only read ops is set %d", gamut_cfg_data->flags);
 		return 0;
 	}
 
 	if (gamut_cfg_data->flags & MDP_PP_OPS_DISABLE) {
-		pr_err("disabling gamut\n");
+		pr_debug("disabling gamut\n");
 		goto bail_out;
 	}
 
@@ -1312,7 +1312,7 @@ static int pp_pa_set_config(char __iomem *base_addr,
 		return 0;
 	}
 	if (pa_cfg_data->flags & MDP_PP_OPS_DISABLE) {
-		pr_err("Disable PA");
+		pr_debug("Disable PA");
 		goto pa_set_sts;
 	}
 
@@ -1722,7 +1722,7 @@ static int pp_igc_set_config(char __iomem *base_addr,
 		return -EINVAL;
 	}
 	if (!(lut_cfg_data->ops & MDP_PP_OPS_WRITE)) {
-		pr_err("non write ops set %d\n", lut_cfg_data->ops);
+		pr_debug("non write ops set %d\n", lut_cfg_data->ops);
 		goto bail_out;
 	}
 	lut_data = lut_cfg_data->cfg_payload;
@@ -1755,7 +1755,7 @@ static int pp_igc_set_config(char __iomem *base_addr,
 	c1 = c0 + 4;
 	c2 = c1 + 4;
 	data = IGC_INDEX_UPDATE | IGC_CONFIG_MASK(lut_cfg_data->block);
-	pr_err("data %x block type %d mask %x\n",
+	pr_debug("data %x block type %d mask %x\n",
 		  data, lut_cfg_data->block,
 		  IGC_CONFIG_MASK(lut_cfg_data->block));
 	writel_relaxed((lut_data->c0_c1_data[0] & IGC_DATA_MASK) | data, c0);
@@ -1839,7 +1839,7 @@ static int pp_igc_get_config(char __iomem *base_addr, void *cfg_data,
 	}
 	c2_data = &c0c1_data[IGC_LUT_ENTRIES];
 	data = IGC_INDEX_VALUE_UPDATE | IGC_CONFIG_MASK(lut_cfg_data->block);
-	pr_err("data %x block type %d mask %x\n",
+	pr_debug("data %x block type %d mask %x\n",
 		  data, lut_cfg_data->block,
 		  IGC_CONFIG_MASK(lut_cfg_data->block));
 	c1 = base_addr + 4;
@@ -1892,11 +1892,11 @@ static int pp_pgc_set_config(char __iomem *base_addr,
 		return -EINVAL;
 	}
 	if (!(pgc_data->flags & ~(MDP_PP_OPS_READ))) {
-		pr_err("only read ops is set %d", pgc_data->flags);
+		pr_debug("only read ops is set %d", pgc_data->flags);
 		return 0;
 	}
 	if (pgc_data->flags & MDP_PP_OPS_DISABLE) {
-		pr_err("disable GC\n");
+		pr_debug("disable GC\n");
 		goto set_ops;
 	}
 

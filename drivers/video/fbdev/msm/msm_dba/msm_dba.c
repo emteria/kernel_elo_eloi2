@@ -33,7 +33,7 @@ void *msm_dba_register_client(struct msm_dba_reg_info *info,
 	struct msm_dba_device_info *device = NULL;
 	struct msm_dba_client_info *client = NULL;
 
-	pr_err("%s: ENTER\n", __func__);
+	pr_debug("%s: ENTER\n", __func__);
 
 	if (!info || !ops) {
 		pr_err("%s: Invalid params\n", __func__);
@@ -42,7 +42,7 @@ void *msm_dba_register_client(struct msm_dba_reg_info *info,
 
 	mutex_lock(&register_mutex);
 
-	pr_err("%s: Client(%s) Chip(%s) Instance(%d)\n", __func__,
+	pr_debug("%s: Client(%s) Chip(%s) Instance(%d)\n", __func__,
 		 info->client_name, info->chip_name, info->instance_id);
 
 	rc = msm_dba_get_probed_device(info, &device);
@@ -54,7 +54,7 @@ void *msm_dba_register_client(struct msm_dba_reg_info *info,
 		return ERR_PTR(rc);
 	}
 
-	pr_err("%s: Client(%s) device found\n", __func__, info->client_name);
+	pr_debug("%s: Client(%s) device found\n", __func__, info->client_name);
 
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client) {
@@ -93,7 +93,7 @@ void *msm_dba_register_client(struct msm_dba_reg_info *info,
 
 	mutex_unlock(&register_mutex);
 
-	pr_err("%s: EXIT\n", __func__);
+	pr_debug("%s: EXIT\n", __func__);
 	return client;
 }
 EXPORT_SYMBOL(msm_dba_register_client);
@@ -106,7 +106,7 @@ int msm_dba_deregister_client(void *client)
 	struct list_head *tmp = NULL;
 	struct list_head *position = NULL;
 
-	pr_err("%s: ENTER\n", __func__);
+	pr_debug("%s: ENTER\n", __func__);
 
 	if (!handle) {
 		pr_err("%s: Invalid Params\n", __func__);
@@ -115,7 +115,7 @@ int msm_dba_deregister_client(void *client)
 
 	mutex_lock(&register_mutex);
 
-	pr_err("%s: Client(%s) Chip(%s) Instance(%d)\n", __func__,
+	pr_debug("%s: Client(%s) Chip(%s) Instance(%d)\n", __func__,
 		 handle->client_name, handle->dev->chip_name,
 		 handle->dev->instance_id);
 
@@ -145,7 +145,7 @@ int msm_dba_deregister_client(void *client)
 
 	mutex_unlock(&register_mutex);
 
-	pr_err("%s: EXIT (%d)\n", __func__, rc);
+	pr_debug("%s: EXIT (%d)\n", __func__, rc);
 	return rc;
 }
 EXPORT_SYMBOL(msm_dba_deregister_client);

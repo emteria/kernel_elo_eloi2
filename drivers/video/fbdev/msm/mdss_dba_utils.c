@@ -93,7 +93,7 @@ static void mdss_dba_utils_notify_display(
 	int state = 0;
 
 	if (!udata) {
-		pr_err("invalid input\n");
+		pr_debug("invalid input\n");
 		return;
 	}
 
@@ -106,7 +106,7 @@ static void mdss_dba_utils_notify_display(
 
 	extcon_set_state_sync(&udata->sdev_display, 0, val);
 
-	pr_err("cable state %s %d\n",
+	pr_debug("cable state %s %d\n",
 		udata->sdev_display.state == state ?
 		"is same" : "switched to",
 		udata->sdev_display.state);
@@ -118,7 +118,7 @@ static void mdss_dba_utils_notify_audio(
 	int state = 0;
 
 	if (!udata) {
-		pr_err("invalid input\n");
+		pr_debug("invalid input\n");
 		return;
 	}
 
@@ -131,7 +131,7 @@ static void mdss_dba_utils_notify_audio(
 
 	extcon_set_state_sync(&udata->sdev_audio, 0, val);
 
-	pr_err("audio state %s %d\n",
+	pr_debug("audio state %s %d\n",
 		udata->sdev_audio.state == state ?
 		"is same" : "switched to",
 		udata->sdev_audio.state);
@@ -144,7 +144,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_connected(struct device *dev,
 	struct mdss_dba_utils_data *udata = NULL;
 
 	if (!dev) {
-		pr_err("invalid device\n");
+		pr_debug("invalid device\n");
 		return -EINVAL;
 	}
 
@@ -156,7 +156,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_connected(struct device *dev,
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->hpd_state);
-	pr_err("'%d'\n", udata->hpd_state);
+	pr_debug("'%d'\n", udata->hpd_state);
 
 	return ret;
 }
@@ -168,7 +168,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_video_mode(struct device *dev,
 	struct mdss_dba_utils_data *udata = NULL;
 
 	if (!dev) {
-		pr_err("invalid device\n");
+		pr_debug("invalid device\n");
 		return -EINVAL;
 	}
 
@@ -180,7 +180,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_video_mode(struct device *dev,
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->current_vic);
-	pr_err("'%d'\n", udata->current_vic);
+	pr_debug("'%d'\n", udata->current_vic);
 
 	return ret;
 }
@@ -193,17 +193,17 @@ static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 
 	udata = mdss_dba_utils_get_data(dev);
 	if (!udata) {
-		pr_err("%s: invalid input\n", __func__);
+		pr_debug("%s: invalid input\n", __func__);
 		return -EINVAL;
 	}
 
 	rc = kstrtoint(buf, 10, &hpd);
 	if (rc) {
-		pr_err("%s: kstrtoint failed\n", __func__);
+		pr_debug("%s: kstrtoint failed\n", __func__);
 		return -EINVAL;
 	}
 
-	pr_err("%s: set value: %d hpd state: %d\n", __func__,
+	pr_debug("%s: set value: %d hpd state: %d\n", __func__,
 					hpd, udata->hpd_state);
 	if (!hpd) {
 		if (udata->ops.power_on)
@@ -241,7 +241,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_hpd(struct device *dev,
 	}
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->hpd_state);
-	pr_err("'%d'\n", udata->hpd_state);
+	pr_debug("'%d'\n", udata->hpd_state);
 
 	return ret;
 }
@@ -301,7 +301,7 @@ static bool mdss_dba_check_audio_support(struct mdss_dba_utils_data *udata)
 	struct msm_hdmi_audio_edid_blk audio_blk;
 
 	if (!udata) {
-		pr_err("%s: Invalid input\n", __func__);
+		pr_debug("%s: Invalid input\n", __func__);
 		return false;
 	}
 	memset(&audio_blk, 0, sizeof(audio_blk));
@@ -335,7 +335,7 @@ static void mdss_dba_utils_dba_cb(void *data, enum msm_dba_callback_event event)
 		return;
 	}
 
-	pr_err("event: %d\n", event);
+	pr_debug("event: %d\n", event);
 
 	if (udata->pinfo)
 		pluggable = udata->pinfo->is_pluggable;
@@ -541,7 +541,7 @@ static int mdss_dba_get_vic_panel_info(struct mdss_dba_utils_data *udata,
 	ds_data.ds_max_clk = MSM_DBA_MAX_PCLK;
 
 	vic = hdmi_get_video_id_code(&timing, &ds_data);
-	pr_err("%s: current vic code is %d\n", __func__, vic);
+	pr_debug("%s: current vic code is %d\n", __func__, vic);
 
 	return vic;
 }

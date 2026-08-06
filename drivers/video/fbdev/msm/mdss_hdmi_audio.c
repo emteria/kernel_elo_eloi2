@@ -99,7 +99,7 @@ static void hdmi_audio_get_audio_sample_rate(u32 *sample_rate_hz)
 		*sample_rate_hz = AUDIO_SAMPLE_RATE_192KHZ;
 		break;
 	default:
-		pr_err("%d unchanged\n", rate);
+		pr_debug("%d unchanged\n", rate);
 		break;
 	}
 }
@@ -164,7 +164,7 @@ static void hdmi_audio_acr_enable(struct hdmi_audio *audio)
 
 	layout = params->num_of_channels == AUDIO_CHANNEL_2 ? 0 : 1;
 
-	pr_err("n=%u, cts=%u, layout=%u\n", acr.n, acr.cts, layout);
+	pr_debug("n=%u, cts=%u, layout=%u\n", acr.n, acr.cts, layout);
 
 	/* AUDIO_PRIORITY | SOURCE */
 	acr_pkt_ctl = BIT(31) | BIT(8);
@@ -350,7 +350,7 @@ static int hdmi_audio_on(void *ctx, u32 pclk,
 	hdmi_audio_acr_setup(audio, true);
 	hdmi_audio_infoframe_setup(audio, true);
 
-	pr_err("HDMI Audio: Enabled\n");
+	pr_debug("HDMI Audio: Enabled\n");
 end:
 	return rc;
 }
@@ -367,7 +367,7 @@ static void hdmi_audio_off(void *ctx)
 	hdmi_audio_infoframe_setup(audio, false);
 	hdmi_audio_acr_setup(audio, false);
 
-	pr_err("HDMI Audio: Disabled\n");
+	pr_debug("HDMI Audio: Disabled\n");
 }
 
 static void hdmi_audio_notify(void *ctx, int val)
@@ -399,7 +399,7 @@ static void hdmi_audio_notify(void *ctx, int val)
 	if (audio->ack_enabled && switched)
 		atomic_set(&audio->ack_pending, 1);
 
-	pr_err("audio %s %s\n", switched ? "switched to" : "same as",
+	pr_debug("audio %s %s\n", switched ? "switched to" : "same as",
 		audio->sdev.state ? "HDMI" : "SPKR");
 }
 
@@ -417,7 +417,7 @@ static void hdmi_audio_ack(void *ctx, u32 ack, u32 hpd)
 		audio->ack_enabled = ack & AUDIO_ACK_ENABLE ?
 			true : false;
 
-		pr_err("audio ack feature %s\n",
+		pr_debug("audio ack feature %s\n",
 			audio->ack_enabled ? "enabled" : "disabled");
 		return;
 	}
@@ -429,11 +429,11 @@ static void hdmi_audio_ack(void *ctx, u32 ack, u32 hpd)
 
 	ack_hpd = ack & AUDIO_ACK_CONNECT;
 
-	pr_err("acknowledging %s\n",
+	pr_debug("acknowledging %s\n",
 		ack_hpd ? "connect" : "disconnect");
 
 	if (ack_hpd != hpd) {
-		pr_err("unbalanced audio state, ack %d, hpd %d\n",
+		pr_debug("unbalanced audio state, ack %d, hpd %d\n",
 			ack_hpd, hpd);
 
 		hdmi_audio_notify(ctx, hpd);

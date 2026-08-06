@@ -567,7 +567,7 @@ int mdss_create_frc_debug(struct mdss_debug_data *mdd)
 	mdss_dbg_frc.log_enable = FRC_DEFAULT_LOG_ENABLE;
 	mdss_dbg_frc.index = 0;
 
-	pr_err("frc_dbg: frc_enable:%d log_enable:%d\n",
+	pr_debug("frc_dbg: frc_enable:%d log_enable:%d\n",
 		mdss_dbg_frc.frc_enable, mdss_dbg_frc.log_enable);
 
 	return 0;

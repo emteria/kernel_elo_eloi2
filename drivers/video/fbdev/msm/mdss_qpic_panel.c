@@ -225,7 +225,7 @@ static int mdss_panel_parse_dt(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-	pr_err("panel res %d %d\n", res[0], res[1]);
+	pr_debug("panel res %d %d\n", res[0], res[1]);
 	panel_data->panel_info.xres = (!rc ? res[0] : 320);
 	panel_data->panel_info.yres = (!rc ? res[1] : 480);
 	rc = of_property_read_u32(np, "qcom,mdss-pan-bpp", &tmp);
@@ -234,7 +234,7 @@ static int mdss_panel_parse_dt(struct platform_device *pdev,
 						__func__, __LINE__);
 		return -EINVAL;
 	}
-	pr_err("panel bpp %d\n", tmp);
+	pr_debug("panel bpp %d\n", tmp);
 	panel_data->panel_info.bpp = (!rc ? tmp : 18);
 	of_property_read_u32(np, "qcom,refresh_rate", &panel_refresh_rate);
 
@@ -250,7 +250,7 @@ static int mdss_qpic_panel_probe(struct platform_device *pdev)
 	static struct mdss_panel_data vendor_pdata;
 	static const char *panel_name;
 
-	pr_err("%s:%d, debug info id=%d", __func__, __LINE__, pdev->id);
+	pr_debug("%s:%d, debug info id=%d", __func__, __LINE__, pdev->id);
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 

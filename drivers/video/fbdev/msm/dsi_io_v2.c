@@ -215,7 +215,7 @@ int msm_dsi_clk_set_rate(unsigned long esc_rate,
 int  msm_dsi_clk_enable(void)
 {
 	if (dsi_io_private->msm_dsi_clk_on) {
-		pr_err("dsi_clks on already\n");
+		pr_debug("dsi_clks on already\n");
 		return 0;
 	}
 
@@ -231,7 +231,7 @@ int  msm_dsi_clk_enable(void)
 int msm_dsi_clk_disable(void)
 {
 	if (dsi_io_private->msm_dsi_clk_on == 0) {
-		pr_err("mdss_dsi_clks already OFF\n");
+		pr_debug("mdss_dsi_clks already OFF\n");
 		return 0;
 	}
 

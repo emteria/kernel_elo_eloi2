@@ -64,7 +64,7 @@ static void check_dsi_ctrl_status(struct work_struct *work)
 
 	if (mdss_panel_is_power_off(pdsi_status->mfd->panel_power_state) ||
 			pdsi_status->mfd->shutdown_pending) {
-		pr_err("%s: panel off\n", __func__);
+		pr_debug("%s: panel off\n", __func__);
 		return;
 	}
 
@@ -110,7 +110,7 @@ void disable_esd_thread(void)
 {
 	if (pstatus_data &&
 		cancel_delayed_work_sync(&pstatus_data->check_status))
-		pr_err("esd thread killed\n");
+		pr_debug("esd thread killed\n");
 }
 
 /*
@@ -161,7 +161,7 @@ static int fb_event_callback(struct notifier_block *self,
 	if ((!(pinfo->esd_check_enabled) &&
 			dsi_status_disable) ||
 			(dsi_status_disable == DSI_STATUS_CHECK_DISABLE)) {
-		pr_err("ESD check is disabled.\n");
+		pr_debug("ESD check is disabled.\n");
 		cancel_delayed_work(&pdata->check_status);
 		return NOTIFY_DONE;
 	}
@@ -180,7 +180,7 @@ static int fb_event_callback(struct notifier_block *self,
 			break;
 		case FB_BLANK_VSYNC_SUSPEND:
 		case FB_BLANK_NORMAL:
-			pr_err("%s : ESD thread running\n", __func__);
+			pr_debug("%s : ESD thread running\n", __func__);
 			break;
 		case FB_BLANK_POWERDOWN:
 		case FB_BLANK_HSYNC_SUSPEND:
@@ -252,7 +252,7 @@ int __init mdss_dsi_status_init(void)
 
 	INIT_DELAYED_WORK(&pstatus_data->check_status, check_dsi_ctrl_status);
 
-	pr_err("%s: DSI ctrl status work queue initialized\n", __func__);
+	pr_debug("%s: DSI ctrl status work queue initialized\n", __func__);
 
 	return rc;
 }
@@ -262,7 +262,7 @@ void __exit mdss_dsi_status_exit(void)
 	fb_unregister_client(&pstatus_data->fb_notifier);
 	cancel_delayed_work_sync(&pstatus_data->check_status);
 	kfree(pstatus_data);
-	pr_err("%s: DSI ctrl status work queue removed\n", __func__);
+	pr_debug("%s: DSI ctrl status work queue removed\n", __func__);
 }
 
 module_param_call(interval, param_set_interval, param_get_uint,

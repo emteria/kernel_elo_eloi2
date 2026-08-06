@@ -580,6 +580,8 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_MMU500_ERRATA1, "qcom,mmu500-errata-1" },
 	{ ARM_SMMU_OPT_STATIC_CB, "qcom,enable-static-cb"},
 	{ ARM_SMMU_OPT_HALT, "qcom,enable-smmu-halt"},
+	{ ARM_SMMU_OPT_FORCE_AARCH32, "qcom,force-aarch32-pgtbl"},
+	{ ARM_SMMU_OPT_NON_FATAL_FAULTS, "qcom,non-fatal-faults"},
 	{ 0, NULL},
 };
 
@@ -682,6 +684,100 @@ static bool is_iommu_pt_coherent(struct arm_smmu_domain *smmu_domain)
 static bool arm_smmu_is_static_cb(struct arm_smmu_device *smmu)
 {
 	return smmu->options & ARM_SMMU_OPT_STATIC_CB;
+}
+
+/*
+ * EloI2 migration: this device's TrustZone image only implements
+ * SCM_SVC_SMMU_PROGRAM/CHANGE_PAGETABLE_FORMAT for the GPU SMMU, not for the
+ * APPS SMMU. Since the CBA2R register (which selects the AArch64 page table
+ * format) lives in the TZ-owned global register space, HLOS cannot switch an
+ * APPS context bank to V8L on its own either. Forcing AArch32-LPAE (V7L) page
+ * tables avoids the switch entirely: no TZ call is made and the context bank
+ * keeps the 32-bit format TZ handed it over in. This mirrors what the working
+ * Android 7 / kernel 3.18 stack did (legacy msm_iommu driver, V7S tables, no
+ * CHANGE_PAGETABLE_FORMAT call for APPS).
+ */
+static bool arm_smmu_force_aarch32(struct arm_smmu_device *smmu)
+{
+	return smmu->options & ARM_SMMU_OPT_FORCE_AARCH32;
+}
+
+/* Names for the enum arm_smmu_context_fmt values, for logging only. */
+static const char * const arm_smmu_ctx_fmt_names[] = {
+	[ARM_SMMU_CTX_FMT_NONE]		= "none",
+	[ARM_SMMU_CTX_FMT_AARCH64]	= "AArch64/V8L",
+	[ARM_SMMU_CTX_FMT_AARCH32_L]	= "AArch32-LPAE/V7L",
+	[ARM_SMMU_CTX_FMT_AARCH32_S]	= "AArch32-short/V7S",
+};
+
+/*
+ * EloI2 migration diagnostic, GLOBAL (GR1) HALF ONLY - always safe.
+ *
+ * CBA2R carries VA64, which is the bit that says which page table format the
+ * HARDWARE is running for this context bank. That is the single most important
+ * datum for this migration, and it happily lives in the global register space.
+ * Reads of the global space are permitted even though TZ owns it - only writes
+ * get dropped (see arm_smmu_skip_write()). Proven on-device: in the 2026-08-05
+ * boot the CBA2R and CBAR reads below both succeeded for cb 0.
+ */
+static void arm_smmu_dump_cb_global(struct arm_smmu_device *smmu, int idx,
+				    const char *stage)
+{
+	void __iomem *gr1_base = ARM_SMMU_GR1(smmu);
+	u32 cba2r = readl_relaxed(gr1_base + ARM_SMMU_GR1_CBA2R(idx));
+	u32 cbar = readl_relaxed(gr1_base + ARM_SMMU_GR1_CBAR(idx));
+
+	dev_err(smmu->dev, "CBDUMP[%s] cb=%d CBA2R=0x%08x VA64=%d CBAR=0x%08x\n",
+		stage, idx, cba2r, cba2r & CBA2R_RW64_64BIT, cbar);
+}
+
+/*
+ * EloI2 migration diagnostic, FULL dump including the context bank's own
+ * register page.
+ *
+ * DANGER - do not call this early. On EloI2 the CB register space is NOT
+ * readable from HLOS until the driver has actually programmed that context
+ * bank. An early read raises a synchronous external abort that kills the boot:
+ *
+ *   Unhandled fault: synchronous external abort (0x96000010) at 0xffffff800a460000
+ *   Kernel BUG at arm_smmu_dump_cb+0xd0/0x200
+ *
+ * That was a probe-time loop reading cb 0's SCTLR at base+0x20000, and it
+ * matches the driver's own warning in parse_static_cb_cfg(): "Context banks may
+ * be xpu-protected". The global-space reads in the same function succeeded, so
+ * only the CB half is restricted.
+ *
+ * Safe call sites are therefore: the context fault handler (which has already
+ * read FSR from this very page), and anywhere after the driver itself has
+ * written the CB. Context banks owned by TZ are skipped entirely.
+ */
+static void arm_smmu_dump_cb(struct arm_smmu_device *smmu, int idx,
+			     const char *stage)
+{
+	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, idx);
+	u32 sctlr, ttbcr, ttbcr2, fsr;
+	u64 ttbr0;
+
+	arm_smmu_dump_cb_global(smmu, idx, stage);
+
+	/* TZ owns this CB - its register page would abort on read. */
+	if (test_bit(idx, smmu->secure_context_map)) {
+		dev_err(smmu->dev,
+			"CBDUMP[%s] cb=%d CB register space owned by TZ, not read\n",
+			stage, idx);
+		return;
+	}
+
+	sctlr = readl_relaxed(cb_base + ARM_SMMU_CB_SCTLR);
+	ttbcr = readl_relaxed(cb_base + ARM_SMMU_CB_TTBCR);
+	ttbcr2 = readl_relaxed(cb_base + ARM_SMMU_CB_TTBCR2);
+	ttbr0 = readq_relaxed(cb_base + ARM_SMMU_CB_TTBR0);
+	fsr = readl_relaxed(cb_base + ARM_SMMU_CB_FSR);
+
+	dev_err(smmu->dev,
+		"CBDUMP[%s] cb=%d SCTLR=0x%08x M=%d TTBCR=0x%08x TTBCR2=0x%08x TTBR0=0x%016llx FSR=0x%08x\n",
+		stage, idx, sctlr, sctlr & SCTLR_M ? 1 : 0, ttbcr, ttbcr2,
+		ttbr0, fsr);
 }
 
 static bool arm_smmu_has_secure_vmid(struct arm_smmu_domain *smmu_domain)
@@ -1146,9 +1242,9 @@ static int arm_smmu_domain_power_on(struct iommu_domain *domain,
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int atomic_domain = smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC);
 
-	pr_info("mdss_smmu power on: org domain = %px\n", domain);
-    pr_info("mdss_smmu power on: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu power on: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu power on: org domain = %px\n", domain);
+    pr_debug("mdss_smmu power on: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu power on: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	if (atomic_domain)
 		return arm_smmu_power_on_atomic(smmu->pwr);
@@ -1166,9 +1262,9 @@ static void arm_smmu_domain_power_off(struct iommu_domain *domain,
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int atomic_domain = smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC);
 
-	pr_info("mdss_smmu power off: org domain = %px\n", domain);
-    pr_info("mdss_smmu power off: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu power off: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu power off: org domain = %px\n", domain);
+    pr_debug("mdss_smmu power off: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu power off: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	if (atomic_domain) {
 		arm_smmu_power_off_atomic(smmu->pwr);
@@ -1468,8 +1564,14 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 	bool fatal_asf = smmu->options & ARM_SMMU_OPT_FATAL_ASF;
 	phys_addr_t phys_soft;
 	u32 frsynra;
+	/*
+	 * EloI2 migration: qcom,non-fatal-faults downgrades the BUG() below to
+	 * a log message for every domain on this SMMU, so that one boot shows
+	 * all the faults instead of panicking on the first one.
+	 */
 	bool non_fatal_fault = !!(smmu_domain->attributes &
-					(1 << DOMAIN_ATTR_NON_FATAL_FAULTS));
+					(1 << DOMAIN_ATTR_NON_FATAL_FAULTS)) ||
+			       !!(smmu->options & ARM_SMMU_OPT_NON_FATAL_FAULTS);
 
 	static DEFINE_RATELIMIT_STATE(_rs,
 				      DEFAULT_RATELIMIT_INTERVAL,
@@ -1551,6 +1653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 			else
 				dev_err(smmu->dev, "hard iova-to-phys (ATOS) failed\n");
 			dev_err(smmu->dev, "SID=0x%x\n", frsynra);
+			arm_smmu_dump_cb(smmu, cfg->cbndx, "fault");
 		}
 		ret = IRQ_NONE;
 		resume = RESUME_TERMINATE;
@@ -1646,12 +1749,12 @@ static int arm_smmu_set_pt_format(struct arm_smmu_domain *smmu_domain,
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
 	int ret = 0;
 
-	pr_err("evaluating set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
+	pr_debug("evaluating set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 	if ((smmu->version > ARM_SMMU_V1) &&
 	    (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64) &&
 	    !arm_smmu_has_secure_vmid(smmu_domain) &&
 	    arm_smmu_is_static_cb(smmu)) {
-		pr_err("calling set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
+		pr_debug("calling set_cb_format with CB %d and ID %d\n", cfg->cbndx, smmu->sec_id);
 		ret = msm_tz_set_cb_format(smmu->sec_id, cfg->cbndx);
 	}
 	return ret;
@@ -1881,7 +1984,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 
 	dynamic = is_dynamic_domain(domain);
 	if (dynamic && !(smmu->options & ARM_SMMU_OPT_DYNAMIC)) {
-		dev_err(smmu->dev, "dynamic domain is not supported here - IGNORED\n");
+		dev_dbg(smmu->dev, "dynamic domain is not supported here - IGNORED\n");
 		//ret = -EPERM;
 		//goto out_unlock;
 	}
@@ -1931,11 +2034,24 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	    (smmu->features & ARM_SMMU_FEAT_FMT_AARCH32_S) &&
 	    (smmu_domain->stage == ARM_SMMU_DOMAIN_S1))
 		cfg->fmt = ARM_SMMU_CTX_FMT_AARCH32_S;
-	if ((IS_ENABLED(CONFIG_64BIT) || cfg->fmt == ARM_SMMU_CTX_FMT_NONE) &&
-	    (smmu->features & (ARM_SMMU_FEAT_FMT_AARCH64_64K |
-			       ARM_SMMU_FEAT_FMT_AARCH64_16K |
-			       ARM_SMMU_FEAT_FMT_AARCH64_4K)))
+	/*
+	 * EloI2 migration: with qcom,force-aarch32-pgtbl keep the AArch32-LPAE
+	 * format picked above instead of upgrading to AArch64. See
+	 * arm_smmu_force_aarch32() for why. Fast domains are left alone - their
+	 * page tables (ARM_V8L_FAST) are hardwired to a V8L layout, so there is
+	 * nothing to gain and the format would no longer match.
+	 */
+	if (arm_smmu_force_aarch32(smmu) && !is_fast &&
+	    cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_L) {
+		dev_dbg(smmu->dev,
+			"forcing AArch32-LPAE page tables (qcom,force-aarch32-pgtbl)\n");
+	} else if ((IS_ENABLED(CONFIG_64BIT) ||
+		    cfg->fmt == ARM_SMMU_CTX_FMT_NONE) &&
+		   (smmu->features & (ARM_SMMU_FEAT_FMT_AARCH64_64K |
+				      ARM_SMMU_FEAT_FMT_AARCH64_16K |
+				      ARM_SMMU_FEAT_FMT_AARCH64_4K))) {
 		cfg->fmt = ARM_SMMU_CTX_FMT_AARCH64;
+	}
 
 	if (cfg->fmt == ARM_SMMU_CTX_FMT_NONE) {
 		ret = -EINVAL;
@@ -2003,11 +2119,24 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	if (arm_smmu_is_slave_side_secure(smmu_domain))
 		tlb = &msm_smmu_gather_ops;
 
-	dev_err(smmu->dev, "Before allocating CB\n");
+	dev_dbg(smmu->dev, "Before allocating CB\n");
 	ret = arm_smmu_alloc_cb(domain, smmu, dev);
 	if (ret < 0)
 		goto out_unlock;
 	cfg->cbndx = ret;
+
+	/*
+	 * EloI2 migration: says which page table format this domain ended up
+	 * with. Kept as dev_dbg so it costs nothing on the (very slow) boot
+	 * console; enable it via dynamic debug if a format question ever comes
+	 * back:
+	 *   echo 'file arm-smmu.c +p' > /sys/kernel/debug/dynamic_debug/control
+	 */
+	dev_dbg(smmu->dev,
+		"CBFMT cb=%d sec_id=%d ctx_fmt=%s pgtbl_fmt=%d ias=%lu oas=%lu fast=%d secure_vmid=%d static=%d\n",
+		cfg->cbndx, smmu->sec_id, arm_smmu_ctx_fmt_names[cfg->fmt],
+		fmt, ias, oas, is_fast, arm_smmu_has_secure_vmid(smmu_domain),
+		arm_smmu_is_static_cb(smmu));
 
 	if (smmu->version < ARM_SMMU_V2) {
 		cfg->irptndx = atomic_inc_return(&smmu->irptndx);
@@ -2039,7 +2168,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 		};
 	}
 
-	dev_err(smmu->dev, "Before allocating ops\n");
+	dev_dbg(smmu->dev, "Before allocating ops\n");
 	smmu_domain->smmu = smmu;
 	smmu_domain->dev = dev;
 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &smmu_domain->pgtbl_cfg,
@@ -2063,7 +2192,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	domain->geometry.aperture_end = (1UL << ias) - 1;
 	domain->geometry.force_aperture = true;
 
-	dev_err(smmu->dev, "inside arm_smmu_init_domain_context with CB %d and ID %d with secure=%d, static=%d, dynamic=%d\n", cfg->cbndx, smmu->sec_id, arm_smmu_has_secure_vmid(smmu_domain), arm_smmu_is_static_cb(smmu), dynamic);
+	dev_dbg(smmu->dev, "inside arm_smmu_init_domain_context with CB %d and ID %d with secure=%d, static=%d, dynamic=%d\n", cfg->cbndx, smmu->sec_id, arm_smmu_has_secure_vmid(smmu_domain), arm_smmu_is_static_cb(smmu), dynamic);
 
 	/* Assign an asid */
 	ret = arm_smmu_init_asid(domain, smmu);
@@ -2105,28 +2234,28 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 
 	/* Publish page table ops for map/unmap */
 	smmu_domain->pgtbl_ops = pgtbl_ops;
-	dev_err(smmu->dev, "After saving ops\n");
-	pr_info("mdss_smmu: org domain = %px\n", domain);
-    pr_info("mdss_smmu: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
-	pr_info("mdss_smmu: smmu_domain->smmu = %px\n", smmu_domain->smmu);
-	pr_info("mdss_smmu: smmu_domain->smmu->dev = %px\n", smmu_domain->smmu->dev);
+	dev_dbg(smmu->dev, "After saving ops\n");
+	pr_debug("mdss_smmu: org domain = %px\n", domain);
+    pr_debug("mdss_smmu: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu: smmu_domain->smmu = %px\n", smmu_domain->smmu);
+	pr_debug("mdss_smmu: smmu_domain->smmu->dev = %px\n", smmu_domain->smmu->dev);
 
 	if (arm_smmu_is_slave_side_secure(smmu_domain) &&
 			!arm_smmu_master_attached(smmu, dev->iommu_fwspec)) {
-		dev_err(smmu->dev, "calling arm_smmu_restore_sec_cfg <- maybe something is overridden there?\n");
+		dev_dbg(smmu->dev, "calling arm_smmu_restore_sec_cfg <- maybe something is overridden there?\n");
 		arm_smmu_restore_sec_cfg(smmu, cfg->cbndx);
 	}
 
 	return 0;
 
 out_clear_smmu:
-	dev_err(smmu->dev, "Destroying domain\n");
+	dev_dbg(smmu->dev, "Destroying domain\n");
 	arm_smmu_destroy_domain_context(domain);
 	smmu_domain->smmu = NULL;
 out_unlock:
 	mutex_unlock(&smmu_domain->init_mutex);
-	dev_err(smmu->dev, "Returning %d\n", ret);
+	dev_dbg(smmu->dev, "Returning %d\n", ret);
 	return ret;
 }
 
@@ -2157,7 +2286,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
 	}
 
 	dynamic = is_dynamic_domain(domain);
-	pr_err("inside arm_smmu_destroy_domain_context for type %u\n", domain->type);
+	pr_debug("inside arm_smmu_destroy_domain_context for type %u\n", domain->type);
 
 	if (dynamic) {
 		arm_smmu_free_asid(domain);
@@ -2646,9 +2775,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int atomic_domain = smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC);
 
-	pr_info("mdss_smmu arm_smmu_attach_dev: org domain = %px\n", domain);
-    pr_info("mdss_smmu arm_smmu_attach_dev: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu arm_smmu_attach_dev: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu arm_smmu_attach_dev: org domain = %px\n", domain);
+    pr_debug("mdss_smmu arm_smmu_attach_dev: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu arm_smmu_attach_dev: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	if (!fwspec || fwspec->ops != &arm_smmu_ops) {
 		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
@@ -2663,7 +2792,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	 * This should be at least a WARN_ON once that's sorted.
 	 */
 	if (!fwspec->iommu_priv) {
-		dev_err(dev, "ignoring non-priv iommu\n");
+		dev_dbg(dev, "ignoring non-priv iommu\n");
 		return -ENODEV;
 	}
 
@@ -2676,16 +2805,16 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return ret;
 	}
 
-	dev_err(dev, "starting arm_smmu_attach_dev with attributes %d and features %d\n", smmu_domain->attributes, smmu->features);
+	dev_dbg(dev, "starting arm_smmu_attach_dev with attributes %d and features %d\n", smmu_domain->attributes, smmu->features);
 
 	if (is_dynamic_domain(domain)) {
-		dev_err(dev, "this domain is dynamic!\n");
+		dev_dbg(dev, "this domain is dynamic!\n");
 	} else {
-		dev_err(dev, "this domain is NOT dynamic!\n");
+		dev_dbg(dev, "this domain is NOT dynamic!\n");
 	}
 
 	/* Ensure that the domain is finalised */
-	dev_err(dev, "before calling arm_smmu_init_domain_context\n");
+	dev_dbg(dev, "before calling arm_smmu_init_domain_context\n");
 	ret = arm_smmu_init_domain_context(domain, smmu, dev);
 	if (ret < 0) {
 		dev_err(dev, "arm_smmu_init_domain_context failed\n");
@@ -2695,7 +2824,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	/* Do not modify the SIDs, HW is still running */
 	if (is_dynamic_domain(domain)) {
 		ret = 0;
-		dev_err(dev, "ignoring dynamic domain\n");
+		dev_dbg(dev, "ignoring dynamic domain\n");
 		goto out_power_off;
 	}
 
@@ -2713,7 +2842,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	/* Looks ok, so add the device to the domain */
 	ret = arm_smmu_domain_add_master(smmu_domain, fwspec);
-	dev_err(dev, "calling arm_smmu_domain_add_master returned %d\n", ret);
+	dev_dbg(dev, "calling arm_smmu_domain_add_master returned %d\n", ret);
 
 out_power_off:
 	/*
@@ -2727,7 +2856,7 @@ out_power_off:
 
 	arm_smmu_power_off(smmu->pwr);
 
-	dev_err(dev, "returning %d from arm_smmu_attach_dev\n", ret);
+	dev_dbg(dev, "returning %d from arm_smmu_attach_dev\n", ret);
 	return ret;
 }
 
@@ -2740,18 +2869,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
 	LIST_HEAD(nonsecure_pool);
 
-	pr_err("inside arm_smmu_map for domain %px with name %s\n", domain, domain->name);
-	pr_info("mdss_smmu: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
-	pr_info("mdss_smmu: smmu_domain->smmu = %px\n", smmu_domain->smmu);
+	pr_debug("inside arm_smmu_map for domain %px with name %s\n", domain, domain->name);
+	pr_debug("mdss_smmu: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu: smmu_domain->smmu = %px\n", smmu_domain->smmu);
 
 	if (!ops) {
-		pr_err("no ops found\n");
+		pr_debug("no ops found\n");
 		return -ENODEV;
 	}
 
 	if (arm_smmu_is_slave_side_secure(smmu_domain)) {
-		pr_err("before returning secure map\n");
+		pr_debug("before returning secure map\n");
 		return msm_secure_smmu_map(domain, iova, paddr, size, prot);
 	}
 
@@ -2769,7 +2898,7 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 
 	arm_smmu_release_prealloc_memory(smmu_domain, &nonsecure_pool);
 
-	pr_err("arm_smmu_map returns %d\n", ret);
+	pr_debug("arm_smmu_map returns %d\n", ret);
 	return ret;
 }
 
@@ -3261,9 +3390,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int ret = 0;
 
-	pr_info("mdss_smmu arm_smmu_domain_get_attr: org domain = %px\n", domain);
-    pr_info("mdss_smmu arm_smmu_domain_get_attr: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu arm_smmu_domain_get_attr: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu arm_smmu_domain_get_attr: org domain = %px\n", domain);
+    pr_debug("mdss_smmu arm_smmu_domain_get_attr: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu arm_smmu_domain_get_attr: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	mutex_lock(&smmu_domain->init_mutex);
 	switch (attr) {
@@ -3692,9 +3821,9 @@ static void arm_smmu_trigger_fault(struct iommu_domain *domain,
 	struct arm_smmu_device *smmu;
 	void __iomem *cb_base;
 
-	pr_info("mdss_smmu arm_smmu_trigger_fault: org domain = %px\n", domain);
-    pr_info("mdss_smmu arm_smmu_trigger_fault: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu arm_smmu_trigger_fault: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu arm_smmu_trigger_fault: org domain = %px\n", domain);
+    pr_debug("mdss_smmu arm_smmu_trigger_fault: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu arm_smmu_trigger_fault: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	if (!smmu_domain->smmu) {
 		pr_err("Can't trigger faults on non-attached domains\n");
@@ -4060,9 +4189,9 @@ static int arm_smmu_alloc_cb(struct iommu_domain *domain,
 	int cb = -EINVAL;
 	bool dynamic;
 
-	pr_info("mdss_smmu arm_smmu_alloc_cb: org domain = %px\n", domain);
-    pr_info("mdss_smmu arm_smmu_alloc_cb: smmu_domain = %px\n", smmu_domain);
-	pr_info("mdss_smmu arm_smmu_alloc_cb: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
+	pr_debug("mdss_smmu arm_smmu_alloc_cb: org domain = %px\n", domain);
+    pr_debug("mdss_smmu arm_smmu_alloc_cb: smmu_domain = %px\n", smmu_domain);
+	pr_debug("mdss_smmu arm_smmu_alloc_cb: smmu_domain->pgtbl_ops = %px\n", smmu_domain->pgtbl_ops);
 
 	/*
 	 * Dynamic domains have already set cbndx through domain attribute.
@@ -4169,7 +4298,7 @@ static int arm_smmu_handoff_cbs(struct arm_smmu_device *smmu)
 		smmu->smrs[i] = smr;
 		smmu->s2crs[i] = s2cr;
 		bitmap_set(smmu->context_map, s2cr.cbndx, 1);
-		dev_err(smmu->dev, "Handoff smr: %x s2cr: %x cb: %d\n",
+		dev_dbg(smmu->dev, "Handoff smr: %x s2cr: %x cb: %d\n",
 			raw_smr, raw_s2cr, s2cr.cbndx);
 	}
 
@@ -4358,7 +4487,7 @@ static int arm_smmu_init_regulators(struct arm_smmu_power_resources *pwr)
 	if (!of_property_read_u32(dev->of_node,
 				  "qcom,deferred-regulator-disable-delay",
 				  &(pwr->regulator_defer)))
-		dev_err(dev, "regulator defer delay %d\n",
+		dev_dbg(dev, "regulator defer delay %d\n",
 			pwr->regulator_defer);
 
 	i = 0;
@@ -4376,7 +4505,7 @@ static int arm_smmu_init_bus_scaling(struct arm_smmu_power_resources *pwr)
 
 	/* We don't want the bus APIs to print an error message */
 	if (!of_find_property(dev->of_node, "qcom,msm-bus,name", NULL)) {
-		dev_err(dev, "No bus scaling info\n");
+		dev_dbg(dev, "No bus scaling info\n");
 		return 0;
 	}
 
@@ -4447,8 +4576,8 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if (arm_smmu_restore_sec_cfg(smmu, 0))
 		return -ENODEV;
 
-	dev_err(smmu->dev, "probing hardware configuration...\n");
-	dev_err(smmu->dev, "SMMUv%d with:\n",
+	dev_dbg(smmu->dev, "probing hardware configuration...\n");
+	dev_dbg(smmu->dev, "SMMUv%d with:\n",
 			smmu->version == ARM_SMMU_V2 ? 2 : 1);
 
 	/* ID0 */
@@ -4462,17 +4591,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 
 	if (id & ID0_S1TS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_S1;
-		dev_err(smmu->dev, "\tstage 1 translation\n");
+		dev_dbg(smmu->dev, "\tstage 1 translation\n");
 	}
 
 	if (id & ID0_S2TS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_S2;
-		dev_err(smmu->dev, "\tstage 2 translation\n");
+		dev_dbg(smmu->dev, "\tstage 2 translation\n");
 	}
 
 	if (id & ID0_NTS) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_NESTED;
-		dev_err(smmu->dev, "\tnested translation\n");
+		dev_dbg(smmu->dev, "\tnested translation\n");
 	}
 
 	if (!(smmu->features &
@@ -4484,7 +4613,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if ((id & ID0_S1TS) &&
 		((smmu->version < ARM_SMMU_V2) || !(id & ID0_ATOSNS))) {
 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
-		dev_err(smmu->dev, "\taddress translation ops\n");
+		dev_dbg(smmu->dev, "\taddress translation ops\n");
 	}
 
 	/*
@@ -4498,7 +4627,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	if (cttw_dt)
 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
 	if (cttw_dt || cttw_reg)
-		dev_err(smmu->dev, "\t%scoherent table walk\n",
+		dev_dbg(smmu->dev, "\t%scoherent table walk\n",
 			   cttw_dt ? "" : "non-");
 	if (cttw_dt != cttw_reg)
 		dev_err(smmu->dev,
@@ -4597,7 +4726,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		dev_err(smmu->dev, "impossible number of S2 context banks!\n");
 		return -ENODEV;
 	}
-	dev_err(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+	dev_dbg(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
 		   smmu->num_context_banks, smmu->num_s2_context_banks);
 	/*
 	 * Cavium CN88xx erratum #27704.
@@ -4666,16 +4795,16 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
 	else
 		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
-	dev_err(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
+	dev_dbg(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
 		   smmu->pgsize_bitmap);
 
 
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S1)
-		dev_err(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
+		dev_dbg(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
 			smmu->va_size, smmu->ipa_size);
 
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S2)
-		dev_err(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
+		dev_dbg(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
 			smmu->ipa_size, smmu->pa_size);
 
 	return 0;
@@ -4779,7 +4908,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	}
 
 	smmu->dev = dev;
-	dev_err(dev, "allocated smmu device\n");
+	dev_dbg(dev, "allocated smmu device\n");
 
 	spin_lock_init(&smmu->atos_lock);
 	idr_init(&smmu->asid_idr);
@@ -5782,7 +5911,7 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 	if (ret)
 		return -EPROBE_DEFER;
 
-	dev_err(dev, "Finish loading\n");
+	dev_dbg(dev, "Finish loading\n");
 	return 0;
 }
 
@@ -5806,7 +5935,7 @@ static int qsmmuv500_tbu_probe(struct platform_device *pdev)
 	const __be32 *cell;
 	int len;
 
-	pr_err("started qsmmuv500_tbu_probe\n");
+	pr_debug("started qsmmuv500_tbu_probe\n");
 
 	tbu = devm_kzalloc(dev, sizeof(*tbu), GFP_KERNEL);
 	if (!tbu)

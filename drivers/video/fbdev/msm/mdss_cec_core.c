@@ -107,23 +107,23 @@ static void cec_dump_msg(struct cec_ctl *ctl, struct cec_msg *msg)
 	}
 
 	spin_lock_irqsave(&ctl->lock, flags);
-	pr_err("==%pS dump start ==\n",
+	pr_debug("==%pS dump start ==\n",
 		__builtin_return_address(0));
 
-	pr_err("cec: sender_id: %d\n", msg->sender_id);
-	pr_err("cec: recvr_id:  %d\n", msg->recvr_id);
+	pr_debug("cec: sender_id: %d\n", msg->sender_id);
+	pr_debug("cec: recvr_id:  %d\n", msg->recvr_id);
 
 	if (msg->frame_size < 2) {
-		pr_err("cec: polling message\n");
+		pr_debug("cec: polling message\n");
 		spin_unlock_irqrestore(&ctl->lock, flags);
 		return;
 	}
 
-	pr_err("cec: opcode: %02x\n", msg->opcode);
+	pr_debug("cec: opcode: %02x\n", msg->opcode);
 	for (i = 0; i < msg->frame_size - 2; i++)
-		pr_err("cec: operand(%2d) : %02x\n", i + 1, msg->operand[i]);
+		pr_debug("cec: operand(%2d) : %02x\n", i + 1, msg->operand[i]);
 
-	pr_err("==%pS dump end ==\n",
+	pr_debug("==%pS dump end ==\n",
 		__builtin_return_address(0));
 	spin_unlock_irqrestore(&ctl->lock, flags);
 }
@@ -215,16 +215,16 @@ static int cec_msg_parser(struct cec_ctl *ctl, struct cec_msg *in_msg)
 		goto end;
 	}
 
-	pr_err("in_msg->opcode = 0x%x\n", in_msg->opcode);
+	pr_debug("in_msg->opcode = 0x%x\n", in_msg->opcode);
 	switch (in_msg->opcode) {
 	case CEC_MSG_SET_OSD_STRING:
 		/* Set OSD String */
-		pr_err("Recvd OSD Str=[0x%x]\n",
+		pr_debug("Recvd OSD Str=[0x%x]\n",
 			in_msg->operand[3]);
 		break;
 	case CEC_MSG_GIVE_PHYS_ADDR:
 		/* Give Phy Addr */
-		pr_err("Recvd a Give Phy Addr cmd\n");
+		pr_debug("Recvd a Give Phy Addr cmd\n");
 
 		out_msg.sender_id = 0x4;
 		/* Broadcast */
@@ -239,14 +239,14 @@ static int cec_msg_parser(struct cec_ctl *ctl, struct cec_msg *in_msg)
 		break;
 	case CEC_MSG_ABORT:
 		/* Abort */
-		pr_err("Recvd an abort cmd.\n");
+		pr_debug("Recvd an abort cmd.\n");
 
 		/* reason = "Refused" */
 		rc = cec_send_abort_opcode(ctl, in_msg, 0x04);
 		break;
 	case CEC_MSG_GIVE_OSD_NAME:
 		/* Give OSD name */
-		pr_err("Recvd 'Give OSD name' cmd.\n");
+		pr_debug("Recvd 'Give OSD name' cmd.\n");
 
 		out_msg.sender_id = 0x4;
 		out_msg.recvr_id = in_msg->sender_id;
@@ -270,7 +270,7 @@ static int cec_msg_parser(struct cec_ctl *ctl, struct cec_msg *in_msg)
 		break;
 	case CEC_MSG_GIVE_POWER_STATUS:
 		/* Give Device Power status */
-		pr_err("Recvd a Power status message\n");
+		pr_debug("Recvd a Power status message\n");
 
 		out_msg.sender_id = 0x4;
 		out_msg.recvr_id = in_msg->sender_id;
@@ -294,7 +294,7 @@ static int cec_msg_parser(struct cec_ctl *ctl, struct cec_msg *in_msg)
 		/* Routing Change cmd */
 	case CEC_MSG_SET_STREAM_PATH:
 		/* Set Stream Path */
-		pr_err("Recvd Set Stream or Routing Change cmd\n");
+		pr_debug("Recvd Set Stream or Routing Change cmd\n");
 
 		out_msg.sender_id = 0x4;
 		out_msg.recvr_id = 0xF; /* broadcast this message */
@@ -319,14 +319,14 @@ static int cec_msg_parser(struct cec_ctl *ctl, struct cec_msg *in_msg)
 		break;
 	case CEC_MSG_USER_CTRL_PRESS:
 		/* User Control Pressed */
-		pr_err("User Control Pressed\n");
+		pr_debug("User Control Pressed\n");
 		break;
 	case CEC_MSG_USER_CTRL_RELEASE:
 		/* User Control Released */
-		pr_err("User Control Released\n");
+		pr_debug("User Control Released\n");
 		break;
 	default:
-		pr_err("Recvd an unknown cmd = [%u]\n",
+		pr_debug("Recvd an unknown cmd = [%u]\n",
 			in_msg->opcode);
 
 		/* reason = "Unrecognized opcode" */
@@ -364,7 +364,7 @@ static int cec_msg_recv(void *data, struct cec_msg *msg)
 
 	msg_node->msg = *msg;
 
-	pr_err("CEC read frame done\n");
+	pr_debug("CEC read frame done\n");
 	cec_dump_msg(ctl, &msg_node->msg);
 
 	spin_lock_irqsave(&ctl->lock, flags);
@@ -402,7 +402,7 @@ static ssize_t cec_rda_enable(struct device *dev,
 
 	spin_lock_irqsave(&ctl->lock, flags);
 	if (ctl->enabled) {
-		pr_err("cec is enabled\n");
+		pr_debug("cec is enabled\n");
 		ret = snprintf(buf, PAGE_SIZE, "%d\n", 1);
 	} else {
 		pr_err("cec is disabled\n");
@@ -448,7 +448,7 @@ static ssize_t cec_wta_enable(struct device *dev,
 		ops->wakeup_en(ops->data, ctl->cec_wakeup_en);
 
 	if (ctl->enabled == cec_en) {
-		pr_err("cec is already %s\n",
+		pr_debug("cec is already %s\n",
 			cec_en ? "enabled" : "disabled");
 		goto bail;
 	}
@@ -633,7 +633,7 @@ static ssize_t cec_rda_msg(struct device *dev,
 
 	list_for_each_entry_safe(msg_node, tmp, &ctl->msg_head, list) {
 		if ((i + 1) * sizeof(struct cec_msg) > PAGE_SIZE) {
-			pr_err("Overflowing PAGE_SIZE.\n");
+			pr_debug("Overflowing PAGE_SIZE.\n");
 			break;
 		}
 

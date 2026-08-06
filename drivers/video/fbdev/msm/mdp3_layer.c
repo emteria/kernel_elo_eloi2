@@ -89,7 +89,7 @@ static struct mdss_fence *__mdp3_create_fence(struct msm_fb_data_type *mfd,
 			sync_fence = NULL;
 			goto end;
 	}
-	pr_err("%s:val=%d\n", mdss_get_sync_fence_name(sync_fence), value);
+	pr_debug("%s:val=%d\n", mdss_get_sync_fence_name(sync_fence), value);
 end:
 	return sync_fence;
 }
@@ -266,7 +266,7 @@ int mdp3_layer_pre_commit(struct msm_fb_data_type *mfd,
 
 	/* Handle NULL commit */
 	if (!layer_count) {
-		pr_err("Handle NULL commit\n");
+		pr_debug("Handle NULL commit\n");
 		return 0;
 	}
 
@@ -283,7 +283,7 @@ int mdp3_layer_pre_commit(struct msm_fb_data_type *mfd,
 
 	stride = layer->buffer.width * ppp_bpp(layer->buffer.format);
 	format = mdp3_ctrl_get_source_format(layer->buffer.format);
-	pr_err("stride:%d layer_width:%d", stride, layer->buffer.width);
+	pr_debug("stride:%d layer_width:%d", stride, layer->buffer.width);
 
 	if ((dma->source_config.format != format) ||
 			(dma->source_config.stride != stride)) {
@@ -309,7 +309,7 @@ int mdp3_layer_pre_commit(struct msm_fb_data_type *mfd,
 		return ret;
 	}
 
-	pr_err("mdp3 precommit ret = %d\n", ret);
+	pr_debug("mdp3 precommit ret = %d\n", ret);
 	mutex_unlock(&mdp3_session->lock);
 	return ret;
 }

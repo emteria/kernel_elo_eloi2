@@ -133,7 +133,7 @@ static inline int mdss_smmu_attach(struct mdss_data_type *mdata)
 	MDSS_XLOG(mdata->iommu_attached);
 
 	if (mdata->iommu_attached) {
-		pr_err("mdp iommu already attached\n");
+		pr_debug("mdp iommu already attached\n");
 		rc = 0;
 		goto end;
 	}
@@ -160,7 +160,7 @@ static inline int mdss_smmu_detach(struct mdss_data_type *mdata)
 	MDSS_XLOG(mdata->iommu_attached);
 
 	if (!mdata->iommu_attached) {
-		pr_err("mdp iommu already dettached\n");
+		pr_debug("mdp iommu already dettached\n");
 		rc = 0;
 		goto end;
 	}

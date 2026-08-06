@@ -230,7 +230,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 				}
 			}
 
-			pr_err("mdss_smmu_attach_v2: setting handoff_pending = false\n");
+			pr_debug("mdss_smmu_attach_v2: setting handoff_pending = false\n");
 			mdss_smmu->handoff_pending = false;
 
 			if (mdss_smmu->mmu_mapping == NULL) {
@@ -239,7 +239,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 			}
 
 			if (!mdss_smmu->domain_attached) {
-				dev_err(mdss_smmu->dev, "iommu attaching device for domain %d\n", i);
+				dev_dbg(mdss_smmu->dev, "iommu attaching device for domain %d\n", i);
 				rc = arm_iommu_attach_device(mdss_smmu->dev,
 						mdss_smmu->mmu_mapping);
 				if (rc) {
@@ -250,7 +250,7 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 					goto err;
 				}
 				mdss_smmu->domain_attached = true;
-				pr_err("iommu v2 domain[%i] attached\n", i);
+				pr_debug("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
 			pr_err("iommu device not attached for domain[%d]\n", i);
@@ -424,8 +424,8 @@ static int mdss_smmu_map_v2(int domain, phys_addr_t iova, phys_addr_t phys,
 		return -EINVAL;
 	}
 
-	pr_err("passing map to iommu_map for domain=%d\n", domain);
-	pr_info("mdss_smmu->dev = %px\n", mdss_smmu->dev);
+	pr_debug("passing map to iommu_map for domain=%d\n", domain);
+	pr_debug("mdss_smmu->dev = %px\n", mdss_smmu->dev);
 
 	return iommu_map(mdss_smmu->mmu_mapping->domain,
 			iova, phys, gfp_order, prot);
@@ -869,7 +869,7 @@ int mdss_smmu_probe(struct platform_device *pdev)
 	if (!mdata->handoff_pending)
 		mdss_smmu_enable_power(mdss_smmu, false);
 	else {
-		pr_err("mdss_smmu_probe: setting handoff_pending = true\n");
+		pr_debug("mdss_smmu_probe: setting handoff_pending = true\n");
 		mdss_smmu->handoff_pending = true;
 	}
 
@@ -881,7 +881,7 @@ int mdss_smmu_probe(struct platform_device *pdev)
 		mdss_smmu->mmu_base = ioremap(be32_to_cpu(*address),
 			be32_to_cpu(*size));
 	} else {
-		pr_err("unable to map context bank base\n");
+		pr_debug("unable to map context bank base\n");
 	}
 
 	pr_info("iommu v2 domain[%d] mapping and clk register successful!\n",

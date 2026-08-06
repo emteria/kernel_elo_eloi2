@@ -119,7 +119,7 @@ static bool mdss_fence_signaled(struct fence *fence)
 	bool status;
 
 	status = ((s32) (tl->value - fence->seqno)) >= 0;
-	pr_err("status:%d fence seq:%d and timeline:%s:%d next %d\n",
+	pr_debug("status:%d fence seq:%d and timeline:%s:%d next %d\n",
 			status, fence->seqno, tl->name,
 			tl->value, tl->next_value);
 	return status;
@@ -130,7 +130,7 @@ static void mdss_fence_release(struct fence *fence)
 	struct mdss_fence *f = to_mdss_fence(fence);
 	struct mdss_timeline *tl = to_mdss_timeline(fence);
 
-	pr_err("%s for fence %s\n", __func__, f->name);
+	pr_debug("%s for fence %s\n", __func__, f->name);
 	spin_lock(&tl->list_lock);
 	if (!list_empty(&f->fence_list))
 		list_del(&f->fence_list);
@@ -217,7 +217,7 @@ static int mdss_inc_timeline_locked(struct mdss_timeline *tl,
 
 	spin_lock(&tl->list_lock);
 	if (list_empty(&tl->fence_list_head)) {
-		pr_err("fence list is empty\n");
+		pr_debug("fence list is empty\n");
 		tl->value += 1;
 		spin_unlock(&tl->list_lock);
 		return 0;
@@ -238,7 +238,7 @@ static int mdss_inc_timeline_locked(struct mdss_timeline *tl,
 		is_signaled = fence_is_signaled_locked(&f->base);
 		spin_unlock_irqrestore(&tl->lock, flags);
 		if (is_signaled) {
-			pr_err("%s signaled\n", f->name);
+			pr_debug("%s signaled\n", f->name);
 			list_del_init(&f->fence_list);
 			fence_put(&f->base);
 		} else {
@@ -309,7 +309,7 @@ struct mdss_fence *mdss_get_sync_fence(
 	if (timestamp)
 		*timestamp = value;
 
-	pr_err("fence created at val=%u tl->name= %s tl->value = %d tl->next_value =%d\n",
+	pr_debug("fence created at val=%u tl->name= %s tl->value = %d tl->next_value =%d\n",
 			value, tl->name, tl->value, tl->next_value);
 
 	return (struct mdss_fence *) &f->base;
@@ -393,7 +393,7 @@ int mdss_wait_sync_fence(struct mdss_fence *fence,
 	rc = fence_wait_timeout((struct fence *) fence, false,
 			msecs_to_jiffies(timeout));
 	if (rc > 0) {
-		pr_err("fence signaled\n");
+		pr_debug("fence signaled\n");
 		rc = 0;
 	} else if (rc == 0) {
 		struct fence *input_fence = (struct fence *) fence;

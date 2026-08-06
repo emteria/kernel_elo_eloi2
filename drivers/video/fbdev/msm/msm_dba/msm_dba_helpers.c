@@ -35,7 +35,7 @@ static void msm_dba_helper_hdcp_handler(struct work_struct *work)
 
 	mutex_lock(&dev->dev_mutex);
 	if (dev->hdcp_status) {
-		pr_err("%s[%s:%d] HDCP is authenticated\n", __func__,
+		pr_debug("%s[%s:%d] HDCP is authenticated\n", __func__,
 			 dev->chip_name, dev->instance_id);
 		mutex_unlock(&dev->dev_mutex);
 		return;
@@ -90,7 +90,7 @@ static irqreturn_t msm_dba_helper_irq_handler(int irq, void *dev)
 			pr_err("%s: interrupt handler failed\n", __func__);
 	}
 
-	pr_err("%s(%s:%d): Eventmask  = 0x%x\n", __func__, device->chip_name,
+	pr_debug("%s(%s:%d): Eventmask  = 0x%x\n", __func__, device->chip_name,
 		 device->instance_id, mask);
 	if (mask)
 		msm_dba_helper_issue_cb(device, NULL, mask);
@@ -123,7 +123,7 @@ int msm_dba_helper_i2c_write_byte(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	pr_err("%s: [%s:0x%02x] : W[0x%02x, 0x%02x]\n", __func__,
+	pr_debug("%s: [%s:0x%02x] : W[0x%02x, 0x%02x]\n", __func__,
 		 client->name, addr, reg, val);
 	client->addr = addr;
 
@@ -152,7 +152,7 @@ int msm_dba_helper_i2c_write_buffer(struct i2c_client *client,
 		pr_err("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
-	pr_err("%s: [%s:0x02%x] : W %d bytes\n", __func__,
+	pr_debug("%s: [%s:0x02%x] : W %d bytes\n", __func__,
 		 client->name, addr, size);
 
 	client->addr = addr;
@@ -200,7 +200,7 @@ int msm_dba_helper_i2c_read(struct i2c_client *client,
 		rc = -EIO;
 	}
 
-	pr_err("%s: [%s:0x02%x] : R[0x%02x, 0x%02x]\n", __func__,
+	pr_debug("%s: [%s:0x02%x] : R[0x%02x, 0x%02x]\n", __func__,
 		 client->name, addr, reg, *buf);
 	return rc;
 }

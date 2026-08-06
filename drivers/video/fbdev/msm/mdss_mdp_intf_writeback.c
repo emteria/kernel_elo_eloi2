@@ -133,7 +133,7 @@ static int mdss_mdp_writeback_addr_setup(struct mdss_mdp_writeback_ctx *ctx,
 		return -EINVAL;
 	data = *in_data;
 
-	pr_err("wb_num=%d addr=0x%pa\n", ctx->wb_num, &data.p[0].addr);
+	pr_debug("wb_num=%d addr=0x%pa\n", ctx->wb_num, &data.p[0].addr);
 
 	ret = mdss_mdp_data_check(&data, &ctx->dst_planes, ctx->dst_fmt);
 	if (ret)
@@ -221,7 +221,7 @@ static int mdss_mdp_writeback_format_setup(struct mdss_mdp_writeback_ctx *ctx,
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	int rc;
 
-	pr_err("wb_num=%d format=%d\n", ctx->wb_num, format);
+	pr_debug("wb_num=%d format=%d\n", ctx->wb_num, format);
 
 	if (ctx->rot90)
 		rotation = true;
@@ -356,7 +356,7 @@ static int mdss_mdp_writeback_prepare_wfd(struct mdss_mdp_ctl *ctl, void *arg)
 	if (ctx->initialized && !ctl->shared_lock) /* already set */
 		return 0;
 
-	pr_err("wfd setup ctl=%d\n", ctl->num);
+	pr_debug("wfd setup ctl=%d\n", ctl->num);
 
 	ctx->opmode = 0;
 	ctx->img_width = ctl->width;
@@ -410,7 +410,7 @@ static int mdss_mdp_writeback_prepare_rot(struct mdss_mdp_ctl *ctl, void *arg)
 		pr_err("no mdata attached to ctl=%d", ctl->num);
 		return -ENODEV;
 	}
-	pr_err("rot setup wb_num=%d\n", ctx->wb_num);
+	pr_debug("rot setup wb_num=%d\n", ctx->wb_num);
 
 	ctx->opmode = BIT(6); /* ROT EN */
 	if (ctl->mdata->rot_block_size == 128)
@@ -501,7 +501,7 @@ static int mdss_mdp_writeback_stop(struct mdss_mdp_ctl *ctl,
 	struct mdss_mdp_writeback_ctx *ctx;
 	struct mdss_mdp_vsync_handler *t, *handle;
 
-	pr_err("stop ctl=%d\n", ctl->num);
+	pr_debug("stop ctl=%d\n", ctl->num);
 
 	ctx = (struct mdss_mdp_writeback_ctx *) ctl->priv_data;
 	if (ctx) {
@@ -539,7 +539,7 @@ static void mdss_mdp_writeback_intr_done(void *arg)
 	}
 	vsync_time = ktime_get();
 
-	pr_err("intr wb_num=%d\n", ctx->wb_num);
+	pr_debug("intr wb_num=%d\n", ctx->wb_num);
 
 	mdss_mdp_irq_disable_nosync(ctx->intr_type, ctx->intf_num);
 
@@ -611,14 +611,14 @@ static bool mdss_mdp_traffic_shaper_helper(struct mdss_mdp_ctl *ctl,
 			traffic_shaper |= MDSS_MDP_REG_TRAFFIC_SHAPER_EN;
 			traffic_shaper_enabled = true;
 
-			pr_err("pnum=%d inum:%d bw=%lld clk_rate=%u shaper=0x%x ena:%d\n",
+			pr_debug("pnum=%d inum:%d bw=%lld clk_rate=%u shaper=0x%x ena:%d\n",
 				pipe->num, ctx->intf_num, perf.bw_overlap,
 				clk_rate, traffic_shaper, enable);
 
 		} else {
 			traffic_shaper = 0;
 
-			pr_err("inum:%d shaper=0x%x, ena:%d\n",
+			pr_debug("inum:%d shaper=0x%x, ena:%d\n",
 				ctx->intf_num, traffic_shaper, enable);
 		}
 
@@ -641,7 +641,7 @@ static void mdss_mdp_traffic_shaper(struct mdss_mdp_ctl *ctl,
 
 	ctl->traffic_shaper_enabled = traffic_shaper_enabled;
 
-	pr_err("traffic shapper ctl:%d ena:%d\n", ctl->num,
+	pr_debug("traffic shapper ctl:%d ena:%d\n", ctl->num,
 		ctl->traffic_shaper_enabled);
 }
 
@@ -715,7 +715,7 @@ static int mdss_mdp_wb_wait4comp(struct mdss_mdp_ctl *ctl, void *arg)
 	if (!rc) {
 		rot_time = (u64)ktime_to_us(ctx->end_time) -
 				(u64)ktime_to_us(ctx->start_time);
-		pr_err("ctx%d type:%d xin_id:%d intf_num:%d took %llu microsecs\n",
+		pr_debug("ctx%d type:%d xin_id:%d intf_num:%d took %llu microsecs\n",
 			ctx->wb_num, ctx->type, ctx->xin_id,
 				ctx->intf_num, rot_time);
 	}
@@ -809,7 +809,7 @@ static int mdss_mdp_writeback_display(struct mdss_mdp_ctl *ctl, void *arg)
 
 	MDSS_XLOG(ctx->wb_num, ctx->type, ctx->xin_id, ctx->intf_num,
 		ctx->dst_rect.w, ctx->dst_rect.h);
-	pr_err("ctx%d type:%d xin_id:%d intf_num:%d start\n",
+	pr_debug("ctx%d type:%d xin_id:%d intf_num:%d start\n",
 		ctx->wb_num, ctx->type, ctx->xin_id, ctx->intf_num);
 
 	ctx->comp_cnt++;
@@ -826,10 +826,10 @@ int mdss_mdp_writeback_start(struct mdss_mdp_ctl *ctl)
 	struct mdss_mdp_format_params *fmt = NULL;
 	bool is_rot;
 
-	pr_err("start ctl=%d\n", ctl->num);
+	pr_debug("start ctl=%d\n", ctl->num);
 
 	if (!ctl->wb) {
-		pr_err("wb not setup in the ctl\n");
+		pr_debug("wb not setup in the ctl\n");
 		return 0;
 	}
 

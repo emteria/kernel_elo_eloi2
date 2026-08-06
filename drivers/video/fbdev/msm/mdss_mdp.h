@@ -1409,7 +1409,7 @@ static inline u32 left_lm_w_from_mfd(struct msm_fb_data_type *mfd)
 	if (ctl && ctl->mixer_left) {
 		width =  ctl->mixer_left->width;
 		width -= (pinfo->lcdc.border_left + pinfo->lcdc.border_right);
-		pr_err("ctl=%d mw=%d l=%d r=%d w=%d\n",
+		pr_debug("ctl=%d mw=%d l=%d r=%d w=%d\n",
 			ctl->num, ctl->mixer_left->width,
 			pinfo->lcdc.border_left, pinfo->lcdc.border_right,
 			width);
@@ -1767,6 +1767,12 @@ void mdss_mdp_reset_mixercfg(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 	struct mdss_mdp_commit_cb *commit_cb);
 int mdss_mdp_display_wait4comp(struct mdss_mdp_ctl *ctl);
+
+/* EloI2 migration: MDP commit stall watchdog, see mdss_mdp_ctl.c */
+void mdss_stall_begin(const char *stage);
+void mdss_stall_stage(const char *stage);
+void mdss_stall_end(void);
+
 int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl, bool use_lock);
 int mdss_mdp_display_wakeup_time(struct mdss_mdp_ctl *ctl,
 				 ktime_t *wakeup_time);

@@ -164,7 +164,7 @@ static int mdss_mdp_splash_iommu_attach(struct msm_fb_data_type *mfd)
 		!mdss_mdp_iommu_dyn_attach_supported(mdp5_data->mdata) ||
 		!mdp5_data->splash_mem_addr ||
 		!mdp5_data->splash_mem_size) {
-		pr_err("dynamic attach is not supported\n");
+		pr_debug("dynamic attach is not supported\n");
 		return -EPERM;
 	}
 
@@ -327,7 +327,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 	if (!mdata->splash_split_disp &&
 		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
 		mfd->panel_info->pdest == DISPLAY_1) {
-		pr_err("delay cleanup for display %d\n",
+		pr_debug("delay cleanup for display %d\n",
 						mfd->panel_info->pdest);
 		splash_mem_addr = mdp5_data->splash_mem_addr;
 		splash_mem_size = mdp5_data->splash_mem_size;
@@ -340,7 +340,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 		(mdata->splash_intf_sel & MDSS_MDP_INTF_DSI1_SEL) &&
 		mfd->panel_info->pdest == DISPLAY_2 &&
 		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_err("free splash mem for display %d\n",
+		pr_debug("free splash mem for display %d\n",
 						mfd->panel_info->pdest);
 		/* Give back the reserved memory to the system */
 		memblock_free(splash_mem_addr, splash_mem_size);
@@ -352,7 +352,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 
 	if (mdp5_data->splash_mem_addr &&
 		!mfd->splash_info.iommu_dynamic_attached) {
-		pr_err("free splash mem for display %d\n",
+		pr_debug("free splash mem for display %d\n",
 						mfd->panel_info->pdest);
 		/* Give back the reserved memory to the system */
 		memblock_free(mdp5_data->splash_mem_addr,
@@ -574,7 +574,7 @@ static int mdss_mdp_display_splash_image(struct msm_fb_data_type *mfd)
 	pr_err("calling mdss_mdp_splash_iommu_attach\n");
 	rc = mdss_mdp_splash_iommu_attach(mfd);
 	if (rc)
-		pr_err("iommu dynamic attach failed\n");
+		pr_debug("iommu dynamic attach failed\n");
 
 	rc = mdss_mdp_splash_kickoff(mfd, &src_rect, &dest_rect);
 	if (rc)
@@ -729,7 +729,7 @@ static __ref int mdss_mdp_splash_parse_dt(struct msm_fb_data_type *mfd)
 	}
 
 	if (!memblock_is_reserved(offsets[0])) {
-		pr_err("failed to reserve memory for fb splash\n");
+		pr_debug("failed to reserve memory for fb splash\n");
 		rc = -EINVAL;
 		goto error;
 	}
@@ -742,7 +742,7 @@ static __ref int mdss_mdp_splash_parse_dt(struct msm_fb_data_type *mfd)
 error:
 	if (!rc && !mfd->panel_info->cont_splash_enabled &&
 		mdp5_mdata->splash_mem_addr) {
-		pr_err("mem reservation not reqd if cont splash disabled\n");
+		pr_debug("mem reservation not reqd if cont splash disabled\n");
 		memblock_free(mdp5_mdata->splash_mem_addr,
 					mdp5_mdata->splash_mem_size);
 		mdss_free_bootmem(mdp5_mdata->splash_mem_addr,
