@@ -230,7 +230,6 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 				}
 			}
 
-			pr_debug("mdss_smmu_attach_v2: setting handoff_pending = false\n");
 			mdss_smmu->handoff_pending = false;
 
 			if (mdss_smmu->mmu_mapping == NULL) {
@@ -239,7 +238,6 @@ static int mdss_smmu_attach_v2(struct mdss_data_type *mdata)
 			}
 
 			if (!mdss_smmu->domain_attached) {
-				dev_dbg(mdss_smmu->dev, "iommu attaching device for domain %d\n", i);
 				rc = arm_iommu_attach_device(mdss_smmu->dev,
 						mdss_smmu->mmu_mapping);
 				if (rc) {
@@ -424,8 +422,6 @@ static int mdss_smmu_map_v2(int domain, phys_addr_t iova, phys_addr_t phys,
 		return -EINVAL;
 	}
 
-	pr_debug("passing map to iommu_map for domain=%d\n", domain);
-	pr_debug("mdss_smmu->dev = %px\n", mdss_smmu->dev);
 
 	return iommu_map(mdss_smmu->mmu_mapping->domain,
 			iova, phys, gfp_order, prot);
@@ -869,7 +865,6 @@ int mdss_smmu_probe(struct platform_device *pdev)
 	if (!mdata->handoff_pending)
 		mdss_smmu_enable_power(mdss_smmu, false);
 	else {
-		pr_debug("mdss_smmu_probe: setting handoff_pending = true\n");
 		mdss_smmu->handoff_pending = true;
 	}
 

@@ -1444,10 +1444,8 @@ int mdss_iommu_ctrl(int enable)
 		 * finished handoff, as it may still be working with phys addr
 		 */
 		if (!mdata->iommu_attached && !mdata->handoff_pending) {
-			pr_debug("before mdss_smmu_attach\n");
 			mdss_bus_rt_bw_vote(true);
 			rc = mdss_smmu_attach(mdata);
-			pr_debug("after mdss_smmu_attach\n");
 		}
 		mdata->iommu_ref_cnt++;
 	} else {
@@ -2253,7 +2251,6 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 
 	if (mdata != NULL) {
 		if (on) {
-			pr_debug("mdss_mdp_footswitch_ctrl_splash: setting handoff_pending = true\n");
 			mdata->handoff_pending = true;
 			pr_debug("Enable MDP FS for splash.\n");
 			if (mdata->venus) {
@@ -2275,7 +2272,6 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 			regulator_disable(mdata->fs);
 			if (mdata->venus)
 				regulator_disable(mdata->venus);
-			pr_debug("mdss_mdp_footswitch_ctrl_splash: setting handoff_pending = false\n");
 			mdata->handoff_pending = false;
 		}
 	} else {
@@ -2923,7 +2919,6 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 					mdata->bus_hdl, 0);
 		mdata->ao_bw_uc_idx = 0;
 	} else {
-		pr_debug("mdss_mdp_probe: setting handoff_pending = true\n");
 		mdata->handoff_pending = true;
 		/*
 		 * If multiple displays are enabled in LK, ctrl_splash off will

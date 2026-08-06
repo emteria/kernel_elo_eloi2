@@ -1709,7 +1709,6 @@ static int mdss_dsi_pinctrl_init(struct platform_device *pdev)
 	ctrl_pdata = platform_get_drvdata(pdev);
 	ctrl_pdata->pin_res.pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR_OR_NULL(ctrl_pdata->pin_res.pinctrl)) {
-		dev_err(&pdev->dev, "No pinctrl DSI :(\n");
 		pr_err("%s: failed to get pinctrl DSI\n", __func__);
 		return PTR_ERR(ctrl_pdata->pin_res.pinctrl);
 	}
@@ -3402,11 +3401,9 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	if (index == 0) {
 		ctrl_pdata->panel_data.panel_info.pdest = DISPLAY_1;
 		ctrl_pdata->ndx = DSI_CTRL_0;
-		pr_err("%s: settings DSI_CTRL to 0 and DISPLAY to 1\n", __func__);
 	} else {
 		ctrl_pdata->panel_data.panel_info.pdest = DISPLAY_2;
 		ctrl_pdata->ndx = DSI_CTRL_1;
-		pr_err("%s: settings DSI_CTRL to 1 and DISPLAY to 2\n", __func__);
 	}
 
 	if (mdss_dsi_ctrl_clock_init(pdev, ctrl_pdata)) {
@@ -3420,7 +3417,6 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	dev_err(&pdev->dev, "before split check\n");
 	if (!mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data) ||
 		(mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data) &&
 		(ctrl_pdata->panel_data.panel_info.pdest == DISPLAY_1))) {

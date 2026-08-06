@@ -120,16 +120,19 @@ int msm_tz_set_cb_format(enum tz_smmu_device_id sec_id, int cbndx)
 	ret = scm_call2(SCM_SIP_FNID(SCM_SVC_SMMU_PROGRAM,
 			SMMU_CHANGE_PAGETABLE_FORMAT), &desc);
 
-	pr_err("Changing format for CB %d with ID %d returned %d\n", cbndx, sec_id, ret);
-
-	/* At this stage, we cannot afford to fail because we have
-	 * committed to support V8L format to client and we can't
-	 * fallback.
+	/*
+	 * Report the failure to the caller instead of BUG()ing on it, as the
+	 * stock driver did. On EloI2 this call is refused for sec_id APPS(17)
+	 * because the TZ image only implements CHANGE_PAGETABLE_FORMAT for the
+	 * GPU. Failing domain creation cleanly is far better than building V8L
+	 * page tables the hardware is not running and translation-faulting
+	 * later. Note apps_iommu no longer reaches this path at all - it uses
+	 * qcom,force-aarch32-pgtbl, which never asks TZ to change the format.
 	 */
 	if (ret) {
-		pr_err("Format change failed for CB %d with ret %d\n",
-			cbndx, ret);
-		// BUG();
+		pr_err("Format change failed for CB %d with ID %d, ret %d\n",
+			cbndx, sec_id, ret);
+		return ret;
 	}
 
 	return 0;

@@ -1353,7 +1353,6 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
 	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 
-	pr_err("starting fb%d overlay for mfd=%px with splash enabled %d and handoff pending %d\n", mfd->index, mfd, mfd->panel_info->cont_splash_enabled, mdata->handoff_pending);
 
 	if (mdss_mdp_ctl_is_power_on(ctl)) {
 		if (!mdp5_data->mdata->batfet)
@@ -1361,7 +1360,6 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 		mdss_mdp_release_splash_pipe(mfd);
 		return 0;
 	} else if (mfd->panel_info->cont_splash_enabled) {
-		pr_err("cont_splash_enabled branch +\n");
 		if (mdp5_data->allow_kickoff) {
 			mdp5_data->allow_kickoff = false;
 		} else {
@@ -1374,7 +1372,6 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 				return -EPERM;
 			}
 		}
-		pr_err("cont_splash_enabled branch -\n");
 	} else if (mdata->handoff_pending) {
 		pr_warn("fb%d: commit while splash handoff pending\n",
 				mfd->index);
@@ -1438,7 +1435,6 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	if (rc && (rc != -EPERM) && (rc != -ENODEV))
 		pr_err("PP resume err %d\n", rc);
 
-	pr_err("mdss_mdp_overlay_start: calling mdss_mdp_splash_cleanup with true!\n");
 	rc = mdss_mdp_splash_cleanup(mfd, true);
 	if (!rc)
 		goto end;
@@ -1639,7 +1635,6 @@ static void __overlay_kickoff_requeue(struct msm_fb_data_type *mfd)
 {
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
-	pr_err("calling mdss_mdp_display_commit #2\n");
 	mdss_mdp_display_commit(ctl, NULL, NULL);
 	mdss_mdp_display_wait4comp(ctl);
 
@@ -1649,7 +1644,6 @@ static void __overlay_kickoff_requeue(struct msm_fb_data_type *mfd)
 
 	__overlay_queue_pipes(mfd);
 
-	pr_err("calling mdss_mdp_display_commit #3\n");
 	mdss_mdp_display_commit(ctl, NULL,  NULL);
 	mdss_mdp_display_wait4comp(ctl);
 }
@@ -2880,7 +2874,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	mutex_lock(&mdp5_data->ov_lock);
 	ctl->bw_pending = 0;
 
-	pr_err("calling mdss_mdp_overlay_start #2\n");
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay #3 %d (%d)\n", mfd->index, ret);
@@ -2890,7 +2883,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		return ret;
 	}
 
-	pr_err("before calling mdss_iommu_ctrl(1)\n");
 	ret = mdss_iommu_ctrl(1);
 	if (IS_ERR_VALUE((unsigned long)ret)) {
 		pr_err("iommu attach failed rc=%d\n", ret);
@@ -2963,7 +2955,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		ATRACE_BEGIN("display_commit");
 		commit_cb.commit_cb_fnc = mdss_mdp_commit_cb;
 		commit_cb.data = mfd;
-		pr_err("calling mdss_mdp_display_commit #4\n");
 		mdss_stall_begin("display_commit");
 		ret = mdss_mdp_display_commit(mdp5_data->ctl, NULL,
 			&commit_cb);
@@ -3452,7 +3443,6 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 		goto pipe_release;
 	}
 
-	pr_err("calling mdss_mdp_overlay_start #3\n");
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay #4 %d (%d)\n", mfd->index, ret);
@@ -5715,7 +5705,6 @@ static int mdss_mdp_overlay_ioctl_handler(struct msm_fb_data_type *mfd,
 		break;
 
 	case MSMFB_OVERLAY_VSYNC_CTRL:
-		pr_err("MSMFB_OVERLAY_VSYNC_CTRL received\n");
 		if (!copy_from_user(&val, argp, sizeof(val))) {
 			ret = mdss_mdp_overlay_vsync_ctrl(mfd, val);
 		} else {
@@ -5960,7 +5949,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 	 */
 	if (!mfd->panel_info->cont_splash_enabled &&
 		!mdata->handoff_pending) {
-		pr_err("calling mdss_mdp_overlay_start #4\n");
 		rc = mdss_mdp_overlay_start(mfd);
 		if (rc)
 			goto end;

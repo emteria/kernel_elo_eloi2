@@ -415,7 +415,6 @@ rename:
 	kobject_get(group->devices_kobj);
 
 	dev->iommu_group = group;
-	struct iommu_group *new_group = dev->iommu_group;
 
 	iommu_group_create_direct_mappings(group, dev);
 
@@ -1104,12 +1103,10 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 {
 	int ret;
 	if (unlikely(domain->ops->attach_dev == NULL)) {
-		pr_debug("skip device attach due to domain->ops->attach_dev == NULL\n");
 		return -ENODEV;
 	}
 
 	ret = domain->ops->attach_dev(domain, dev);
-	pr_debug("domain->ops->attach_dev returned %d for device %s\n", ret, dev_name(dev));
 
 	if (!ret) {
 		trace_attach_device_to_domain(dev);
@@ -1118,7 +1115,6 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 		if (!strnlen(domain->name, IOMMU_DOMAIN_NAME_LEN)) {
 			strlcpy(domain->name, dev_name(dev),
 				IOMMU_DOMAIN_NAME_LEN);
-			pr_debug("using domain name %s\n", domain->name);
 		}
 	}
 
@@ -1373,12 +1369,10 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 
 	if (unlikely(domain->ops->map == NULL ||
 		     domain->pgsize_bitmap == 0UL)) {
-		pr_debug("iommu_map failed #1\n");
 		return -ENODEV;
 	}
 
 	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING))) {
-		pr_debug("iommu_map failed #2\n");
 		return -EINVAL;
 	}
 
@@ -1402,12 +1396,9 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		size_t pgsize = iommu_pgsize(domain->pgsize_bitmap,
 						iova | paddr, size);
 
-		pr_debug("mapping: iova 0x%lx pa %pa pgsize 0x%zx for domain %s\n",
-			 iova, &paddr, pgsize, domain->name);
 
 		ret = domain->ops->map(domain, iova, paddr, pgsize, prot);
 		if (ret) {
-			pr_debug("iommu_map failed #3\n");
 			break;
 		}
 
