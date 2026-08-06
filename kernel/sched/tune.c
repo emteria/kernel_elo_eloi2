@@ -300,7 +300,17 @@ schedtune_accept_deltas(int nrg_delta, int cap_delta,
  *    implementation especially for the computation of the per-CPU boost
  *    value
  */
-#define BOOSTGROUPS_COUNT 5
+/*
+ * Android 14's init.rc creates six schedtune groups under /dev/stune:
+ * foreground, background, top-app, rt (init.rc:116-119), camera-daemon (:214)
+ * and nnapi-hal (:222). With the root group that needs 7 slots. The stock
+ * value of 5 makes the last two mkdir()s fail with -ENOSPC:
+ *   init: Command 'mkdir /dev/stune/camera-daemon' ... failed: No space left
+ *   init: Command 'mkdir /dev/stune/nnapi-hal' ... failed: No space left
+ * Cost of raising it is one extra entry per group in the per-CPU boost_groups
+ * array, i.e. a few bytes per CPU.
+ */
+#define BOOSTGROUPS_COUNT 7
 
 /* Array of configured boostgroups */
 static struct schedtune *allocated_group[BOOSTGROUPS_COUNT] = {

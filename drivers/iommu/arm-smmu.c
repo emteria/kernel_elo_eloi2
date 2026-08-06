@@ -4331,8 +4331,16 @@ static int arm_smmu_init_clocks(struct arm_smmu_power_resources *pwr)
 		struct clk *c = devm_clk_get(dev, cname);
 
 		if (IS_ERR(c)) {
-			dev_err(dev, "Couldn't get clock #1: %s\n",
-				cname);
+			/*
+			 * -EPROBE_DEFER just means the clock controller has not
+			 * probed yet and we will be retried; it is not an
+			 * error. kgsl_smmu hits this for gpu_ahb_clk on every
+			 * boot because clock_gcc_gfx comes up after it, and the
+			 * retry succeeds. Shouting about it made a normal
+			 * deferral look like a hardware fault.
+			 */
+			if (PTR_ERR(c) != -EPROBE_DEFER)
+				dev_err(dev, "Couldn't get clock: %s\n", cname);
 			return PTR_ERR(c);
 		}
 
