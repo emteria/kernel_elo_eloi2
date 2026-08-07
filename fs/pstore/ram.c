@@ -594,6 +594,62 @@ void notrace ramoops_console_write_buf(const char *buf, size_t size)
 	persistent_ram_write(cxt->cprz, buf, size);
 }
 
+/*
+ * EloI2 A14 bring-up: print the previous boot's console to this boot's console.
+ *
+ * Normally you would read /sys/fs/pstore after the reset. This device has no
+ * shell and no working adb - the UART is output only - so nothing will ever read
+ * it and the kernel has to do the dump itself.
+ *
+ * Hard bounded on purpose. The console is 115200 8N1 = 11.5 KB/s, so dumping the
+ * whole 512 KB zone would add 45 s to every boot and would itself risk the printk
+ * problems this project has already been bitten by. The tail is what matters when
+ * you are looking for the cause of a reset.
+ */
+#define RAMOOPS_BOOT_DUMP_MAX	(16 * 1024)
+
+static void ramoops_dump_prev_console(struct ramoops_context *cxt)
+{
+	char line[192];
+	size_t old_size, off, len;
+	const char *old;
+
+	if (!cxt->cprz)
+		return;
+
+	old_size = persistent_ram_old_size(cxt->cprz);
+	old = persistent_ram_old(cxt->cprz);
+	if (!old_size || !old)
+		return;
+
+	off = (old_size > RAMOOPS_BOOT_DUMP_MAX) ?
+			old_size - RAMOOPS_BOOT_DUMP_MAX : 0;
+
+	pr_err("ramoops: ==== PREVIOUS BOOT CONSOLE, last %zu of %zu bytes ====\n",
+	       old_size - off, old_size);
+
+	while (off < old_size) {
+		len = 0;
+		while (off < old_size && old[off] != '\n' &&
+		       len < sizeof(line) - 1) {
+			char c = old[off++];
+
+			/* the zone is raw memory - it may hold anything */
+			line[len++] = (c >= 0x20 && c <= 0x7e) ? c : '.';
+		}
+		line[len] = '\0';
+
+		/* swallow the newline we stopped on, if that is why we stopped */
+		if (off < old_size && old[off] == '\n')
+			off++;
+
+		if (len)
+			pr_err("ramoops| %s\n", line);
+	}
+
+	pr_err("ramoops: ==== END OF PREVIOUS BOOT CONSOLE ====\n");
+}
+
 static int ramoops_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -668,6 +724,12 @@ static int ramoops_probe(struct platform_device *pdev)
 			       cxt->console_size, 0);
 	if (err)
 		goto fail_init_cprz;
+
+	/*
+	 * Do this before pstore_register() so the dump reflects the previous
+	 * boot only, and so it still happens if anything below fails.
+	 */
+	ramoops_dump_prev_console(cxt);
 
 	err = ramoops_init_prz(dev, cxt, &cxt->fprz, &paddr, cxt->ftrace_size,
 			       LINUX_VERSION_CODE);

@@ -135,6 +135,43 @@
 			label = "cont_splash_mem";
 		};
 
+		/*
+		 * EloI2 A14 bring-up: persistent RAM for pstore/ramoops, so the
+		 * last console output survives a reset. The device resets
+		 * silently at ~120 s with the kernel alive and printing, and
+		 * nothing in the build survives a reset to tell us why.
+		 *
+		 * Address chosen deliberately, do not move it without redoing
+		 * this arithmetic:
+		 *   0x90001000 + 0x13ff000 = 0x91400000  end of cont_splash_mem
+		 *   0x9F000000 .. 0x9F100000             this region, 1 MB
+		 *   0xA0100000                           LK SCRATCH_ADDR
+		 *                                        (target/msm8953/rules.mk)
+		 * so it sits above every fixed reservation and below LK's
+		 * download buffer. It is clear of every CMA pool this board
+		 * creates (0x8f000000, 0x8f800000, 0xc7800000, 0xfc000000,
+		 * 0xfe800000, 0xfec00000, 0xffc00000).
+		 *
+		 * NO "no-map" ON PURPOSE. With no-map the region leaves the
+		 * linear map, pfn_valid() goes false and persistent_ram falls
+		 * back to ioremap, i.e. Device-nGnRE memory, where the plain
+		 * memcpy in ram_core.c can fault on unaligned access. Left
+		 * mapped, it takes the persistent_ram_vmap writecombine path.
+		 *
+		 * A fastboot flash writes over this (LK's 512 MB download
+		 * buffer starts 1 MB above it), so the first boot after a flash
+		 * legitimately has nothing to recover.
+		 */
+		ramoops_mem: ramoops_region@9f000000 {
+			compatible = "ramoops";
+			reg = <0x0 0x9f000000 0x0 0x100000>;
+			console-size = <0x80000>;	/* 512 KB */
+			record-size  = <0x20000>;	/* 128 KB of oops/panic */
+			ftrace-size  = <0x0>;
+			pmsg-size    = <0x0>;
+			ecc-size     = <0x0>;
+		};
+
 		adsp_shmem_device_mem: adsp_shmem_device_region@0xc0100000 {
 			compatible = "shared-dma-pool";
 			label = "adsp_shmem_device_mem";
@@ -340,6 +377,28 @@
 	};
 
 	thermal_zones: thermal-zones {};
+
+	/*
+	 * EloI2 A14 bring-up 2026-08-07: RESTORED. This node was deleted by the
+	 * local commit e0f6dbc973d1 "Debugging unexpected restart" (Oct 2024),
+	 * together with the #include of msm8953-thermal.dtsi further down, so
+	 * this device has had NO temperature sensing and NO thermal mitigation
+	 * for the whole bring-up. migration-fap20-v49-org - the known-good
+	 * reference on the same silicon - still has both, and this node is a
+	 * byte-for-byte copy of FAP20's msm8953.dtsi:411.
+	 * Without it, thermal-engine has nothing to read (which is why it exits
+	 * with status 1 every boot) and nothing throttles the SoC.
+	 */
+	tsens0: tsens@4a8000 {
+		compatible = "qcom,msm8953-tsens";
+		reg = <0x4a8000 0x1000>,
+			<0x4a9000 0x1000>;
+		reg-names = "tsens_srot_physical",
+					"tsens_tm_physical";
+		interrupts = <0 184 0>, <0 314 0>;
+		interrupt-names = "tsens-upper-lower", "tsens-critical";
+		#thermal-sensor-cells = <1>;
+	};
 
 	qcom_seecom: qseecom@85b00000 {
 		compatible = "qcom,qseecom";
@@ -1716,6 +1775,16 @@
 #include "msm8953-regulator.dtsi"
 #include "pmi8950.dtsi"
 #include "msm-gdsc-8916.dtsi"
+/*
+ * RESTORED 2026-08-07, see the tsens0 node above. Deleted by e0f6dbc973d1.
+ * 43 thermal zones with real trip points and cpufreq/GPU cooling maps. The file
+ * itself was never deleted and is byte-identical to FAP20's, only the include
+ * was dropped. Must come after pm8953.dtsi (it references &pm8953_tz and
+ * &pm8953_vadc) and after msm8953-cpu.dtsi (it references &CPU0..&CPU7).
+ * Some cooling-maps point at the modem QMI cooling devices, which EloI2 has no
+ * modem for; those maps simply stay unbound at runtime, the zones still work.
+ */
+#include "msm8953-thermal.dtsi"
 #include "msm8953-mdss.dtsi"
 #include "msm8953-mdss-pll.dtsi"
 #include "msm8953-audio.dtsi"
