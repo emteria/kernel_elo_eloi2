@@ -4644,7 +4644,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 			return -ENOMEM;
 
 		dev_notice(smmu->dev,
-			   "\tstream matching with %lu register groups, mask 0x%x",
+			   "\tstream matching with %lu register groups, mask 0x%x\n",
 			   size, smmu->smr_mask_mask);
 	}
 	/* s2cr->type == 0 means translation, so initialise explicitly */

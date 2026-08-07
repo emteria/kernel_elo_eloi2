@@ -8329,7 +8329,7 @@ static int qseecom_retrieve_ce_data(struct platform_device *pdev)
 						"qcom,support-pfe");
 
 	if (!qseecom.support_pfe && !qseecom.support_fde) {
-		pr_warn("Device does not support PFE/FDE");
+		pr_warn("Device does not support PFE/FDE\n");
 		goto out;
 	}
 
@@ -8589,7 +8589,7 @@ static int qseecom_retrieve_ce_data(struct platform_device *pdev)
 			pce_entry++;
 		}
 	} else {
-		pr_warn("Device does not support FDE");
+		pr_warn("Device does not support FDE\n");
 		disk_encrypt_pipe = 0xff;
 	}
 	if (qseecom.support_pfe) {
@@ -8635,7 +8635,7 @@ static int qseecom_retrieve_ce_data(struct platform_device *pdev)
 			pce_entry++;
 		}
 	} else {
-		pr_warn("Device does not support PFE");
+		pr_warn("Device does not support PFE\n");
 		file_encrypt_pipe = 0xff;
 	}
 

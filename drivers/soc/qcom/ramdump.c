@@ -321,7 +321,7 @@ void *create_ramdump_device(const char *dev_name, struct device *parent)
 				parent->of_node, "qcom,complete-ramdump");
 		if (!rd_dev->complete_ramdump)
 			dev_info(parent,
-			"for %s segments only will be dumped.", dev_name);
+			"for %s segments only will be dumped\n", dev_name);
 	}
 
 	init_waitqueue_head(&rd_dev->dump_wait_q);
