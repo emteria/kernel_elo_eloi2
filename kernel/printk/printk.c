@@ -722,13 +722,35 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 	struct devkmsg_user *user = file->private_data;
 	size_t len = iov_iter_count(from);
 	ssize_t ret = len;
+	bool truncated = false;
 
-	if (!user || len > LOG_LINE_MAX)
+	if (!user)
 		return -EINVAL;
+
+	/*
+	 * Truncate oversized writes instead of rejecting them.
+	 *
+	 * Upstream returns -EINVAL here, which is fatal on a device whose only
+	 * diagnostic channel is the UART. Android's init "stdio_to_kmsg" points
+	 * a service's stdout at /dev/kmsg_debug, which first_stage_init creates
+	 * as the very same char device (1:11) as /dev/kmsg. logcat flushes once
+	 * per message and exits(1) on a short write, so ONE log line above
+	 * LOG_LINE_MAX killed our logcat-to-kmsg bridge for good; init respawned
+	 * it, logcat replayed the buffer, hit the same line and died again, in a
+	 * loop that hid every framework message logged after it.
+	 *
+	 * vprintk_emit() already trims to LOG_LINE_MAX via its textbuf[], so
+	 * clamping here only makes the loss explicit rather than fatal. Report
+	 * the original count as written so the writer keeps going.
+	 */
+	if (len > LOG_LINE_MAX) {
+		len = LOG_LINE_MAX;
+		truncated = true;
+	}
 
 	/* Ignore when user logging is disabled. */
 	if (devkmsg_log & DEVKMSG_LOG_MASK_OFF)
-		return len;
+		return ret;	/* not len - that is now the clamped value */
 
 	/* Ratelimit when not explicitly enabled. */
 	if (!(devkmsg_log & DEVKMSG_LOG_MASK_ON)) {
@@ -745,6 +767,10 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 		kfree(buf);
 		return -EFAULT;
 	}
+
+	/* Make a truncation visible in the log rather than silent. */
+	if (truncated && len >= 4)
+		memcpy(buf + len - 4, "...", 4);
 
 	/*
 	 * Extract and skip the syslog prefix <[0-9]*>. Coming from userspace
