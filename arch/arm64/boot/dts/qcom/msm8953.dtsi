@@ -190,6 +190,23 @@
 			alignment = <0 0x400000>;
 			size = <0 0x800000>;
 		};
+
+		/*
+		 * EloI2 A14 bring-up 2026-08-08: RESTORED, verbatim from
+		 * migration-fap20-v49-org. Deleted by the local commit
+		 * e0f6dbc973d1 "Debugging unexpected restart" (Oct 2024) along
+		 * with the wdog node and the thermal subsystem. Backs
+		 * CONFIG_QCOM_MEMORY_DUMP_V2 and the watchdog driver's scandump.
+		 * "reusable" means this is a CMA pool, not a permanent 4 MB
+		 * carve-out, and it carries no fixed address so it cannot
+		 * collide with ramoops_mem at 0x9f000000 (that one has a fixed
+		 * reg and is memblock-reserved, so CMA will not place here).
+		 */
+		dump_mem: mem_dump_region {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x400000>;
+		};
 	};
 
 	aliases {
@@ -377,6 +394,60 @@
 	};
 
 	thermal_zones: thermal-zones {};
+
+	/*
+	 * EloI2 A14 bring-up 2026-08-08: RESTORED, verbatim from
+	 * migration-fap20-v49-org, together with dump_mem above and the wdog
+	 * node below. Consumed by drivers/soc/qcom/memory_dump_v2.c, which
+	 * publishes the dump table through the already-present imem child
+	 * mem_dump_table@10 so TZ/SBL can fill these regions across a reset.
+	 * It makes NO SCM call - the only one in that driver is behind
+	 * CONFIG_MSM_DEBUG_LAR_UNLOCK, which stays off deliberately because
+	 * this device's TrustZone is a generation older than this kernel.
+	 * rpm_sw_dump and pmic_dump are the interesting ones here: an RPM
+	 * error-fatal is one of the few things that can pull PS_HOLD without
+	 * leaving any trace in Linux.
+	 */
+	mem_dump {
+		compatible = "qcom,mem-dump";
+		memory-region = <&dump_mem>;
+
+		rpm_sw_dump {
+			qcom,dump-size = <0x28000>;
+			qcom,dump-id = <0xea>;
+		};
+
+		pmic_dump {
+			qcom,dump-size = <0x10000>;
+			qcom,dump-id = <0xe4>;
+		};
+
+		vsense_dump {
+			qcom,dump-size = <0x10000>;
+			qcom,dump-id = <0xe9>;
+		};
+
+		tmc_etf_dump {
+			qcom,dump-size = <0x10000>;
+			qcom,dump-id = <0xf0>;
+		};
+
+		tmc_etr_reg_dump {
+			qcom,dump-size = <0x1000>;
+			qcom,dump-id = <0x100>;
+		};
+
+		tmc_etf_reg_dump {
+			qcom,dump-size = <0x1000>;
+			qcom,dump-id = <0x101>;
+		};
+
+		misc_data_dump {
+			qcom,dump-size = <0x1000>;
+			qcom,dump-id = <0xe8>;
+		};
+
+	};
 
 	/*
 	 * EloI2 A14 bring-up 2026-08-07: RESTORED. This node was deleted by the
@@ -1024,6 +1095,41 @@
 		compatible = "qcom,rpm-smd";
 		rpm-channel-name = "rpm_requests";
 		rpm-channel-type = <15>; /* SMD_APPS_RPM */
+	};
+
+	/*
+	 * EloI2 A14 bring-up 2026-08-08: RESTORED, verbatim from
+	 * migration-fap20-v49-org (same silicon, same kernel, boots Android 14
+	 * with these exact bark/pet values under the same UART console load).
+	 * Deleted by e0f6dbc973d1 "Debugging unexpected restart" (Oct 2024).
+	 *
+	 * A 2026-08-07 session concluded "MSM8953 has no qcom,msm-watchdog node
+	 * so the driver never probes on either device". THAT WAS WRONG - it was
+	 * grepped from THIS file AFTER e0f6dbc973d1 had already removed the
+	 * node. The device's own shipping Android 7 kernel has it too:
+	 * PlatformElo-v07/kernel/msm-3.18/.../msm8953.dtsi:1153, with
+	 * CONFIG_MSM_WATCHDOG_V2=y in its elo_defconfig:543. EloI2 on 4.9 was
+	 * the only one of the three configurations running with no watchdog.
+	 *
+	 * PURPOSE HERE IS DIAGNOSTIC. On any stall longer than bark-time the
+	 * driver prints a bark banner plus a backtrace of every CPU over the
+	 * UART before the bite, so a hang stops being silent. If the death is
+	 * an instantaneous external reset instead, this stays quiet and costs
+	 * nothing. NOTE it also ARMS a reset source that is absent today - a
+	 * bite is a NEW failure mode and must not be confused with the mystery
+	 * reset. It is loud, so the two are easy to tell apart. If it turns out
+	 * to fire spuriously, raise qcom,bark-time rather than dropping this.
+	 */
+	wdog: qcom,wdt@b017000 {
+		compatible = "qcom,msm-watchdog";
+		reg = <0xb017000 0x1000>;
+		reg-names = "wdt-base";
+		interrupts = <0 3 0>, <0 4 0>;
+		qcom,bark-time = <11000>;
+		qcom,pet-time = <9360>;
+		qcom,ipi-ping;
+		qcom,wakeup-enable;
+		qcom,scandump-size = <0x40000>;
 	};
 
 	qcom,msm-rtb {
