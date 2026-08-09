@@ -328,11 +328,14 @@
 		max-clk-turbo = <465000000>;
 	};
 
-	qcom,adsp {
-		status = "disabled";
-		compatible = "adsp-shmem-device";
-		memory-region = <&adsp_shmem_device_mem>;
-	};
+	/*
+	 * EloI2 A14 ROUND K, 2026-08-10. qcom,adsp REMOVED together with the
+	 * adsp_shmem_device_region it pointed at - see the comment left in
+	 * msm8953.dtsi where that region used to be. This node was a local
+	 * addition, absent from both the Android 7 tree and
+	 * github/migration-fap20-v49-org, and it was status = "disabled", so it
+	 * never probed and the memory it reserved was never used.
+	 */
 
 	qcom,vfe {
 		compatible = "qcom,vfe";
