@@ -147,7 +147,13 @@ config TRACING_SUPPORT
 	# irqflags tracing for your architecture.
 	depends on TRACE_IRQFLAGS_SUPPORT || PPC32
 	depends on STACKTRACE_SUPPORT
-	default n
+	# EloI2 A14 bring-up 2026-08-09, F65: RESTORED to upstream's "default y".
+	# Commit 5b263617b817 "Add display drivers" changed this to "default n" as an
+	# unrelated drive-by edit, which silently removed ftrace/atrace/perfetto from
+	# this kernel. FAP20's tree (migration-fap20-v49-logs) and mainline both have
+	# "default y". TRACING_SUPPORT has no prompt, so a defconfig cannot override it -
+	# the Kconfig itself has to be corrected.
+	default y
 
 if TRACING_SUPPORT
 

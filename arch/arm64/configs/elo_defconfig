@@ -101,7 +101,14 @@ CONFIG_TICK_CPU_ACCOUNTING=y
 CONFIG_IRQ_TIME_ACCOUNTING=y
 CONFIG_SCHED_WALT=y
 # CONFIG_BSD_PROCESS_ACCT is not set
-# CONFIG_TASKSTATS is not set
+# EloI2 F65 tier 2. Per-task/per-UID accounting that storage and power attribution feed on.
+# TASK_DELAY_ACCT selects SCHED_INFO; TASK_IO_ACCOUNTING needs TASK_XACCT needs TASKSTATS.
+# UID_SYS_STATS lives in drivers/misc/Kconfig but is grouped here with what it depends on.
+CONFIG_TASKSTATS=y
+CONFIG_TASK_DELAY_ACCT=y
+CONFIG_TASK_XACCT=y
+CONFIG_TASK_IO_ACCOUNTING=y
+CONFIG_UID_SYS_STATS=y
 CONFIG_PSI=y
 # CONFIG_PSI_DEFAULT_DISABLED is not set
 
@@ -125,7 +132,21 @@ CONFIG_RCU_NOCB_CPU=y
 CONFIG_RCU_NOCB_CPU_ALL=y
 CONFIG_BUILD_BIN2C=y
 CONFIG_IKCONFIG=y
-# CONFIG_IKCONFIG_PROC is not set
+# EloI2 A14 bring-up 2026-08-09, F54. THIS IS A CRASH FIX, NOT A CONVENIENCE.
+# Without /proc/config.gz, system_server SIGABRTs:
+#   android_os_Debug.cpp:1009  android_os_Debug_isVmapStack()
+#     CHECK(result == OK) << "Kernel configs could not be fetched. b/151092221";
+# It only wants to know whether CONFIG_VMAP_STACK is set, but if the config cannot be READ AT ALL
+# it aborts the process instead of degrading, and the process is system_server - which takes the
+# whole framework down with it (that is where boot 09's com.android.phone DeadSystemException
+# came from). A second armed landmine on the same root cause is
+#   KeyLayoutMap.cpp:106  LOG_ALWAYS_FATAL_IF(result != OK, "Kernel configs could not be fetched")
+# in the input stack, also inside system_server.
+# The IKCONFIG line above already compiles the config blob INTO the kernel; the line below only
+# publishes it at /proc/config.gz. No extra memory beyond the proc entry, no behavioural risk.
+# (Deliberately not starting this comment with "# CONFIG_" - confdata.c parses '# CONFIG_x ...'
+#  looking for 'is not set', and there is no reason to hand it something to chew on.)
+CONFIG_IKCONFIG_PROC=y
 # CONFIG_IKHEADERS is not set
 CONFIG_LOG_BUF_SHIFT=21
 # CONFIG_CONSOLE_FLUSH_ON_HOTPLUG is not set
@@ -230,7 +251,9 @@ CONFIG_SLUB=y
 # CONFIG_SLAB_FREELIST_RANDOM is not set
 CONFIG_SLUB_CPU_PARTIAL=y
 # CONFIG_SYSTEM_DATA_VERIFICATION is not set
-# CONFIG_PROFILING is not set
+# EloI2 F65 tier 2. Required by UID_SYS_STATS (drivers/misc/Kconfig:
+# depends on PROFILING && TASK_XACCT && TASK_IO_ACCOUNTING).
+CONFIG_PROFILING=y
 CONFIG_TRACEPOINTS=y
 # CONFIG_KPROBES is not set
 # CONFIG_JUMP_LABEL is not set
@@ -475,10 +498,13 @@ CONFIG_ARCH_NR_GPIO=1280
 CONFIG_PREEMPT=y
 CONFIG_PREEMPT_COUNT=y
 # CONFIG_HZ_100 is not set
-CONFIG_HZ_250=y
+# CONFIG_HZ_250 is not set
 # CONFIG_HZ_300 is not set
-# CONFIG_HZ_1000 is not set
-CONFIG_HZ=250
+# EloI2 F65. 250 -> 1000 to match FAP20, which runs the same SoC and the same 4.9.337 kernel
+# at HZ_1000. Better scheduling granularity for a UI device; NO_HZ_IDLE keeps the idle cost
+# down. Changed because the reference proves the value works here, not on general principle.
+CONFIG_HZ_1000=y
+CONFIG_HZ=1000
 CONFIG_SCHED_HRTICK=y
 CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC=y
 CONFIG_ARCH_HAS_HOLES_MEMORYMODEL=y
@@ -677,6 +703,7 @@ CONFIG_CPU_FREQ_MSM=y
 CONFIG_NET=y
 CONFIG_COMPAT_NETLINK_MESSAGES=y
 CONFIG_NET_INGRESS=y
+CONFIG_NET_EGRESS=y
 
 #
 # Networking options
@@ -689,7 +716,8 @@ CONFIG_UNIX_SCM=y
 CONFIG_XFRM=y
 CONFIG_XFRM_ALGO=y
 CONFIG_XFRM_USER=y
-# CONFIG_XFRM_INTERFACE is not set
+# EloI2 F65 tier 2. IKEv2/IPsec VPN (Android 12+). depends on XFRM && IPV6, both already =y.
+CONFIG_XFRM_INTERFACE=y
 # CONFIG_XFRM_SUB_POLICY is not set
 # CONFIG_XFRM_MIGRATE is not set
 CONFIG_XFRM_STATISTICS=y
@@ -711,7 +739,8 @@ CONFIG_IP_PNP_DHCP=y
 # CONFIG_NET_IPGRE_DEMUX is not set
 CONFIG_NET_IP_TUNNEL=y
 # CONFIG_IP_MROUTE is not set
-# CONFIG_SYN_COOKIES is not set
+# EloI2 F65 tier 2.
+CONFIG_SYN_COOKIES=y
 # CONFIG_NET_IPVTI is not set
 CONFIG_NET_UDP_TUNNEL=y
 # CONFIG_NET_FOU is not set
@@ -727,7 +756,8 @@ CONFIG_INET_XFRM_MODE_TUNNEL=y
 # CONFIG_INET_XFRM_MODE_BEET is not set
 CONFIG_INET_DIAG=y
 CONFIG_INET_TCP_DIAG=y
-# CONFIG_INET_UDP_DIAG is not set
+# EloI2 F65 tier 2. netd's SockDiag uses UDP socket diag to tear down sockets.
+CONFIG_INET_UDP_DIAG=y
 CONFIG_INET_DIAG_DESTROY=y
 # CONFIG_TCP_CONG_ADVANCED is not set
 CONFIG_TCP_CONG_CUBIC=y
@@ -886,7 +916,8 @@ CONFIG_NETFILTER_XT_MATCH_MARK=y
 CONFIG_NETFILTER_XT_MATCH_MULTIPORT=y
 # CONFIG_NETFILTER_XT_MATCH_NFACCT is not set
 # CONFIG_NETFILTER_XT_MATCH_OSF is not set
-# CONFIG_NETFILTER_XT_MATCH_OWNER is not set
+# EloI2 F65 tier 2. "-m owner --uid-owner", used by netd's firewall chains.
+CONFIG_NETFILTER_XT_MATCH_OWNER=y
 CONFIG_NETFILTER_XT_MATCH_POLICY=y
 # CONFIG_NETFILTER_XT_MATCH_PHYSDEV is not set
 CONFIG_NETFILTER_XT_MATCH_PKTTYPE=y
@@ -1046,7 +1077,11 @@ CONFIG_NET_SCH_PRIO=y
 # CONFIG_NET_SCH_FQ is not set
 # CONFIG_NET_SCH_HHF is not set
 # CONFIG_NET_SCH_PIE is not set
-# CONFIG_NET_SCH_INGRESS is not set
+# EloI2 F65 tier 1. clsact qdisc. netd attaches its eBPF traffic-accounting programs to it
+# (NetworkController.cpp:152, RouteController.cpp:1168); without it every boot logs
+# "TcUtils : NLMSG_ERROR message return error: -2" and per-app data accounting is dead.
+# depends on NET_CLS_ACT (already =y) and selects NET_INGRESS + NET_EGRESS.
+CONFIG_NET_SCH_INGRESS=y
 # CONFIG_NET_SCH_PLUG is not set
 
 #
@@ -1290,7 +1325,9 @@ CONFIG_ZRAM=y
 # CONFIG_BLK_DEV_UMEM is not set
 # CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=y
-CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
+# EloI2 F65. 8 -> 16 to match FAP20. A14 mounts ~20 APEXes on loop devices. More are created
+# on demand via /dev/loop-control so 8 was probably fine; 16 is cheap insurance.
+CONFIG_BLK_DEV_LOOP_MIN_COUNT=16
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_DRBD is not set
 # CONFIG_BLK_DEV_NBD is not set
@@ -1547,7 +1584,8 @@ CONFIG_NET_CORE=y
 # CONFIG_NETPOLL is not set
 # CONFIG_NET_POLL_CONTROLLER is not set
 # CONFIG_RMNET_IPLO is not set
-# CONFIG_TUN is not set
+# EloI2 F65 tier 2. /dev/tun - every VpnService app needs it.
+CONFIG_TUN=y
 # CONFIG_TUN_VNET_CROSS_LE is not set
 # CONFIG_VETH is not set
 # CONFIG_NLMON is not set
@@ -3632,8 +3670,8 @@ CONFIG_NOP_USB_XCEIV=y
 # CONFIG_USB_QCOM_8X16_PHY is not set
 # CONFIG_USB_ULPI is not set
 CONFIG_DUAL_ROLE_USB_INTF=y
-# CONFIG_USB_MSM_SSPHY_QMP is not set
-# CONFIG_MSM_QUSB_PHY is not set
+CONFIG_USB_MSM_SSPHY_QMP=y
+CONFIG_MSM_QUSB_PHY=y
 # CONFIG_MSM_HSUSB_PHY is not set
 CONFIG_USB_MSM_OTG=y
 # CONFIG_USB_PHY_TUNE_FACTORY_OVERRIDE is not set
@@ -3663,7 +3701,25 @@ CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
 # CONFIG_USB_GADGET_XILINX is not set
 CONFIG_USB_CI13XXX_MSM=y
 # CONFIG_USB_DUMMY_HCD is not set
-# CONFIG_USB_CONFIGFS is not set
+CONFIG_USB_CONFIGFS=y
+CONFIG_USB_CONFIGFS_SERIAL=y
+CONFIG_USB_CONFIGFS_NCM=y
+CONFIG_USB_CONFIGFS_QCRNDIS=y
+CONFIG_USB_CONFIGFS_RNDIS=y
+CONFIG_USB_CONFIGFS_RMNET_BAM=y
+CONFIG_USB_CONFIGFS_MASS_STORAGE=y
+CONFIG_USB_CONFIGFS_F_FS=y
+CONFIG_USB_CONFIGFS_F_MTP=y
+CONFIG_USB_CONFIGFS_F_PTP=y
+CONFIG_USB_CONFIGFS_F_ACC=y
+CONFIG_USB_CONFIGFS_F_AUDIO_SRC=y
+CONFIG_USB_CONFIGFS_UEVENT=y
+CONFIG_USB_CONFIGFS_F_MIDI=y
+CONFIG_USB_CONFIGFS_F_HID=y
+CONFIG_USB_CONFIGFS_F_DIAG=y
+CONFIG_USB_CONFIGFS_F_CDEV=y
+CONFIG_USB_CONFIGFS_F_CCID=y
+CONFIG_USB_CONFIGFS_F_QDSS=y
 # CONFIG_USB_LED_TRIG is not set
 # CONFIG_USB_ULPI_BUS is not set
 # CONFIG_UWB is not set
@@ -4367,7 +4423,26 @@ CONFIG_EXT3_FS=y
 # CONFIG_EXT3_FS_POSIX_ACL is not set
 # CONFIG_EXT3_FS_SECURITY is not set
 CONFIG_EXT4_FS=y
-# CONFIG_EXT4_FS_POSIX_ACL is not set
+# EloI2 A14 bring-up 2026-08-09, F61. ANOTHER CRASH-CLASS FIX, NOT A NICETY.
+# /data on this device is EXT4 (fstab.qcom:41, userdata -> /data ext4). Without ext4's own
+# POSIX ACL support, setxattr(path, "system.posix_acl_default") returns EOPNOTSUPP, and vold
+# does exactly that on /data/media/<user>:
+#   FsCrypt.cpp:1022  SetDefaultAcl(media_ce_path, 02770, AID_MEDIA_RW, ...)
+#   Utils.cpp:195     setxattr(path, XATTR_NAME_POSIX_ACL_DEFAULT, ...)   -> fails
+#   Utils.cpp:198     "Failed to set default ACL on /data/media/0: Operation not supported
+#                      on transport endpoint"
+# and the failure propagates all the way up:
+#   vold -> IVold::prepareUserStorage -> StorageManagerService.prepareUserStorage
+#        -> UserDataPreparer.prepareUserData
+#        -> UserDataPreparer.java:129-131  "Destroying user 0 ... because we failed to prepare"
+#           followed by destroyUserDataLI(), i.e. USER 0's DATA IS WIPED AND RETRIED EVERY BOOT.
+# The generic CONFIG_FS_POSIX_ACL=y below is NOT enough - it only builds the shared ACL layer;
+# ext4 only installs its posix_acl xattr handlers when EXT4_FS_POSIX_ACL is set.
+# WHY FAP20 DOES NOT SHOW THIS despite having the identical vold source (same FsCrypt.cpp:1022)
+# and the same "# CONFIG_EXT4_FS_POSIX_ACL is not set": its /data is F2FS at runtime - its vold
+# installs fscrypt keys tagged "f2fs:<id>" - and channel_defconfig sets CONFIG_F2FS_FS_POSIX_ACL=y.
+# Different filesystem, ACL support present, no failure. Ours is ext4 with no ext4 ACL support.
+CONFIG_EXT4_FS_POSIX_ACL=y
 CONFIG_EXT4_FS_SECURITY=y
 CONFIG_EXT4_ENCRYPTION=y
 CONFIG_EXT4_FS_ENCRYPTION=y
@@ -4404,7 +4479,8 @@ CONFIG_QUOTACTL=y
 # CONFIG_AUTOFS4_FS is not set
 CONFIG_FUSE_FS=y
 # CONFIG_CUSE is not set
-# CONFIG_OVERLAY_FS is not set
+# EloI2 F65 tier 2. overlayfs - adb remount / system overlay.
+CONFIG_OVERLAY_FS=y
 
 #
 # Caches
@@ -4618,13 +4694,28 @@ CONFIG_BOOTPARAM_HARDLOCKUP_PANIC_VALUE=0
 CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
 CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=1
 CONFIG_PANIC_ON_RECURSIVE_FAULT=y
-# CONFIG_DETECT_HUNG_TASK is not set
-# CONFIG_WQ_WATCHDOG is not set
+# EloI2 F65 tier 4, DIAGNOSTIC. Prints a full stack trace for any task stuck in D state past
+# the timeout. We have spent several rounds unable to see what a stalled thread is doing.
+# BOOTPARAM_HUNG_TASK_PANIC IS DELIBERATELY LEFT OFF: the bug we are chasing IS a reset, so a
+# panic-and-reboot on hung task would muddy exactly the signal we want. We want the trace only.
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=120
+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
+# EloI2 F65 tier 4, DIAGNOSTIC. Detects stalled workqueues.
+CONFIG_WQ_WATCHDOG=y
+# EloI2 F65 tier 4, DIAGNOSTIC. ftrace/atrace/perfetto, and ftrace_dump_on_oops.
+# THESE NEED A KCONFIG FIX TOO: kernel/trace/Kconfig:150 had TRACING_SUPPORT flipped from
+# 'default y' to 'default n' in OUR tree by commit 5b263617b817 "Add display drivers" - an
+# unrelated drive-by change. FAP20 and upstream both have 'default y'. TRACING_SUPPORT has no
+# prompt, so it cannot be set from a defconfig; the Kconfig line is restored alongside this.
+CONFIG_FTRACE=y
+CONFIG_FUNCTION_TRACER=y
+CONFIG_DYNAMIC_FTRACE=y
 # CONFIG_PANIC_ON_OOPS is not set
 CONFIG_PANIC_ON_OOPS_VALUE=0
 CONFIG_PANIC_TIMEOUT=5
 CONFIG_SCHED_DEBUG=y
-# CONFIG_SCHED_INFO is not set
+CONFIG_SCHED_INFO=y
 CONFIG_PANIC_ON_SCHED_BUG=y
 # CONFIG_PANIC_ON_RT_THROTTLING is not set
 # CONFIG_SCHEDSTATS is not set
@@ -4834,7 +4925,7 @@ CONFIG_CRYPTO_ABLK_HELPER=y
 # Authenticated Encryption with Associated Data
 #
 # CONFIG_CRYPTO_CCM is not set
-# CONFIG_CRYPTO_GCM is not set
+CONFIG_CRYPTO_GCM=y
 # CONFIG_CRYPTO_CHACHA20POLY1305 is not set
 CONFIG_CRYPTO_SEQIV=y
 CONFIG_CRYPTO_ECHAINIV=y
@@ -4864,9 +4955,9 @@ CONFIG_CRYPTO_XCBC=y
 # Digest
 #
 CONFIG_CRYPTO_CRC32C=y
-# CONFIG_CRYPTO_CRC32 is not set
+CONFIG_CRYPTO_CRC32=y
 # CONFIG_CRYPTO_CRCT10DIF is not set
-# CONFIG_CRYPTO_GHASH is not set
+CONFIG_CRYPTO_GHASH=y
 # CONFIG_CRYPTO_POLY1305 is not set
 CONFIG_CRYPTO_MD4=y
 CONFIG_CRYPTO_MD5=y
@@ -4956,7 +5047,7 @@ CONFIG_CRYPTO_AES_ARM64_CE=y
 CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
 CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
-# CONFIG_CRYPTO_CRC32_ARM64 is not set
+CONFIG_CRYPTO_CRC32_ARM64=y
 CONFIG_BINARY_PRINTF=y
 
 #
