@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
+#include <linux/msm_rtb.h>
 
 #include <asm/atomic.h>
 #include <asm/barrier.h>
@@ -789,13 +790,122 @@ const char *esr_get_class_string(u32 esr)
  * bad_mode handles the impossible case in the exception vector. This is always
  * fatal.
  */
+/*
+ * EloI2 A14 bring-up 2026-08-09. SError instrumentation. See finding F73.
+ *
+ * THE PROBLEM THIS SOLVES. This device dies at 58-131 s and, in two of six boots of
+ * "20260809 - boot 02.txt", the LAST LINE ON THE CONSOLE was the pr_crit below:
+ *     Bad mode in Error handler detected on CPU0, code 0xbf000000 -- SError
+ * Nothing followed it - not the panic banner, not a backtrace - neither on the UART
+ * nor in the pstore console zone, which was checked by reading the ramoops replay of
+ * the following boot. So panic() produces no output on this device, and every scrap
+ * of evidence has to be printed HERE, in the one context that is known to still work.
+ *
+ * WHAT bad_mode() THREW AWAY: it receives `regs` and never printed them. That is why
+ * this project has never had a PC, an LR or a backtrace for the reset.
+ *
+ * WHY WE STILL panic() AT THE END: arch/arm64/kernel/entry.S:433-439 reaches this
+ * function with "b bad_mode", a BRANCH and not a call, so there is no return address
+ * and no kernel_exit - bad_mode CANNOT return. Surviving an SError would need entry.S
+ * changed to "bl bad_mode" plus a kernel_exit, and returning from an imprecise
+ * external abort may simply fault again. That is a separate, riskier experiment.
+ */
+static unsigned int serror_rtb_entries = 96;
+core_param(serror_rtb_entries, serror_rtb_entries, uint, 0644);
+
+static unsigned int serror_hold_ms = 2000;
+core_param(serror_hold_ms, serror_hold_ms, uint, 0644);
+
+static void bad_mode_report(struct pt_regs *regs, int reason, unsigned int esr)
+{
+	unsigned int ec  = (esr & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT;
+	unsigned int il  = (esr >> 25) & 0x1;
+	unsigned int ids = (esr >> 24) & 0x1;
+	unsigned int iss = esr & 0x00ffffff;
+
+	pr_crit("SERR: ESR=0x%08x EC=0x%02x(%s) IL=%u IDS=%u ISS=0x%06x\n",
+		esr, ec, esr_get_class_string(esr), il, ids, iss);
+
+	if (ec == ESR_ELx_EC_SERROR) {
+		if (ids) {
+			/*
+			 * IDS=1 means the architectural AET/EA/DFSC fields are NOT
+			 * valid and the syndrome is implementation defined. On this
+			 * part that means the ESR carries no further information -
+			 * do not try to read a fault type out of it. The register
+			 * trace below is the actual evidence.
+			 */
+			pr_crit("SERR: IDS=1, syndrome is IMPLEMENTATION DEFINED - the ESR says no more than 'external asynchronous abort'\n");
+		} else {
+			pr_crit("SERR: IDS=0, AET=0x%x EA=%u DFSC=0x%02x\n",
+				(iss >> 10) & 0x7, (iss >> 9) & 0x1, iss & 0x3f);
+		}
+	}
+
+	pr_crit("SERR: PSTATE at abort = 0x%08lx, taken from %s\n",
+		(unsigned long)regs->pstate,
+		user_mode(regs) ? "EL0 (user)" : "EL1 (kernel)");
+
+	/*
+	 * The register dump and backtrace bad_mode() never produced. For an
+	 * ASYNCHRONOUS abort the PC is where the CPU was when the abort was taken,
+	 * NOT necessarily the instruction that caused it. Treat it as a hint.
+	 */
+	show_regs(regs);
+
+	/*
+	 * The real payload: the last register accesses this CPU made, with the
+	 * MMIO address and the calling function for each. CONFIG_QCOM_RTB=y and
+	 * msm_rtb.filter=0x237 have been recording this the whole time.
+	 */
+	msm_rtb_dump_last(serror_rtb_entries);
+
+	/*
+	 * Give a slow or deferred console time to drain before panic() takes the
+	 * machine down. IRQs are still on here; this costs one delay per death.
+	 */
+	if (serror_hold_ms)
+		mdelay(serror_hold_ms);
+
+	pr_crit("SERR: ==== report complete, entering panic ====\n");
+}
+
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
+	/*
+	 * EloI2 A14 ROUND I. THIS MUST BE THE FIRST STATEMENT IN THIS FUNCTION.
+	 *
+	 * Round H (finding F75) established that on this device nothing after
+	 * the single pr_crit below ever reaches a console - not the UART, not
+	 * the pstore console zone. So the evidence has to be committed to
+	 * persistent RAM BEFORE we try to print anything at all. This call takes
+	 * no lock, allocates nothing and cannot be deferred; the next boot prints
+	 * what it stored. Everything below is now a bonus, not the instrument.
+	 */
+	msm_rtb_note_fault(esr, instruction_pointer(regs), regs->regs[30],
+			   regs->sp, read_sysreg(far_el1), regs->pstate);
+
 	console_verbose();
 
-	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
+	/*
+	 * ONE LINE, AND IT CARRIES EVERYTHING. We reliably get exactly one line
+	 * out of this device before it dies, so the payload goes here rather
+	 * than in a tidy sequence of follow-up prints that never happen. The
+	 * leading text is deliberately unchanged - the log analysis in
+	 * eloi2-android14-task.txt greps for it.
+	 */
+	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s PC=0x%016lx LR=0x%016lx SP=0x%016lx FAR=0x%016lx PSTATE=0x%08lx %s PC=%pS\n",
 		handler[reason], smp_processor_id(), esr,
-		esr_get_class_string(esr));
+		esr_get_class_string(esr),
+		instruction_pointer(regs),
+		(unsigned long)regs->regs[30],
+		(unsigned long)regs->sp,
+		(unsigned long)read_sysreg(far_el1),
+		(unsigned long)regs->pstate,
+		user_mode(regs) ? "EL0" : "EL1",
+		(void *)instruction_pointer(regs));
+
+	bad_mode_report(regs, reason, esr);
 
 	local_irq_disable();
 	panic("bad mode");
