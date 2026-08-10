@@ -27,7 +27,24 @@
 			label = "home_key";
 			gpios = <&pm8953_gpios 4 0x1>;
 			linux,input-type = <1>;
-			linux,code = <0x66>; // 102
+			/*
+			 * EloI2 A14 2026-08-10. WAS <0x66> = 102 = KEY_HOME, AND THAT
+			 * DID NOTHING IN ANDROID. This device ships no device-specific
+			 * key layout, so input falls back to
+			 * frameworks/base/data/keyboards/Generic.kl, and there
+			 *     key 102   MOVE_HOME     <- a text-cursor key, not Home
+			 *     key 172   HOME          <- the Android Home key
+			 * 172 is KEY_HOMEPAGE. Pressing the button was emitting
+			 * MOVE_HOME, which does nothing outside a text field - which is
+			 * exactly what the developer saw when he pressed it.
+			 * Changing the code here is a one-line fix and avoids shipping a
+			 * .kl file, which would have to be named after the input device
+			 * name the kernel generates ("soc:gpio_oem_keys", sanitised) -
+			 * fragile and harder to verify.
+			 * The power key needs no such fix: qpnp_pon already emits 116,
+			 * and Generic.kl maps 116 to POWER correctly.
+			 */
+			linux,code = <172>; // KEY_HOMEPAGE -> Generic.kl "HOME"
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
