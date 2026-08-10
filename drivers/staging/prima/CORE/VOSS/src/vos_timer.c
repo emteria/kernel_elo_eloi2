@@ -326,14 +326,14 @@ hdd_list_t vosTimerList;
 
 static void vos_timer_clean(void);
 
-void vos_timer_manager_init()
+void vos_timer_manager_init(void)
 {
    /* Initalizing the list with maximum size of 60000 */
    hdd_list_init(&vosTimerList, 1000);  
    return;
 }
 
-static void vos_timer_clean()
+static void vos_timer_clean(void)
 {
     v_SIZE_t listSize;
     unsigned long flags;
@@ -368,7 +368,7 @@ static void vos_timer_clean()
     }
 }
 
-void vos_timer_exit()
+void vos_timer_exit(void)
 {
     vos_timer_clean();
     hdd_list_destroy(&vosTimerList);
