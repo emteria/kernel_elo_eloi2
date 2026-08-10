@@ -1828,10 +1828,19 @@ CONFIG_USB_NET_DRIVERS=y
 # CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_RTL8152 is not set
 # CONFIG_USB_LAN78XX is not set
-# CONFIG_USB_USBNET is not set
+# USB networking, for Ethernet: the port is an ASIX AX88179 USB3 adapter behind an internal
+# GenesysLogic hub, not a MAC on the SoC.
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_AX8817X=y
+CONFIG_USB_NET_AX88179_178A=y
+CONFIG_USB_NET_CDCETHER=y
 # CONFIG_USB_HSO is not set
 # CONFIG_USB_IPHETH is not set
-# CONFIG_WLAN is not set
+# WLAN. CONFIG_WLAN is the master switch for drivers/net/wireless; it was off, so neither the
+# pronto driver in drivers/staging/prima nor the cnss helpers were built at all.
+CONFIG_WLAN=y
+CONFIG_WCNSS_MEM_PRE_ALLOC=y
+CONFIG_CNSS_UTILS=y
 # CONFIG_QCA402X is not set
 
 #
@@ -4054,8 +4063,27 @@ CONFIG_ION_MSM=y
 #
 # Qualcomm Atheros Prima WLAN module
 #
+# EloI2 A14 ROUND Q 2026-08-10, F114. The pronto WLAN driver, enabled to match FAP20 EXACTLY.
+# *** IT IS PRONTO_WLAN, NOT PRIMA_WLAN. Both are tristate symbols in the same
+# drivers/staging/prima/Kconfig, and FAP20's built .config has "# CONFIG_PRIMA_WLAN is not set"
+# with CONFIG_PRONTO_WLAN=y. PRIMA is the older Riva part; this board is pronto-v3, which the
+# restored qcom,wcnss-wlan node states explicitly (qcom,is-pronto-v3, qcom,has-pronto-hw).
+# Setting PRIMA_WLAN instead would be the wrong module - I nearly did exactly that. ***
+# The pronto WLAN driver. *** IT IS PRONTO_WLAN, NOT PRIMA_WLAN *** - both are tristate symbols
+# in drivers/staging/prima/Kconfig; PRIMA is the older Riva part. Values match FAP20's built
+# .config. QCOM_TDLS is not optional: the driver does not compile without it, because
+# wlan_hdd_tdls.h declares two prototypes outside the #ifdef that defines their types.
 # CONFIG_PRIMA_WLAN is not set
-# CONFIG_PRONTO_WLAN is not set
+CONFIG_PRONTO_WLAN=y
+# CONFIG_PRIMA_WLAN_BTAMP is not set
+CONFIG_PRIMA_WLAN_LFR=y
+CONFIG_PRIMA_WLAN_OKC=y
+CONFIG_PRIMA_WLAN_11AC_HIGH_TP=y
+CONFIG_WLAN_FEATURE_11W=y
+CONFIG_QCOM_VOWIFI_11R=y
+CONFIG_ENABLE_LINUX_REG=y
+CONFIG_WLAN_OFFLOAD_PACKETS=y
+CONFIG_QCOM_TDLS=y
 # CONFIG_GOLDFISH is not set
 # CONFIG_CHROME_PLATFORMS is not set
 

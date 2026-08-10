@@ -972,6 +972,19 @@
 		#hwlock-cells = <1>;
 	};
 
+	/*
+	 * Restored: deleted from this tree by the 2024 strip commit e0f6dbc973d1, present and
+	 * identical in both reference trees. Provides the "measure" clock for qcom,wcnss-wlan below.
+	 */
+	clock_debug: qcom,cc-debug@1874000 {
+		compatible = "qcom,cc-debug-8953";
+		reg = <0x1874000 0x4>;
+		reg-names = "cc_base";
+		clocks = <&clock_cpu clk_cpu_debug_pri_mux>;
+		clock-names = "debug_cpu_clk";
+		#clock-cells = <1>;
+	};
+
 	clock_gcc_mdss: qcom,gcc-mdss@1800000 {
 		compatible = "qcom,gcc-mdss-8953";
 		reg = <0x1800000 0x80000>;
@@ -1229,6 +1242,30 @@
 			qcom,smd-irq-bitmask = <0x100>;
 			interrupts = <0 289 1>;
 			label = "adsp";
+		};
+
+		/*
+		 * The SMD/SMSM edges for WCNSS, also removed by the 2024 strip. Without them the host has
+		 * no IPC channel to the WCNSS firmware: it boots, waits for a handshake that never comes,
+		 * and dies on its own watchdog ("dog.c: Watchdog startup timeout"), which with
+		 * restart_level=SYSTEM reset the whole SoC. The modem edges are deliberately NOT restored -
+		 * telephony is off on this device.
+		 */
+		qcom,smd-wcnss {
+			compatible = "qcom,smd";
+			qcom,smd-edge = <6>;
+			qcom,smd-irq-offset = <0x0>;
+			qcom,smd-irq-bitmask = <0x20000>;
+			interrupts = <0 142 1>;
+			label = "wcnss";
+		};
+
+		qcom,smsm-wcnss {
+			compatible = "qcom,smsm";
+			qcom,smsm-edge = <6>;
+			qcom,smsm-irq-offset = <0x0>;
+			qcom,smsm-irq-bitmask = <0x80000>;
+			interrupts = <0 144 1>;
 		};
 
 		qcom,smsm-adsp {
@@ -1765,41 +1802,103 @@
 		memory-region = <&wcnss_fw_mem>;
 	};
 
+	/*
+	 * The WLAN device node. Deleted from this tree by the 2024 strip commit e0f6dbc973d1, which
+	 * left the qcom,pronto PIL loader above but removed the device the wcnss driver binds to -
+	 * so WLAN could never probe. Restored verbatim; identical in the Android 7 and FAP20 trees.
+	 * This board is pronto/WCN36xx (qcom,is-pronto-v3), so the driver is CONFIG_PRONTO_WLAN.
+	 */
+	qcom,wcnss-wlan@0a000000 {
+		compatible = "qcom,wcnss_wlan";
+		reg = <0x0a000000 0x280000>,
+		      <0x0b011008 0x04>,
+		      <0x0a21b000 0x3000>,
+		      <0x03204000 0x00000100>,
+		      <0x03200800 0x00000200>,
+		      <0x0a100400 0x00000200>,
+		      <0x0a205050 0x00000200>,
+		      <0x0a219000 0x00000020>,
+		      <0x0a080488 0x00000008>,
+		      <0x0a080fb0 0x00000008>,
+		      <0x0a08040c 0x00000008>,
+		      <0x0a0120a8 0x00000008>,
+		      <0x0a012448 0x00000008>,
+		      <0x0a080c00 0x00000001>;
+
+		reg-names = "wcnss_mmio", "wcnss_fiq",
+			    "pronto_phy_base", "riva_phy_base",
+			    "riva_ccu_base", "pronto_a2xb_base",
+			    "pronto_ccpu_base", "pronto_saw2_base",
+			    "wlan_tx_phy_aborts","wlan_brdg_err_source",
+			    "wlan_tx_status", "alarms_txctl",
+			    "alarms_tactl", "pronto_mcu_base";
+
+		interrupts = <0 145 0 0 146 0>;
+		interrupt-names = "wcnss_wlantx_irq", "wcnss_wlanrx_irq";
+
+		qcom,pronto-vddmx-supply = <&pm8953_s7_level_ao>;
+		qcom,pronto-vddcx-supply = <&pm8953_s2_level>;
+		qcom,pronto-vddpx-supply = <&pm8953_l5>;
+		qcom,iris-vddxo-supply   = <&pm8953_l7>;
+		qcom,iris-vddrfa-supply  = <&pm8953_l19>;
+		qcom,iris-vddpa-supply   = <&pm8953_l9>;
+		qcom,iris-vdddig-supply  = <&pm8953_l5>;
+
+		qcom,iris-vddxo-voltage-level = <1800000 0 1800000>;
+		qcom,iris-vddrfa-voltage-level = <1300000 0 1300000>;
+		qcom,iris-vddpa-voltage-level = <3300000 0 3300000>;
+		qcom,iris-vdddig-voltage-level = <1800000 0 1800000>;
+
+		qcom,vddmx-voltage-level = <RPM_SMD_REGULATOR_LEVEL_TURBO
+					RPM_SMD_REGULATOR_LEVEL_NONE
+					RPM_SMD_REGULATOR_LEVEL_TURBO>;
+		qcom,vddcx-voltage-level = <RPM_SMD_REGULATOR_LEVEL_NOM
+					RPM_SMD_REGULATOR_LEVEL_NONE
+					RPM_SMD_REGULATOR_LEVEL_TURBO>;
+		qcom,vddpx-voltage-level = <1800000 0 1800000>;
+
+		qcom,iris-vddxo-current = <10000>;
+		qcom,iris-vddrfa-current = <100000>;
+		qcom,iris-vddpa-current = <515000>;
+		qcom,iris-vdddig-current = <10000>;
+
+		qcom,pronto-vddmx-current = <0>;
+		qcom,pronto-vddcx-current = <0>;
+		qcom,pronto-vddpx-current = <0>;
+
+		pinctrl-names = "wcnss_default", "wcnss_sleep",
+				"wcnss_gpio_default";
+		pinctrl-0 = <&wcnss_default>;
+		pinctrl-1 = <&wcnss_sleep>;
+		pinctrl-2 = <&wcnss_gpio_default>;
+
+		gpios = <&tlmm 76 0>, <&tlmm 77 0>, <&tlmm 78 0>,
+			<&tlmm 79 0>, <&tlmm 80 0>;
+
+		clocks = <&clock_gcc clk_xo_wlan_clk>,
+			 <&clock_gcc clk_rf_clk2>,
+			 <&clock_debug clk_gcc_debug_mux>,
+			 <&clock_gcc clk_wcnss_m_clk>;
+
+		clock-names = "xo", "rf_clk", "measure", "wcnss_debug";
+
+		qcom,has-autodetect-xo;
+		qcom,is-pronto-v3;
+		qcom,has-pronto-hw;
+		qcom,has-vsys-adc-channel;
+		qcom,has-a2xb-split-reg;
+		qcom,wcnss-adc_tm = <&pm8953_adc_tm>;
+	};
+
 	usb3: ssusb@7000000{
 		compatible = "qcom,dwc-usb3-msm";
 
 		/*
-		 * EloI2 A14 2026-08-08: *** USB DELIBERATELY DISABLED. ONE LINE TO
-		 * UNDO WHEN THE PHY PORT IS DONE - DELETE THE status LINE BELOW. ***
-		 *
-		 * Everything else added in Rounds A/A2/A3 is LEFT IN PLACE on purpose
-		 * (the resets binding and qcom,core-clk-rate here, CONFIG_MSM_QUSB_PHY,
-		 * CONFIG_USB_MSM_SSPHY_QMP and the configfs gadget stack in
-		 * elo_defconfig) so that resuming this work costs no rediscovery.
-		 * All of it is inert while this node is disabled: both PHY drivers bail
-		 * out at their devm_reset_control_get("phy_reset") call BEFORE touching
-		 * any hardware - phy-msm-qusb.c:1060 and phy-msm-ssusb-qmp.c:~919 -
-		 * so having them compiled in costs nothing.
-		 *
-		 * WHY IT IS OFF: with the DT gates cleared, dwc3-msm gets as far as
-		 * devm_usb_get_phy_by_phandle() (dwc3-msm.c:4014), which returns
-		 * -EPROBE_DEFER because no usb_phy is ever registered. The platform
-		 * core then retries forever, re-registering the USB BAM every ~69 ms,
-		 * and the boot never reaches Android. A hard single failure is fine;
-		 * an endless deferral is not. See F29-F32.
-		 *
-		 * THE REMAINING WORK, per F31: EloI2's qusb_phy and ssphy nodes are the
-		 * 3.18-era binding. They need porting to the 4.9 one - resets instead of
-		 * reset-clocks, and for ssphy a genuine re-derivation of
-		 * qcom,qmp-phy-init-seq (four values per entry here, three on FAP20) and
-		 * qcom,qmp-phy-reg-offset (ten entries here, six on FAP20). The intended
-		 * approach is to replace BOTH nodes wholesale with FAP20's versions -
-		 * same SoC, same pm8953_l7 rail - not to patch ours incrementally.
-		 *
-		 * Deferred by the developer 2026-08-08 until SystemUI comes up. USB is a
-		 * means to an adb shell, not the goal.
+		 * USB host is required for Ethernet: the port has a permanently attached GenesysLogic
+		 * USB3 hub with an ASIX AX88179 gigabit adapter on it. Rounds A/A2/A3 added the resets
+		 * binding and qcom,core-clk-rate here; the PHY nodes below were ported from FAP20 because
+		 * ours were the 3.18-era binding and dwc3-msm deferred forever without them.
 		 */
-		status = "disabled";
 		reg = <0x07000000 0xfc000>,
 			<0x0007e000 0x400>;
 		reg-names = "core_base",
@@ -1823,24 +1922,8 @@
 		qcom,dwc-usb3-msm-tx-fifo-size = <21288>;
 
 		/*
-		 * EloI2 A14 bring-up 2026-08-08, ROUND A2. UNCOMMITTED until tested.
-		 * Values verbatim from migration-fap20-v49-org. Round A restored the
-		 * core_reset binding above, which got the probe past -ENOENT; it then
-		 * stopped at the NEXT missing property with -EINVAL:
-		 *     msm-dwc3 7000000.ssusb: USB core-clk-rate is not present
-		 *     msm-dwc3: probe of 7000000.ssusb failed with error -22
-		 * dwc3-msm.c:3235 reads qcom,core-clk-rate and returns -EINVAL if it
-		 * is absent, so this one is REQUIRED. The -hs variant is optional -
-		 * dwc3-msm.c:3249 falls back to core-clk-rate with only a dev_dbg -
-		 * and is set here purely for parity with the reference.
-		 *
-		 * A full brace-matched diff of this whole node against FAP20 was done
-		 * before adding these, so this is the LAST property that can fail the
-		 * probe. The remaining differences are all optional or deliberate:
-		 *   qcom,pm-qos-latency = <2>            optional, not added
-		 *   qcom,msm-bus,num-cases <2> vs <3>    ours is self-consistent
-		 *   snps,usb2-l1-disable (FAP20) vs snps,nominal-elastic-buffer (ours)
-		 *     - a PHY tuning difference, NOT copied. Do not blind-copy it.
+		 * Required: dwc3-msm.c reads qcom,core-clk-rate and returns -EINVAL without it. Values
+		 * verbatim from FAP20. The -hs variant is optional, kept for parity.
 		 */
 		qcom,core-clk-rate = <133333333>;	/* NOM */
 		qcom,core-clk-rate-hs = <60000000>;	/* LOW SVS */
@@ -1856,24 +1939,8 @@
 				"sleep_clk", "xo", "cfg_ahb_clk";
 
 		/*
-		 * EloI2 A14 bring-up 2026-08-08, ROUND A. UNCOMMITTED ON PURPOSE
-		 * until a test confirms it. Restored from migration-fap20-v49-org,
-		 * whose ssusb node is otherwise byte-identical to this one.
-		 *
-		 * Without these two lines dwc3-msm.c cannot find the reset control
-		 * it asks for by name and the whole controller fails to probe:
-		 *     msm-dwc3 7000000.ssusb: failed to get core_reset
-		 *     msm-dwc3 7000000.ssusb: error getting clock or gdsc.
-		 *     msm-dwc3: probe of 7000000.ssusb failed with error -2
-		 * which is why "mount functionfs adb /dev/usb-ffs/adb" fails with
-		 * ENODEV and init kills adbd 8 ms after starting it - i.e. this is
-		 * why THIS DEVICE HAS NEVER HAD ADB, in the main system and in
-		 * recovery alike. FAP20 probes fine and reaches charger detection.
-		 *
-		 * Everything needed already exists in this tree:
-		 *   include/dt-bindings/clock/msm-clocks-8953.h:357 GCC_USB_30_BCR 3
-		 *   drivers/clk/msm/clock-gcc-8953.c:3732  [GCC_USB_30_BCR]={0x3F070}
-		 *   clock_gcc above declares #reset-cells = <1>
+		 * Required: without these dwc3-msm cannot resolve the reset control it looks up by name
+		 * and the controller fails to probe ("failed to get core_reset"). Restored from FAP20.
 		 */
 		resets = <&clock_gcc GCC_USB_30_BCR>;
 		reset-names = "core_reset";
@@ -1884,6 +1951,14 @@
 			interrupt-parent = <&intc>;
 			interrupts = <0 140 0>;
 			usb-phy = <&qusb_phy>, <&ssphy>;
+			/*
+			 * Required. Without dr_mode the core defaults to OTG (is_drd=1) and dwc3-msm never
+			 * enters host mode; the OTG state machine is not started either, because that path
+			 * needs a "usb" power_supply and this board has no battery or charger. host is correct
+			 * here anyway - the hub is permanently attached and there is no ID pin to read.
+			 * NOTE: host-only means no USB gadget, so no adb-over-USB. adb runs over the network.
+			 */
+			dr_mode = "host";
 			tx-fifo-resize;
 			snps,usb3-u1u2-disable;
 			snps,nominal-elastic-buffer;
@@ -1957,18 +2032,16 @@
 		};
 	};
 
+	/* Ported from FAP20: ours was the 3.18 binding (reset-clocks instead of resets), which
+	 * made dwc3-msm return -EPROBE_DEFER forever. Same SoC, same rails. */
 	qusb_phy: qusb@79000 {
 		compatible = "qcom,qusb2phy";
 		reg = <0x079000 0x180>,
-			<0x070f8800 0x400>,
 			<0x01841030 0x4>,
-			<0x0193f044 0x4>,
 			<0x0193f020 0x4>;
 		reg-names = "qusb_phy_base",
-			"qscratch_base",
 			"ref_clk_addr",
-			"tcsr_phy_clk_scheme_sel",
-			"tcsr_phy_level_shift_keeper";
+			"tcsr_clamp_dig_n_1p8";
 
 		USB3_GDSC-supply = <&gdsc_usb30>;
 		vdd-supply = <&pm8953_l3>;
@@ -1976,29 +2049,32 @@
 		vdda33-supply = <&pm8953_l13>;
 		qcom,vdd-voltage-level = <0 925000 925000>;
 
-		qcom,qusb-phy-init-seq = <0xF8 0x80
-					0xB3 0x84
+		qcom,qusb-phy-init-seq = <0xf8 0x80
+					0xb3 0x84
 					0x83 0x88
-					0xC0 0x8C
-					0x14 0x9C
+					0xc0 0x8c
+					0x14 0x9c
 					0x30 0x08
-					0x79 0x0C
+					0x79 0x0c
 					0x21 0x10
 					0x00 0x90
-					0x9F 0x1C
+					0x9f 0x1c
 					0x00 0x18>;
 		phy_type= "utmi";
+		qcom,phy-clk-scheme = "cml";
+		qcom,major-rev = <1>;
 
 		clocks = <&clock_gcc clk_bb_clk1>,
 			 <&clock_gcc clk_gcc_qusb_ref_clk>,
 			 <&clock_gcc clk_gcc_usb_phy_cfg_ahb_clk>,
-			 <&clock_gcc clk_gcc_qusb2_phy_reset>,
 			 <&clock_gcc clk_gcc_pcnoc_usb3_axi_clk>,
 			 <&clock_gcc clk_gcc_usb30_master_clk>;
 
 		clock-names = "ref_clk_src", "ref_clk", "cfg_ahb_clk",
-			      "phy_reset", "iface_clk", "core_clk";
+			      "iface_clk", "core_clk";
 
+		resets = <&clock_gcc GCC_QUSB2_PHY_BCR>;
+		reset-names = "phy_reset";
 	};
 
 	usb_nop_phy: usb_nop_phy {
@@ -2007,109 +2083,119 @@
 	};
 
 
+	/* Ported from FAP20: ours was the 3.18 binding (reset-clocks instead of resets), which
+	 * made dwc3-msm return -EPROBE_DEFER forever. Same SoC, same rails. */
 	ssphy: ssphy@78000 {
 		compatible = "qcom,usb-ssphy-qmp";
 		reg = <0x78000 0x9f8>,
-		      <0x0193f244 0x4>,
-		      <0x0193f044 0x4>;
+		      <0x0193f244 0x4>;
 		reg-names = "qmp_phy_base",
-			    "vls_clamp_reg",
-			    "tcsr_phy_clk_scheme_sel";
-		qcom,qmp-phy-init-seq = <0xac 0x14 0x1a 0x00
-					0x34 0x08 0x08 0x00
-					0x174 0x30 0x30 0x00
-					0x3c 0x06 0x06 0x00
-					0xb4 0x00 0x00 0x00
-					0xb8 0x08 0x08 0x00
-					0x194 0x06 0x06 0x3e8
-					0x19c 0x01 0x01 0x00
-					0x178 0x00 0x00 0x00
-					0xd0 0x82 0x82 0x00
-					0xdc 0x55 0x55 0x00
-					0xe0 0x55 0x55 0x00
-					0xe4 0x03 0x03 0x00
-					0x78 0x0b 0x0b 0x00
-					0x84 0x16 0x16 0x00
-					0x90 0x28 0x28 0x00
-					0x108 0x80 0x80 0x00
-					0x10c 0x00 0x00 0x00
-					0x184 0x0a 0x0a 0x00
-					0x4c 0x15 0x15 0x00
-					0x50 0x34 0x34 0x00
-					0x54 0x00 0x00 0x00
-					0xc8 0x00 0x00 0x00
-					0x18c 0x00 0x00 0x00
-					0xcc 0x00 0x00 0x00
-					0x128 0x00 0x00 0x00
-					0x0c 0x0a 0x0a 0x00
-					0x10 0x01 0x01 0x00
-					0x1c 0x31 0x31 0x00
-					0x20 0x01 0x01 0x00
-					0x14 0x00 0x00 0x00
-					0x18 0x00 0x00 0x00
-					0x24 0xde 0xde 0x00
-					0x28 0x07 0x07 0x00
-					0x48 0x0f 0x0f 0x00
-					0x70 0x0f 0x0f 0x00
-					0x100 0x80 0x80 0x00
-					0x440 0x0b 0x0b 0x00
-					0x4d8 0x02 0x02 0x00
-					0x4dc 0x6c 0x6c 0x00
-					0x4e0 0xbb 0xbb 0x00
-					0x508 0x77 0x77 0x00
-					0x50c 0x80 0x80 0x00
-					0x514 0x03 0x03 0x00
-					0x51c 0x16 0x16 0x00
-					0x448 0x75 0x75 0x00
-					0x454 0x00 0x00 0x00
-					0x40c 0x0a 0x0a 0x00
-					0x41c 0x06 0x06 0x00
-					0x510 0x00 0x00 0x00
-					0x268 0x45 0x45 0x00
-					0x2ac 0x12 0x12 0x00
-					0x294 0x06 0x06 0x00
-					0x254 0x00 0x00 0x00
-					0x8c8 0x83 0x83 0x00
-					0x8c4 0x02 0x02 0x00
-					0x8cc 0x09 0x09 0x00
-					0x8d0 0xa2 0xa2 0x00
-					0x8d4 0x85 0x85 0x00
-					0x880 0xd1 0xd1 0x00
-					0x884 0x1f 0x1f 0x00
-					0x888 0x47 0x47 0x00
-					0x80c 0x9f 0x9f 0x00
-					0x824 0x17 0x17 0x00
-					0x828 0x0f 0x0f 0x00
-					0x8b8 0x75 0x75 0x00
-					0x8bc 0x13 0x13 0x00
-					0x8b0 0x86 0x86 0x00
-					0x8a0 0x04 0x04 0x00
-					0x88c 0x44 0x44 0x00
-					0x870 0xe7 0xe7 0x00
-					0x874 0x03 0x03 0x00
-					0x878 0x40 0x40 0x00
-					0x87c 0x00 0x00 0x00
-					0x9d8 0x88 0x88 0x00
-					0xffffffff 0xffffffff 0x00 0x00>;
-		qcom,qmp-phy-reg-offset = <0x988 0x98c 0x990 0x994
-					0x974 0x8d8 0x8dc 0x804 0x800
-					0x808>;
+			    "vls_clamp_reg";
+
+		qcom,qmp-phy-init-seq = /*<reg_offset, value, delay>*/
+					<0xac 0x14 0x00
+					0x34 0x08 0x00
+					0x174 0x30 0x00
+					0x3c 0x06 0x00
+					0xb4 0x00 0x00
+					0xb8 0x08 0x00
+					0x194 0x06 0x3e8
+					0x19c 0x01 0x00
+					0x178 0x00 0x00
+					0xd0 0x82 0x00
+					0xdc 0x55 0x00
+					0xe0 0x55 0x00
+					0xe4 0x03 0x00
+					0x78 0x0b 0x00
+					0x84 0x16 0x00
+					0x90 0x28 0x00
+					0x108 0x80 0x00
+					0x10c 0x00 0x00
+					0x184 0x0a 0x00
+					0x4c 0x15 0x00
+					0x50 0x34 0x00
+					0x54 0x00 0x00
+					0xc8 0x00 0x00
+					0x18c 0x00 0x00
+					0xcc 0x00 0x00
+					0x128 0x00 0x00
+					0x0c 0x0a 0x00
+					0x10 0x01 0x00
+					0x1c 0x31 0x00
+					0x20 0x01 0x00
+					0x14 0x00 0x00
+					0x18 0x00 0x00
+					0x24 0xde 0x00
+					0x28 0x07 0x00
+					0x48 0x0f 0x00
+					0x70 0x0f 0x00
+					0x100 0x80 0x00
+					0x440 0x0b 0x00
+					0x4d8 0x02 0x00
+					0x4dc 0x6c 0x00
+					0x4e0 0xbb 0x00
+					0x508 0x77 0x00
+					0x50c 0x80 0x00
+					0x514 0x03 0x00
+					0x51c 0x16 0x00
+					0x448 0x75 0x00
+					0x454 0x00 0x00
+					0x40c 0x0a 0x00
+					0x41c 0x06 0x00
+					0x510 0x00 0x00
+					0x268 0x45 0x00
+					0x2ac 0x12 0x00
+					0x294 0x06 0x00
+					0x254 0x00 0x00
+					0x8c8 0x83 0x00
+					0x8c4 0x02 0x00
+					0x8cc 0x09 0x00
+					0x8d0 0xa2 0x00
+					0x8d4 0x85 0x00
+					0x880 0xd1 0x00
+					0x884 0x1f 0x00
+					0x888 0x47 0x00
+					0x80c 0x9f 0x00
+					0x824 0x17 0x00
+					0x828 0x0f 0x00
+					0x8b8 0x75 0x00
+					0x8bc 0x13 0x00
+					0x8b0 0x86 0x00
+					0x8a0 0x04 0x00
+					0x88c 0x44 0x00
+					0x870 0xe7 0x00
+					0x874 0x03 0x00
+					0x878 0x40 0x00
+					0x87c 0x00 0x00
+					0x9d8 0x88 0x00
+					0xffffffff 0x00 0x00>;
+		qcom,qmp-phy-reg-offset =
+				<0x974  /* USB3_PHY_PCS_STATUS */
+				0x8d8   /* USB3_PHY_AUTONOMOUS_MODE_CTRL */
+				0x8dc   /* USB3_PHY_LFPS_RXTERM_IRQ_CLEAR */
+				0x804   /* USB3_PHY_POWER_DOWN_CONTROL */
+				0x800   /* USB3_PHY_SW_RESET */
+				0x808>; /* USB3_PHY_START */
+
 		vdd-supply = <&pm8953_l3>;
-		vdda18-supply = <&pm8953_l7>;
+		core-supply = <&pm8953_l7>;
 		qcom,vdd-voltage-level = <0 925000 925000>;
+		qcom,core-voltage-level = <0 1800000 1800000>;
 		qcom,vbus-valid-override;
 
 		clocks = <&clock_gcc clk_gcc_usb3_aux_clk>,
 			 <&clock_gcc clk_gcc_usb3_pipe_clk>,
 			 <&clock_gcc clk_gcc_usb_phy_cfg_ahb_clk>,
-			 <&clock_gcc clk_gcc_usb3_phy_reset>,
-			 <&clock_gcc clk_gcc_usb3phy_phy_reset>,
 			 <&clock_gcc clk_bb_clk1>,
 			 <&clock_gcc clk_gcc_usb_ss_ref_clk>;
 
-		clock-names = "aux_clk", "pipe_clk", "cfg_ahb_clk", "phy_reset",
-			      "phy_phy_reset", "ref_clk_src", "ref_clk";
+		clock-names = "aux_clk", "pipe_clk", "cfg_ahb_clk",
+			      "ref_clk_src", "ref_clk";
 
+		resets = <&clock_gcc GCC_USB3_PHY_BCR>,
+			<&clock_gcc GCC_USB3PHY_PHY_BCR>;
+
+		reset-names = "phy_reset", "phy_phy_reset";
 	};
 
 	usb_audio_qmi_dev {

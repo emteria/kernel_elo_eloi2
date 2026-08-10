@@ -77,6 +77,11 @@
 		qcom,eth-wake-up = <&tlmm 39 0>;  /* USB Gigabit Ethernet wakeup pin: Low Active*/
 		qcom,eth-reset-gpio = <&tlmm 40 0>;  /* USB Gigabit Ethernet reset pin: Low Active*/
 	};
+	/*
+	 * NOTE: no driver in this kernel binds to the node above - drivers/net/usb/usb_gigabit_eth.c
+	 * exists only in the Android 7 tree. Its job (drive the AX88179 power/reset/wake GPIOs high)
+	 * is done by the fixed regulators further down instead.
+	 */
 /* OEM, Jerry.Zhai, 2017/01/09, usb gigabit ethernet pwr control }*/
 
 /* pp, Tony.L.Cai, 2017/03/23, gpio leds porting{*/
@@ -127,11 +132,79 @@
 		regulator-type= "voltage";
 		enable-at-boot;
 		regulator-boot-on;
+		/*
+		 * always-on: this 5 V rail feeds the internal USB hub and the Ethernet adapter, and
+		 * nothing in this tree requests it - the OEM drivers that used to are not present.
+		 */
+		regulator-always-on;
 		gpios = <0>;
 		states = <5000000 0x1
 							0 0x0>;
 	};
 /*}pp, tony.l.cai, 20170605, gpio regulator enable for p5v_usb*/
+
+	/*
+	 * The USB/Ethernet enable pins. This board powers and un-resets its internal USB tree from
+	 * TLMM GPIOs, which three OEM drivers used to do (usb_gigabit_eth, gl3523_smbus,
+	 * usb2517_smbus); none of them exist in this kernel, so nothing drove the pins and no USB
+	 * device ever enumerated. Modelled as fixed regulators with regulator-always-on so the core
+	 * drives them at registration with no consumer.
+	 *
+	 * *** DO NOT USE gpio-hog FOR THIS. *** pinctrl-msm registers the gpiochip before adding its
+	 * pin range, so a hog is requested too early, returns -EPROBE_DEFER, and a failed hog aborts
+	 * the ENTIRE gpiochip registration - which left the device with no GPIOs and no init at all.
+	 *
+	 * Levels are what the Android 7 drivers actually do:
+	 *   gpio 38 eth power / 40 eth reset / 39 eth wake  HIGH
+	 *   gpio 1  GL3523 hub reset                        LOW  (enable-active-high omitted)
+	 *   gpio 29 USB2517 hub reset                       HIGH
+	 * These cannot pulse. If a hub ever needs a real reset pulse it needs a driver, and these
+	 * five nodes must be removed if the OEM drivers are ever ported.
+	 */
+	eloi2_eth_pwr: eloi2_eth_pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "eloi2-eth-power-en";
+		gpio = <&tlmm 38 0>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	eloi2_eth_rst: eloi2_eth_rst {
+		compatible = "regulator-fixed";
+		regulator-name = "eloi2-eth-reset";
+		gpio = <&tlmm 40 0>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	eloi2_eth_wake: eloi2_eth_wake {
+		compatible = "regulator-fixed";
+		regulator-name = "eloi2-eth-wake";
+		gpio = <&tlmm 39 0>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	eloi2_hub3_rst: eloi2_hub3_rst {
+		compatible = "regulator-fixed";
+		regulator-name = "eloi2-gl3523-hub-reset";
+		gpio = <&tlmm 1 0>;
+		/* no enable-active-high: enabled drives the pin LOW = out of reset */
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	eloi2_hub2_rst: eloi2_hub2_rst {
+		compatible = "regulator-fixed";
+		regulator-name = "eloi2-usb2517-hub-reset";
+		gpio = <&tlmm 29 0>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+	};
 
 /*OEM, Terry.Yan, 20171127, add fixed regulator for p5v_arm (RTC/HDMI){*/
 	p5v_arm: p5v_arm {
