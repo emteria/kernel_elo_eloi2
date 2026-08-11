@@ -1404,3 +1404,56 @@ static int __init clock_late_init(void)
 /* clock_late_init should run only after all deferred probing
  * (excluding DLKM probes) has completed.
  */
+/*
+ * EloI2 A14, 2026-08-11. *** THIS ONE LINE WAS MISSING AND IT IS THE ROOT CAUSE OF B2 - THE
+ * DISPLAY NEVER COMING BACK AFTER A BLANK OR A SUSPEND. RESTORED. See F138. ***
+ *
+ * WITHOUT IT clock_late_init() is compiled but NEVER REGISTERED, so it never runs and the
+ * handoff_list is never drained. Every clock the bootloader left enabled keeps the prepare+enable
+ * reference that __handoff_clk() took at registration, FOREVER. Proof, from the CLKWATCH
+ * instrument on a full power cycle ("20260810 - boot 09 power.txt"):
+ *     [3.297295] CLKWATCH prepare pclk0_clk_src  prepare_count=1 count=1 caller=__handoff_clk+0x220
+ *     [3.307075] CLKWATCH prepare byte0_clk_src  prepare_count=1 count=1 caller=__handoff_clk+0x220
+ * and "Removing enables held for handed-off clocks" - the first line of clock_late_init() -
+ * appears NOWHERE in any boot log we have.
+ *
+ * THAT IS THE WHOLE B2 MECHANISM, and it finally explains every measurement:
+ *   - byte0_clk_src / pclk0_clk_src / dsi0pll_vco_clk_8996 sit at prepare_count=2 = 1 handoff
+ *     vote + 1 from the DSI driver, at EVERY stage of a power cycle (off/entry, off/exit,
+ *     on/pre-setsrc, on/exit).
+ *   - at display-off the DSI clock manager correctly releases ITS reference - the DSIMGR dump
+ *     shows both clients going to zero and the aggregate to link 0 / core 0 - but the handoff
+ *     vote remains, so the clocks never actually stop and the DSI PLL is never re-initialised.
+ *   - on resume mdss_dsi_on() reparents the RCG to a PLL that was never brought back up, the
+ *     CONFIG_UPDATE bit never clears ("rcg didn't update its configuration", CMD_RCGR 0x1), the
+ *     DSI link is invalid, and the SN65DSI86 bridge reports DP_PLL_LOCK=UNLOCK 50 times.
+ *   - and it explains why the FIRST enable ALWAYS works: it inherits LK's still-live setup.
+ *
+ * HOW IT WENT MISSING - it was an ACCIDENT, not a workaround, which is why restoring it is safe:
+ * commit a3731a81aa98 "Fix booting after patch restore" (2024-10-10) was a cleanup removing the
+ * pr_info/pr_err debug lines added during an earlier debugging session. In this very function it
+ * deleted "Looping #2", "Looping #3", "Unlocking mutex" and "Finishing" - and then one line too
+ * far, taking the initcall registration with them. Nothing in that commit suggests the initcall
+ * itself was causing a problem.
+ * BOTH REFERENCE TREES HAVE IT, unchanged: PlatformFap20 (4.9, Android 14) and PlatformElo-v07
+ * (3.18, Android 7, this board).
+ *
+ * *** CONFIRMED ON THE DEVICE 2026-08-11, log "20260811 - boot 01.txt", kernel #5. This is no
+ * longer a prediction - it is measured, and it does exactly what is described above: ***
+ *   [   8.731817] clock_late_init: Removing enables held for handed-off clocks   (once)
+ *   [   8.740254] CLKWATCH unprepare dsi0pll_vco_clk_8996  caller=clock_late_init+0xc4/0x178
+ *   [   8.741492] CLKWATCH unprepare pclk0_clk_src         caller=clock_late_init+0xc4/0x178
+ *   [   8.751997] CLKWATCH unprepare byte0_clk_src         caller=clock_late_init+0xc4/0x178
+ * and across a full power cycle the DSI clocks now REALLY stop and REALLY come back:
+ *   display-off  393.529  byte0/pclk0/vco reach prepare_count=0 count=0   (was 2/2 forever)
+ *   display-on   410.973  they are prepared FRESH from 0, so the PLL lock sequence runs
+ *   bridge       411.182  sn65dsi86 DP_PLL_LOCK=85(LOCK)                  (was UNLOCK x50)
+ *                411.304  DisplayPort Link Semi-Auto train Success!!
+ * "rcg didn't update its configuration" and "timeout (0) enabling timegen" are BOTH GONE from
+ * the log, and the boot is otherwise clean: 0 FATAL EXCEPTION, boot_completed at 75.2 s, nothing
+ * breaks after the handoff release. The feared regression did not happen.
+ *
+ * NOTE THE SCREEN IS STILL BLACK AFTER A WAKE - but that is now a problem ABOVE this layer, not
+ * a clock problem. The DSI link and the eDP bridge both come back correctly; see the task file.
+ */
+late_initcall_sync(clock_late_init);
