@@ -860,6 +860,23 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 		}
 
 	}
+	else if((bl_level>0)&&backlight_enabled)
+	{
+		/*
+		 * The symmetric counterpart of the bl_level==0 branch above, which
+		 * had none. led_en is driven low on every blank and was never raised
+		 * again: the only branch that could restore it is the one below, and
+		 * that is gated on backlight_enabled==0, a flag cleared solely by
+		 * set_pwm_for_lvds_panel() - never called on an eDP board. So every
+		 * wake after the first produced a correct image with the LED string
+		 * off. Costs one redundant write of the same value on brightness
+		 * changes, and deliberately no msleep, so the slider stays cheap.
+		 */
+		if (gpio_is_valid(led_en_edp))
+			gpio_set_value(led_en_edp, 1);
+		if (gpio_is_valid(led_en_lvds))
+			gpio_set_value(led_en_lvds, 1);
+	}
 	else if((bl_level>0)&&(backlight_enabled==0))
 	{
 		if (gpio_is_valid(backlight_en))
