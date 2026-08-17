@@ -222,6 +222,24 @@
 		};
 
 		/*
+		 * EloI2 A14, backlog B6. 33 pages at 0xfbd40000..0xfbd60fff abort
+		 * on read on every boot, identically, but do NOT reset the SoC.
+		 * /proc/iomem shows them inside "System RAM" with no child entry,
+		 * i.e. Linux believes it owns memory a TrustZone/XPU carve-out has
+		 * made unreadable. This reserves the enclosing 1 MB so the page
+		 * allocator can never hand it out. no-map: the region must leave
+		 * the linear map entirely, which is the opposite of the ramoops
+		 * choice above and right for the opposite reason.
+		 * Clear of every reservation and CMA pool on this board. Full
+		 * evidence is in eloi2-android14-task.txt, backlog B6.
+		 */
+		xpu_hole_mem: xpu_hole_region@fbd00000 {
+			reg = <0x0 0xfbd00000 0x0 0x100000>;
+			no-map;
+			label = "xpu_hole_mem";
+		};
+
+		/*
 		 * EloI2 A14 ROUND K, 2026-08-10. adsp_shmem_device_region@0xc0100000
 		 * REMOVED, together with its only consumer in msm8953-camera.dtsi.
 		 *
