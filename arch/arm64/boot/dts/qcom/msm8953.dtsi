@@ -222,69 +222,6 @@
 		};
 
 		/*
-		 * EloI2 A14 bring-up 2026-08-09 evening, ROUND I. Persistent RAM
-		 * for the RTB register trace, so it survives the reset and can be
-		 * replayed on the FOLLOWING boot.
-		 *
-		 * WHY THIS EXISTS. Round H proved (F75) that the SoC is gone
-		 * within about a millisecond of the abort: the last console line
-		 * is complete, the ramoops CONSOLE replay of the next boot ends on
-		 * that same line, and the console was only at 22% of line rate, so
-		 * there was no backlog to blame. msm_rtb_dump_last() therefore can
-		 * NEVER run in the fault path on this device. The only way to read
-		 * the RTB back is to keep it at a FIXED address across the reset
-		 * and dump it at probe time on the next boot - exactly the trick
-		 * that makes the ramoops replay work.
-		 *
-		 * Stock msm_rtb.c takes its buffer from dma_alloc_coherent, whose
-		 * physical address is not knowable on the next boot. This region
-		 * replaces that allocation.
-		 *
-		 * Address arithmetic, do not move it without redoing this:
-		 *   0x91400000               end of cont_splash_mem
-		 *   0x9F000000 .. 0x9F100000 ramoops_mem, 1 MB
-		 *   0x9F100000 .. 0x9F500000 THIS REGION, 4 MB, immediately above
-		 *   0xA0100000               LK SCRATCH_ADDR
-		 * so it sits in the same proven-clear gap as ramoops, adjacent to
-		 * a region that is already known to survive a warm reset on this
-		 * board, and clear of every CMA pool (0x8f000000, 0x8f800000,
-		 * 0xc7800000, 0xfe400000, 0xfe800000, 0xfec00000, 0xffc00000).
-		 *
-		 * SIZE RAISED 1 MB -> 4 MB, ROUND J, and this is the whole point
-		 * of that round. At 1 MB the ring is 16384 entries, and finding
-		 * F86 measured what fills it: the 1 kHz scheduler tick on 8 CPUs
-		 * alone is 8000 entries per second, so the ring covered barely
-		 * two seconds and the newest 96 entries were mostly ticks. The
-		 * deaths happen 3.0 s after sys.boot_completed (F77), so a
-		 * two-second ring cannot even reach back to the trigger.
-		 * 4 MB gives 65536 entries, about 5 s at the observed rate, which
-		 * covers the whole boot_completed-to-death window with margin.
-		 * THE ALTERNATIVE WAS TO STOP LOGGING TIMER IRQs IN irq-gic.c.
-		 * That was rejected DELIBERATELY: it would have removed ~8000
-		 * uncached writes per second from the interrupt path, i.e. changed
-		 * the timing of the very thing being measured, and it would have
-		 * cost the IRQ-number evidence that made the driver attribution in
-		 * F85 possible. Spending 3 MB of a 3 GB device is the cheaper and
-		 * far more deterministic way to buy the same window.
-		 *
-		 * "no-map" IS DELIBERATE HERE, and it is the opposite of the
-		 * choice made for ramoops above - the reasons differ, both are
-		 * right. ramoops must stay mapped because persistent_ram falls
-		 * back to a plain memcpy that can fault on Device memory. The RTB
-		 * instead needs to be UNCACHED, because entries written in the
-		 * last microseconds before a reset must already be in DRAM and not
-		 * sitting in a dirty cache line. no-map takes it out of the linear
-		 * map, msm_rtb.c then ioremap_wc()s it, which is Normal
-		 * Non-cacheable - unaligned access safe, unlike Device memory, and
-		 * the same cacheability the dma_alloc_coherent buffer had.
-		 */
-		rtb_persist_mem: rtb_persist_region@9f100000 {
-			reg = <0x0 0x9f100000 0x0 0x400000>;
-			no-map;
-			label = "rtb_persist_mem";
-		};
-
-		/*
 		 * EloI2 A14 ROUND K, 2026-08-10. adsp_shmem_device_region@0xc0100000
 		 * REMOVED, together with its only consumer in msm8953-camera.dtsi.
 		 *
@@ -1337,17 +1274,10 @@
 		qcom,scandump-size = <0x40000>;
 	};
 
+	/* Stock node, inert: CONFIG_QCOM_RTB is off, so nothing binds it. */
 	qcom,msm-rtb {
 		compatible = "qcom,msm-rtb";
 		qcom,rtb-size = <0x100000>;
-		/*
-		 * EloI2 A14 ROUND I: point the RTB at the fixed carveout so it
-		 * survives a reset and can be replayed next boot. See the long
-		 * comment on rtb_persist_region@9f100000. If this phandle is
-		 * absent msm_rtb.c falls back to dma_alloc_coherent exactly as
-		 * before, so removing this line reverts the behaviour.
-		 */
-		memory-region = <&rtb_persist_mem>;
 	};
 
 	qcom,msm-imem@8600000 {

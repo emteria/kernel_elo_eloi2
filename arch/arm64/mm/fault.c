@@ -30,7 +30,6 @@
 #include <linux/highmem.h>
 #include <linux/perf_event.h>
 #include <linux/preempt.h>
-#include <linux/msm_rtb.h>	/* EloI2 A14 ROUND I: msm_rtb_note_fault() */
 
 #include <asm/bug.h>
 #include <asm/cpufeature.h>
@@ -643,70 +642,8 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 	if (!inf->fn(addr, esr, regs))
 		return;
 
-	/*
-	 * EloI2 A14 ROUND K, 2026-08-10. THE MEMORY PROBE'S SAFETY NET, AND IT
-	 * MUST STAY ABOVE msm_rtb_note_fault() BELOW.
-	 *
-	 * An external abort normally goes straight to arm64_notify_die() and the
-	 * machine dies. The memory scanner in kernel/trace/msm_rtb.c needs to
-	 * READ memory that may abort and live to report it, so honour an
-	 * exception-table fixup here the way the translation-fault path already
-	 * does via __do_kernel_fault().
-	 *
-	 * THIS IS INERT FOR EVERYTHING ELSE. Ordinary kernel code has no extable
-	 * entry covering these PCs, so search_exception_tables() returns NULL and
-	 * the behaviour is exactly as before. Only code that deliberately carries
-	 * a fixup - i.e. the scanner - can survive.
-	 *
-	 * IT IS ABOVE THE note_fault CALL ON PURPOSE: a probe-induced abort must
-	 * NOT be recorded as the boot's fatal fault and must NOT switch the RTB
-	 * off, or the scan would blind the instrument it depends on.
-	 */
-	if (!user_mode(regs) && !is_el1_instruction_abort(esr) &&
-	    fixup_exception(regs))
-		return;
-
-	/*
-	 * EloI2 A14 ROUND I. Same reasoning as bad_mode() in traps.c: commit the
-	 * evidence to persistent RAM before attempting to print, because on this
-	 * device nothing after the first line gets out (finding F75).
-	 *
-	 * ONLY FOR KERNEL-MODE FAULTS, and that restriction matters:
-	 * msm_rtb_note_fault() switches the RTB off, so calling it for a
-	 * survivable user-mode SIGBUS would blind us for the rest of the boot and
-	 * throw away the trace for the death we are actually chasing.
-	 */
-	if (!user_mode(regs))
-		msm_rtb_note_fault(esr, instruction_pointer(regs),
-				   (unsigned long)regs->regs[30],
-				   (unsigned long)regs->sp, addr,
-				   (unsigned long)regs->pstate);
-
-	/*
-	 * ONE LINE, AND IT CARRIES EVERYTHING - see the same comment in
-	 * bad_mode(). The leading text is deliberately unchanged because the log
-	 * analysis greps for it.
-	 *
-	 * THE ADDRESS DECODE IS THE POINT OF THIS ROUND'S THIRD QUESTION. Three
-	 * Round H deaths were synchronous external aborts inside a 48 KB window
-	 * of the linear map (finding F78) and nothing said what lived there.
-	 * virt_addr_valid() and pfn_valid() are pure arithmetic plus a section
-	 * lookup - no locks, safe in this context.
-	 */
-	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx PC=0x%016lx LR=0x%016lx SP=0x%016lx PSTATE=0x%08lx %s PA=0x%016llx %s PC=%pS\n",
-		 inf->name, esr, addr,
-		 instruction_pointer(regs),
-		 (unsigned long)regs->regs[30],
-		 (unsigned long)regs->sp,
-		 (unsigned long)regs->pstate,
-		 user_mode(regs) ? "EL0" : "EL1",
-		 virt_addr_valid(addr) ?
-			(unsigned long long)__pa(addr) : 0ULL,
-		 !virt_addr_valid(addr) ? "not-linear-map" :
-			(pfn_valid(__pa(addr) >> PAGE_SHIFT) ?
-				"linear-map,pfn_valid" :
-				"linear-map,PFN NOT VALID"),
-		 (void *)instruction_pointer(regs));
+	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
+		 inf->name, esr, addr);
 
 	info.si_signo = inf->sig;
 	info.si_errno = 0;
