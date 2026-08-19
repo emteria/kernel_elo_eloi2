@@ -22,9 +22,13 @@ USERINCLUDE     += \
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
-LINUXINCLUDE    += \
+#
+# Prepended, not appended: an older copy of these uapi headers under include/uapi
+# would otherwise shadow the ones shipped here.
+LINUXINCLUDE    := \
                 -I$(srctree)/techpack/audio/include/uapi \
-                -I$(srctree)/techpack/audio/include
+                -I$(srctree)/techpack/audio/include \
+                $(LINUXINCLUDE)
 
 ifeq ($(CONFIG_ARCH_SDM845), y)
 LINUXINCLUDE    += \
