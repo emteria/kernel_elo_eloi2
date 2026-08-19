@@ -241,6 +241,20 @@
 	status = "disabled";
 };
 
+/*
+ * Internal-codec PDM pin groups. They probe even with int_codec disabled and
+ * steal gpio67/68 and gpio69/73/74, which the external codec uses for its reset
+ * and interrupt lines. Do NOT disable cdc_us_euro_sw or cdc_quin_mi2s_gpios -
+ * ext_codec references those two.
+ */
+&cdc_pri_mi2s_gpios {
+	status = "disabled";
+};
+
+&cdc_comp_gpios {
+	status = "disabled";
+};
+
 &slim_msm {
 	status = "okay";
 };
@@ -276,6 +290,9 @@
 
 	qcom,spk-amp-mute-gpio = <&tlmm 95 0>;/*AMP_MUTE:MUTE the speaker AMP*/
 	qcom,spk-amp-enable-gpio = <&tlmm 96 0>;/*SPKR_EN:power on the speaker AMP*/
+
+	/* No WSA881x here - the speaker amp hangs off the two GPIOs above */
+	qcom,wsa-max-devs = <0>;
 	qcom,msm-mbhc-hphl-swh = <1>;
 	qcom,msm-mbhc-gnd-swh = <1>;
 
