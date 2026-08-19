@@ -47,7 +47,8 @@
 #define CONFIG_MSM_CDC_PINCTRL 1
 #define CONFIG_SND_SOC_MSM_STUB 1
 #define CONFIG_MSM_AVTIMER 1
-#define CONFIG_AVTIMER_LEGACY 1
+/* Off - see sdm450auto.conf. This define is what avtimer.c actually tests. */
+/* #define CONFIG_AVTIMER_LEGACY 1 */
 #define CONFIG_SND_SOC_EXT_CODEC 1
 #define CONFIG_SND_SOC_INT_CODEC 1
 #define CONFIG_SND_SOC_SDM660_CDC 1
