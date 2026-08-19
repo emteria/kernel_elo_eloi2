@@ -384,7 +384,8 @@
 
 	msm_audio_ion: qcom,msm-audio-ion {
 		compatible = "qcom,msm-audio-ion";
-		qcom,smmu-version = <1>;
+		/* Must be 2: the 4.9 msm_audio_ion driver rejects any other value */
+		qcom,smmu-version = <2>;
 		qcom,smmu-enabled;
 		iommus = <&adsp_io 1>;
 	};
