@@ -969,6 +969,7 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 	union snd_codec_options *codec_options;
 
 	int ret = 0;
+	int asm_api_ver;
 	uint16_t bit_width;
 	bool use_default_chmap = true;
 	char *chmap = NULL;
@@ -1017,9 +1018,9 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 			break;
 		}
 
-		if (q6core_get_avcs_api_version_per_service(
-					APRV2_IDS_SERVICE_ID_ADSP_ASM_V) >=
-					ADSP_ASM_API_VERSION_V2) {
+		asm_api_ver = q6core_get_avcs_api_version_per_service(
+					APRV2_IDS_SERVICE_ID_ADSP_ASM_V);
+		if (asm_api_ver >= ADSP_ASM_API_VERSION_V2) {
 			ret = q6asm_media_format_block_pcm_format_support_v5(
 					prtd->audio_client,
 					prtd->sample_rate,
@@ -1030,7 +1031,7 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 					sample_word_size,
 					ASM_LITTLE_ENDIAN,
 					DEFAULT_QF);
-		} else {
+		} else if (asm_api_ver >= 0) {
 			ret = q6asm_media_format_block_pcm_format_support_v4(
 					prtd->audio_client,
 					prtd->sample_rate,
@@ -1041,6 +1042,15 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 					sample_word_size,
 					ASM_LITTLE_ENDIAN,
 					DEFAULT_QF);
+		} else {
+			ret = q6asm_media_format_block_pcm_format_support_v3(
+					prtd->audio_client,
+					prtd->sample_rate,
+					prtd->num_channels,
+					bit_width, stream_id,
+					use_default_chmap,
+					chmap,
+					sample_word_size);
 		}
 		if (ret < 0)
 			pr_err("%s: CMD Format block failed\n", __func__);
@@ -1285,6 +1295,7 @@ static int msm_compr_configure_dsp_for_playback
 	struct snd_soc_pcm_runtime *soc_prtd = cstream->private_data;
 	uint16_t bits_per_sample = 16;
 	int dir = IN, ret = 0;
+	int asm_api_ver;
 	struct audio_client *ac = prtd->audio_client;
 	uint32_t stream_index;
 	struct asm_softpause_params softpause = {
@@ -1357,15 +1368,20 @@ static int msm_compr_configure_dsp_for_playback
 		pr_debug("%s: stream_id %d bits_per_sample %d\n",
 				__func__, ac->stream_id, bits_per_sample);
 
-		if (q6core_get_avcs_api_version_per_service(
-					APRV2_IDS_SERVICE_ID_ADSP_ASM_V) >=
-					ADSP_ASM_API_VERSION_V2)
+		asm_api_ver = q6core_get_avcs_api_version_per_service(
+					APRV2_IDS_SERVICE_ID_ADSP_ASM_V);
+		if (asm_api_ver >= ADSP_ASM_API_VERSION_V2)
 			ret = q6asm_stream_open_write_v5(ac,
 				prtd->codec, bits_per_sample,
 				ac->stream_id,
 				prtd->gapless_state.use_dsp_gapless_mode);
-		else
+		else if (asm_api_ver >= 0)
 			ret = q6asm_stream_open_write_v4(ac,
+				prtd->codec, bits_per_sample,
+				ac->stream_id,
+				prtd->gapless_state.use_dsp_gapless_mode);
+		else
+			ret = q6asm_stream_open_write_v3(ac,
 				prtd->codec, bits_per_sample,
 				ac->stream_id,
 				prtd->gapless_state.use_dsp_gapless_mode);
