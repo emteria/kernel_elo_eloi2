@@ -3261,6 +3261,113 @@ static int msm8952_mclk_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/*
+ * External speaker amplifier (APA2606) on LINEOUT3. Ported from the Elo/ODM
+ * Android 7 driver, sound/soc/msm/msm8952-slimbus.c, which CAF dropped when the
+ * audio stack moved to techpack/. Unmuting is delayed to suppress a power-on
+ * pop; that delay is the ODM's, not ours. See the project notes, F195.
+ */
+static int spk_amp_unmute_delay_ms = 13;
+module_param(spk_amp_unmute_delay_ms, int, 0644);
+
+static struct snd_soc_card *snd_card_for_ext_pa;
+static struct workqueue_struct *audio_unmute_workqueue;
+
+static void audio_unmute_routine(struct work_struct *ws)
+{
+	struct msm8952_asoc_mach_data *pdata;
+	int delay_us = spk_amp_unmute_delay_ms * 1000;
+
+	if (!snd_card_for_ext_pa)
+		return;
+	pdata = snd_soc_card_get_drvdata(snd_card_for_ext_pa);
+	if (!pdata || !gpio_is_valid(pdata->spkr_amp_mute_gpio))
+		return;
+
+	usleep_range(delay_us, delay_us + 1000);
+	gpio_direction_output(pdata->spkr_amp_mute_gpio, 1);
+	pr_debug("%s: spkr_amp_mute_gpio ON\n", __func__);
+}
+static DECLARE_DELAYED_WORK(audio_unmute_work, audio_unmute_routine);
+
+static void msm_ext_spk_power_amp_on(void)
+{
+	if (!snd_card_for_ext_pa || !audio_unmute_workqueue)
+		return;
+	queue_delayed_work(audio_unmute_workqueue, &audio_unmute_work, 0);
+}
+
+static void msm_ext_spk_power_amp_off(void)
+{
+	struct msm8952_asoc_mach_data *pdata;
+
+	if (!snd_card_for_ext_pa)
+		return;
+	pdata = snd_soc_card_get_drvdata(snd_card_for_ext_pa);
+	if (!pdata || !gpio_is_valid(pdata->spkr_amp_mute_gpio))
+		return;
+
+	cancel_delayed_work_sync(&audio_unmute_work);
+	gpio_direction_output(pdata->spkr_amp_mute_gpio, 0);
+	pr_debug("%s: spkr_amp_mute_gpio OFF\n", __func__);
+}
+
+static int msm8952_spk_amp_event(struct snd_soc_dapm_widget *w,
+				 struct snd_kcontrol *k, int event)
+{
+	pr_debug("%s: %s event 0x%x\n", __func__, w->name, event);
+
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		msm_ext_spk_power_amp_on();
+	else
+		msm_ext_spk_power_amp_off();
+
+	return 0;
+}
+
+static void msm8952_ext_spk_amp_gpios_init(struct platform_device *pdev,
+					   struct msm8952_asoc_mach_data *pdata)
+{
+	int ret;
+
+	pdata->spkr_amp_mute_gpio = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,spk-amp-mute-gpio", 0);
+	if (gpio_is_valid(pdata->spkr_amp_mute_gpio)) {
+		ret = devm_gpio_request(&pdev->dev, pdata->spkr_amp_mute_gpio,
+					"spkr_amp_mute");
+		if (ret) {
+			dev_err(&pdev->dev, "%s: mute gpio %d request failed %d\n",
+				__func__, pdata->spkr_amp_mute_gpio, ret);
+			pdata->spkr_amp_mute_gpio = -EINVAL;
+		} else {
+			/* start muted; the DAPM event unmutes on playback */
+			gpio_direction_output(pdata->spkr_amp_mute_gpio, 0);
+		}
+	} else {
+		dev_dbg(&pdev->dev, "%s: no qcom,spk-amp-mute-gpio\n", __func__);
+	}
+
+	pdata->spkr_amp_en_gpio = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,spk-amp-enable-gpio", 0);
+	if (gpio_is_valid(pdata->spkr_amp_en_gpio)) {
+		ret = devm_gpio_request(&pdev->dev, pdata->spkr_amp_en_gpio,
+					"spkr_amp_en");
+		if (ret) {
+			dev_err(&pdev->dev, "%s: enable gpio %d request failed %d\n",
+				__func__, pdata->spkr_amp_en_gpio, ret);
+			pdata->spkr_amp_en_gpio = -EINVAL;
+		} else {
+			/* the ODM holds the amp powered permanently */
+			gpio_direction_output(pdata->spkr_amp_en_gpio, 1);
+		}
+	} else {
+		dev_dbg(&pdev->dev, "%s: no qcom,spk-amp-enable-gpio\n", __func__);
+	}
+
+	dev_info(&pdev->dev, "%s: spk amp mute-gpio %d enable-gpio %d\n",
+		 __func__, pdata->spkr_amp_mute_gpio, pdata->spkr_amp_en_gpio);
+}
+
 #ifndef CONFIG_SND_SOC_MADERA
 static const struct snd_soc_dapm_widget msm8952_tasha_dapm_widgets[] = {
 
@@ -3268,9 +3375,9 @@ static const struct snd_soc_dapm_widget msm8952_tasha_dapm_widgets[] = {
 	msm8952_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
-	SND_SOC_DAPM_SPK("Lineout_3 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_3 amp", msm8952_spk_amp_event),
 	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
-	SND_SOC_DAPM_SPK("Lineout_4 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_4 amp", msm8952_spk_amp_event),
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
@@ -3295,6 +3402,9 @@ static struct snd_soc_dapm_route wcd9335_audio_paths[] = {
 	{"MIC BIAS2", NULL, "MCLK"},
 	{"MIC BIAS3", NULL, "MCLK"},
 	{"MIC BIAS4", NULL, "MCLK"},
+	/* the external amp follows LINEOUT3/4, so its widget gets power events */
+	{"Lineout_3 amp", NULL, "LINEOUT3"},
+	{"Lineout_4 amp", NULL, "LINEOUT4"},
 };
 #endif
 
@@ -3947,6 +4057,11 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 	pr_info("%s: sound card register successfully\n", __func__);
+
+	snd_card_for_ext_pa = card;
+	if (!audio_unmute_workqueue)
+		audio_unmute_workqueue = create_singlethread_workqueue("audio_unmute_wq");
+	msm8952_ext_spk_amp_gpios_init(pdev, pdata);
 
 #ifndef CONFIG_SND_SOC_MADERA
 	num_strings = of_property_count_strings(pdev->dev.of_node,

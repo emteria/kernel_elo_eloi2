@@ -41,6 +41,8 @@ struct msm8952_codec {
 struct msm8952_asoc_mach_data {
 	int ext_pa;
 	int us_euro_gpio;
+	int spkr_amp_en_gpio;		/* high enables the external amp */
+	int spkr_amp_mute_gpio;		/* low mutes the external amp */
 	struct delayed_work hs_detect_dwork;
 	struct snd_soc_codec *codec;
 	struct msm8952_codec msm8952_codec_fn;
