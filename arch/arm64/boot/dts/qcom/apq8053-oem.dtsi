@@ -255,6 +255,23 @@
 	status = "disabled";
 };
 
+/*
+ * WSA881x pin groups. Same shape as the two above: this board has no WSA881x
+ * (qcom,wsa-max-devs = <0>), but the pinctrl nodes have no status property, so
+ * they probe anyway and apply their sleep state - which takes both speaker
+ * amplifier control pins away from us. wsa_vi_off muxes gpio95 to "wsa_io" with
+ * a pull-down, and wsa_reset_off drives gpio96 output-low, so the amp is held
+ * muted and powered off. Do NOT disable wsa881x_analog_clk_gpio as well - it
+ * muxes gpio25, which has not been checked here.
+ */
+&wsa881x_analog_vi_gpio {
+	status = "disabled";
+};
+
+&wsa881x_analog_reset_gpio {
+	status = "disabled";
+};
+
 &slim_msm {
 	status = "okay";
 };
