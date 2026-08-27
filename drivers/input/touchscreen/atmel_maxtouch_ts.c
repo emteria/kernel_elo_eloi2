@@ -21,6 +21,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/bitmap.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
@@ -81,6 +82,7 @@
 #define MXT_PROCI_TOUCHSUPPRESSION_T42	42
 #define MXT_PROCI_STYLUS_T47		47
 #define MXT_PROCG_NOISESUPPRESSION_T48	48
+#define MXT_PROCG_NOISESUPPRESSION_T72	72
 #define MXT_SPT_COMMSCONFIG_T18		18
 #define MXT_SPT_GPIOPWM_T19		19
 #define MXT_SPT_SELFTEST_T25		25
@@ -351,6 +353,10 @@ struct mxt_data {
 	u8 T63_reportid_max;
 	u8 T100_reportid_min;
 	u8 T100_reportid_max;
+	u8 T72_reportid;
+
+	/* Report IDs already reported as unhandled; see mxt_proc_message(). */
+	DECLARE_BITMAP(unknown_reportid, 256);
 
 	/* for fw update in bootloader */
 	struct completion bl_completion;
@@ -1275,7 +1281,9 @@ static int mxt_proc_message(struct mxt_data *data, u8 *message)
 	} else if (report_id >= data->T15_reportid_min
 		   && report_id <= data->T15_reportid_max) {
 		mxt_proc_t15_messages(data, message);
-	} else {
+	} else if (report_id == data->T72_reportid) {
+		/* Noise suppression status: recognised, deliberately unused. */
+	} else if (!test_and_set_bit(report_id, data->unknown_reportid)) {
 		dump = true;
 	}
 
@@ -2267,6 +2275,7 @@ static int mxt_parse_object_table(struct mxt_data *data)
 	/* Valid Report IDs start counting from 1 */
 	reportid = 1;
 	data->mem_size = 0;
+	bitmap_zero(data->unknown_reportid, 256);
 	for (i = 0; i < data->info->object_num; i++) {
 		struct mxt_object *object = data->object_table + i;
 		u8 min_id, max_id;
@@ -2333,6 +2342,9 @@ static int mxt_parse_object_table(struct mxt_data *data)
 			break;
 		case MXT_PROCG_NOISESUPPRESSION_T48:
 			data->T48_reportid = min_id;
+			break;
+		case MXT_PROCG_NOISESUPPRESSION_T72:
+			data->T72_reportid = min_id;
 			break;
 		case MXT_PROCI_ACTIVE_STYLUS_T63:
 			/* Only handle messages from first T63 instance */
