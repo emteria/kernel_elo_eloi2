@@ -98,11 +98,29 @@ enum {
 	ULP_LSM_TOPOLOGY_ID_CAL_TYPE,
 	AFE_FB_SPKR_PROT_TH_VI_CAL_TYPE,
 	AFE_FB_SPKR_PROT_EX_VI_CAL_TYPE,
+	AFE_SIDETONE_IIR_CAL_TYPE,
+	AFE_LSM_TOPOLOGY_CAL_TYPE,
+	AFE_LSM_TX_CAL_TYPE,
+	ADM_LSM_TOPOLOGY_CAL_TYPE,
+	ADM_LSM_AUDPROC_CAL_TYPE,
+	ADM_LSM_AUDPROC_PERSISTENT_CAL_TYPE,
 	MAX_CAL_TYPES,
 };
 
 #define AFE_FB_SPKR_PROT_TH_VI_CAL_TYPE AFE_FB_SPKR_PROT_TH_VI_CAL_TYPE
 #define AFE_FB_SPKR_PROT_EX_VI_CAL_TYPE AFE_FB_SPKR_PROT_EX_VI_CAL_TYPE
+
+#define AFE_SIDETONE_IIR_CAL_TYPE AFE_SIDETONE_IIR_CAL_TYPE
+
+#define AFE_LSM_TOPOLOGY_CAL_TYPE AFE_LSM_TOPOLOGY_CAL_TYPE
+#define AFE_LSM_TX_CAL_TYPE AFE_LSM_TX_CAL_TYPE
+#define ADM_LSM_TOPOLOGY_CAL_TYPE ADM_LSM_TOPOLOGY_CAL_TYPE
+#define ADM_LSM_AUDPROC_CAL_TYPE ADM_LSM_AUDPROC_CAL_TYPE
+#define ADM_LSM_AUDPROC_PERSISTENT_CAL_TYPE ADM_LSM_AUDPROC_PERSISTENT_CAL_TYPE
+#define LSM_CAL_TYPES
+
+#define TOPOLOGY_SPECIFIC_CHANNEL_INFO
+#define MSM_SPKR_PROT_SPV3
 
 enum {
 	VERSION_0_0,
@@ -296,6 +314,10 @@ struct audio_cal_info_spk_prot_cfg {
 	 * 1 - Start calib
 	 * 2 - Disable spk prot
 	 */
+#ifdef MSM_SPKR_PROT_SPV3
+	uint32_t	sp_version;
+	int32_t	limiter_th[SP_V2_NUM_MAX_SPKRS];
+#endif
 };
 
 struct audio_cal_info_sp_th_vi_ftm_cfg {
@@ -346,6 +368,19 @@ struct audio_cal_info_sidetone {
 	int32_t		pid;
 };
 
+#define MAX_SIDETONE_IIR_DATA_SIZE   224
+#define MAX_NO_IIR_FILTER_STAGE      10
+
+struct audio_cal_info_sidetone_iir {
+	uint16_t	iir_enable;
+	uint16_t	num_biquad_stages;
+	uint16_t	pregain;
+	int32_t	        tx_acdb_id;
+	int32_t	        rx_acdb_id;
+	int32_t	        mid;
+	int32_t	        pid;
+	uint8_t	        iir_config[MAX_SIDETONE_IIR_DATA_SIZE];
+};
 struct audio_cal_info_lsm_top {
 	int32_t		topology;
 	int32_t		acdb_id;
@@ -360,9 +395,15 @@ struct audio_cal_info_lsm {
 	int32_t		app_type;
 };
 
+#define VSS_NUM_CHANNELS_MAX	8
+
 struct audio_cal_info_voc_top {
 	int32_t		topology;
 	int32_t		acdb_id;
+#ifdef TOPOLOGY_SPECIFIC_CHANNEL_INFO
+	uint32_t	num_channels;
+	uint8_t		channel_mapping[VSS_NUM_CHANNELS_MAX];
+#endif
 };
 
 struct audio_cal_info_vocproc {
@@ -380,7 +421,7 @@ enum {
 struct audio_cal_info_vocvol {
 	int32_t		tx_acdb_id;
 	int32_t		rx_acdb_id;
-	/* DEFUALT_ or VOL_BOOST_FEATURE_SET */
+	/* DEFAULT_ or VOL_BOOST_FEATURE_SET */
 	int32_t		feature_set;
 };
 
@@ -578,6 +619,17 @@ struct audio_cal_type_sidetone {
 struct audio_cal_sidetone {
 	struct audio_cal_header			hdr;
 	struct audio_cal_type_sidetone		cal_type;
+};
+
+struct audio_cal_type_sidetone_iir {
+	struct audio_cal_type_header	   cal_hdr;
+	struct audio_cal_data		   cal_data;
+	struct audio_cal_info_sidetone_iir cal_info;
+};
+
+struct audio_cal_sidetone_iir {
+	struct audio_cal_header		   hdr;
+	struct audio_cal_type_sidetone_iir cal_type;
 };
 
 struct audio_cal_type_lsm_top {
