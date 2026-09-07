@@ -8,7 +8,14 @@ endif
 DTC_FLAGS += -p 1024
 
 dtb-$(CONFIG_ARCH_MSM8953) += \
-       apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb
+       apq8053-mtp-aaio2_std101-tm101-evt0.dtb \
+       apq8053-mtp-aaio2_std101-tm101-evt2.dtb \
+       apq8053-mtp-aaio2_std156-boe_nv156-evt0.dtb \
+       apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb \
+       apq8053-mtp-aaio2_std215-hr215-evt0.dtb \
+       apq8053-mtp-aaio2_std215-hr215-evt2.dtb \
+       apq8053-mtp-aaio2_value101-tm101-evt2.dtb \
+       apq8053-mtp-aaio2_value156-boe_nt156-evt2.dtb
 
 dtbo-$(CONFIG_ARCH_MSM8953) += \
 	sdm632-ocean-na-evt1-overlay.dtbo
@@ -644,7 +651,14 @@ sda429-bg-wdp-overlay.dtbo-base := sda429-bg-wdp.dtb
 else
 
 dtb-$(CONFIG_ARCH_MSM8953) += \
-       apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb
+       apq8053-mtp-aaio2_std101-tm101-evt0.dtb \
+       apq8053-mtp-aaio2_std101-tm101-evt2.dtb \
+       apq8053-mtp-aaio2_std156-boe_nv156-evt0.dtb \
+       apq8053-mtp-aaio2_std156-boe_nv156-evt2.dtb \
+       apq8053-mtp-aaio2_std215-hr215-evt0.dtb \
+       apq8053-mtp-aaio2_std215-hr215-evt2.dtb \
+       apq8053-mtp-aaio2_value101-tm101-evt2.dtb \
+       apq8053-mtp-aaio2_value156-boe_nt156-evt2.dtb
 
 dtb-$(CONFIG_ARCH_MSM8937) += msm8937-pmi8950-mtp.dtb \
 	msm8937-interposer-sdm439-cdp.dtb \
