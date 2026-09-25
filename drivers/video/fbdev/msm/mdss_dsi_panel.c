@@ -819,6 +819,8 @@ extern int led_en_lvds;
 extern int led_en_edp;
 
 static int backlight_enabled=1;
+static u32 last_bl_level;	/* level the panel is actually lit at */
+
 void set_pwm_for_lvds_panel(struct mdss_dsi_ctrl_pdata *ctrl,u32 level)
 {
 	pr_info("set_pwm_for_lvds_panel!!!\n");
@@ -826,6 +828,33 @@ void set_pwm_for_lvds_panel(struct mdss_dsi_ctrl_pdata *ctrl,u32 level)
 	mdss_dsi_panel_bklt_pwm(ctrl, level);
 	backlight_enabled=0;
 
+}
+
+/*
+ * Continuous-splash handoff for the LVDS boards.
+ *
+ * This used to be set_pwm_for_lvds_panel(ctrl, 0), i.e. it blanked the panel.
+ * On msm-3.18 that was covered: a blank/unblank followed within ~300 ms and
+ * reprogrammed the bridge. On msm-4.9 nothing blanks - measured, the only
+ * mdss_fb_blank_sub calls a 10" boot makes are FB_BLANK_UNBLANK - so the panel
+ * stayed dark from the handoff until the framework's first brightness write,
+ * 14.4 s later, which is most of the boot animation.
+ *
+ * Keep the state change the bridge needs (backlight_enabled = 0 hands control
+ * to the PWM branches of bl_ctrl) but re-apply the level the panel is already
+ * lit at instead of zero, so the picture never drops.
+ */
+void mdss_dsi_panel_lvds_bl_handoff(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (!last_bl_level) {
+		/* Nothing has set a level yet - leave the bootloader's
+		 * backlight exactly as it is rather than guess one. */
+		backlight_enabled = 0;
+		pr_info("lvds bl handoff: no level yet, keeping bootloader's\n");
+		return;
+	}
+	pr_info("lvds bl handoff: holding level %u\n", last_bl_level);
+	set_pwm_for_lvds_panel(ctrl, last_bl_level);
 }
 
 static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
@@ -847,6 +876,8 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	}
 
 	pr_err("mdss_dsi_panel_bl_ctrl,level is %d\n",bl_level);
+	if (bl_level)
+		last_bl_level = bl_level;
 
 	if((bl_level==0)&&backlight_enabled)
 	{

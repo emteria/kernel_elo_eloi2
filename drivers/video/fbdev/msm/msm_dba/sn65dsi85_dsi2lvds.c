@@ -142,6 +142,7 @@ int irq_times=0;
 
 
 extern void set_pwm_for_lvds_panel(struct mdss_dsi_ctrl_pdata *ctrl,u32 level);
+extern void mdss_dsi_panel_lvds_bl_handoff(struct mdss_dsi_ctrl_pdata *ctrl);
 
 void sn65dsi85_dsi2lvds_enable_early(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
@@ -176,8 +177,7 @@ void sn65dsi85_dsi2lvds_enable_early(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			msleep(900);
 		}
 		#endif
-		gpio_set_value(led_en_lvds, 0);
-		set_pwm_for_lvds_panel(ctrl_pdata,0);
+		mdss_dsi_panel_lvds_bl_handoff(ctrl_pdata);
 		splash_flag=0;
 	}
 
