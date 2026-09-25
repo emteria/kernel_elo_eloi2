@@ -1,8 +1,8 @@
 /*
- * Touch Screen driver for SiS 9200 family I2C Touch panels
+ * drivers/input/touchscreen/sis_i2c.c
+ * I2C Touch panel driver for SiS 9200 family
  *
  * Copyright (C) 2015 SiS, Inc.
- * Copyright (C) 2016 Nextfour Group
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,402 +12,1173 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Date: 2016/06/07
+ * Version:	Android_v2.11.04
  */
-
-#include <linux/crc-itu-t.h>
+#include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/hrtimer.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
-#include <linux/input/mt.h>
 #include <linux/interrupt.h>
-#include <linux/gpio/consumer.h>
-#include <linux/module.h>
+#include <linux/io.h>
+#include <linux/platform_device.h>
+#include "sis_i2c.h"
+#include <linux/linkage.h>
 #include <linux/slab.h>
+#include <linux/gpio.h>
+#include <linux/irq.h>
 #include <asm/unaligned.h>
+#include <linux/uaccess.h>
+#include <linux/crc-itu-t.h> /*For CRC*/
+#ifdef _STD_RW_IO
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/cdev.h>
+#define DEVICE_NAME "sis_aegis_touch_device"
+static const int sis_char_devs_count = 1;        /* device count */
+static int sis_char_major;/* must 0 */
+static struct cdev sis_char_cdev;
+static struct class *sis_char_class;
+#endif
+#include <linux/of_gpio.h>
+#include <linux/of_irq.h>
+#include <linux/device.h>
+#include <linux/gpio.h>
 
-#define SIS_I2C_NAME		"sis_i2c_ts"
+/* Addresses to scan */
+static const unsigned short normal_i2c[] = { SIS_SLAVE_ADDR, I2C_CLIENT_END };
+static struct workqueue_struct *sis_wq;
+struct sis_ts_data *ts_bak;/* must 0 */
+struct sisTP_driver_data *TPInfo;/* must NULL */
+#ifdef switch_tp
+char tp_usb_mode = 0;
+#endif
+static void sis_tpinfo_clear(struct sisTP_driver_data *TPInfo, int max);
+static unsigned int sis_enable_gpio = 0; // 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch
 
-/*
- * The I2C packet format:
- * le16		byte count
- * u8		Report ID
- * <contact data - variable length>
- * u8		Number of contacts
- * le16		Scan Time (optional)
- * le16		CRC
- *
- * One touch point information consists of 6+ bytes, the order is:
- * u8		contact state
- * u8		finger id
- * le16		x axis
- * le16		y axis
- * u8		contact width (optional)
- * u8		contact height (optional)
- * u8		pressure (optional)
- *
- * Maximum amount of data transmitted in one shot is 64 bytes, if controller
- * needs to report more contacts than fit in one packet it will send true
- * number of contacts in first packet and 0 as number of contacts in second
- * packet.
- */
 
-#define SIS_MAX_PACKET_SIZE		64
+#ifdef CONFIG_X86
+/*static const struct i2c_client_address_data addr_data;*/
+/* Insmod parameters */
+static int sis_ts_detect
+(struct i2c_client *client, struct i2c_board_info *info);
+#endif
 
-#define SIS_PKT_LEN_OFFSET		0
-#define SIS_PKT_REPORT_OFFSET		2 /* Report ID/type */
-#define SIS_PKT_CONTACT_OFFSET		3 /* First contact */
-
-#define SIS_SCAN_TIME_LEN		2
-
-/* Supported report types */
-#define SIS_ALL_IN_ONE_PACKAGE		0x10
-#define SIS_PKT_IS_TOUCH(x)		(((x) & 0x0f) == 0x01)
-#define SIS_PKT_IS_HIDI2C(x)		(((x) & 0x0f) == 0x06)
-
-/* Contact properties within report */
-#define SIS_PKT_HAS_AREA(x)		((x) & BIT(4))
-#define SIS_PKT_HAS_PRESSURE(x)		((x) & BIT(5))
-#define SIS_PKT_HAS_SCANTIME(x)		((x) & BIT(6))
-
-/* Contact size */
-#define SIS_BASE_LEN_PER_CONTACT	6
-#define SIS_AREA_LEN_PER_CONTACT	2
-#define SIS_PRESSURE_LEN_PER_CONTACT	1
-
-/* Offsets within contact data */
-#define SIS_CONTACT_STATUS_OFFSET	0
-#define SIS_CONTACT_ID_OFFSET		1 /* Contact ID */
-#define SIS_CONTACT_X_OFFSET		2
-#define SIS_CONTACT_Y_OFFSET		4
-#define SIS_CONTACT_WIDTH_OFFSET	6
-#define SIS_CONTACT_HEIGHT_OFFSET	7
-#define SIS_CONTACT_PRESSURE_OFFSET(id)	(SIS_PKT_HAS_AREA(id) ? 8 : 6)
-
-/* Individual contact state */
-#define SIS_STATUS_UP			0x0
-#define SIS_STATUS_DOWN			0x3
-
-/* Touchscreen parameters */
-#define SIS_MAX_FINGERS			10
-#define SIS_MAX_X			4095
-#define SIS_MAX_Y			4095
-#define SIS_MAX_PRESSURE		255
-
-/* Resolution diagonal */
-#define SIS_AREA_LENGTH_LONGER		5792
-/*((SIS_MAX_X^2) + (SIS_MAX_Y^2))^0.5*/
-#define SIS_AREA_LENGTH_SHORT		5792
-#define SIS_AREA_UNIT			(5792 / 32)
-
-struct sis_ts_data {
-	struct i2c_client *client;
-	struct input_dev *input;
-
-	struct gpio_desc *attn_gpio;
-	struct gpio_desc *reset_gpio;
-
-	u8 packet[SIS_MAX_PACKET_SIZE];
-};
-
-static int sis_read_packet(struct i2c_client *client, u8 *buf,
-			   unsigned int *num_contacts,
-			   unsigned int *contact_size)
+static int mxt_pinctrl_init(struct sis_ts_data *data)
 {
-	int count_idx;
-	int ret;
-	u16 len;
-	u16 crc, pkg_crc;
-	u8 report_id;
+    int error;
 
-	ret = i2c_master_recv(client, buf, SIS_MAX_PACKET_SIZE);
-	if (ret <= 0)
-		return -EIO;
+    /* Get pinctrl if target uses pinctrl */
+    data->ts_pinctrl = devm_pinctrl_get((&data->client->dev));
+    if (IS_ERR_OR_NULL(data->ts_pinctrl)) {
+        dev_dbg(&data->client->dev,
+            "Device does not use pinctrl\n");
+        error = PTR_ERR(data->ts_pinctrl);
+        data->ts_pinctrl = NULL;
+        return error;
+    }
 
-	len = get_unaligned_le16(&buf[SIS_PKT_LEN_OFFSET]);
-	if (len > SIS_MAX_PACKET_SIZE) {
-		dev_err(&client->dev,
-			"%s: invalid packet length (%d vs %d)\n",
-			__func__, len, SIS_MAX_PACKET_SIZE);
-		return -E2BIG;
-	}
+    data->gpio_state_active
+        = pinctrl_lookup_state(data->ts_pinctrl, "pmx_ts_active");
+    if (IS_ERR_OR_NULL(data->gpio_state_active)) {
+        dev_dbg(&data->client->dev,
+            "Can not get ts default pinstate\n");
+        error = PTR_ERR(data->gpio_state_active);
+        data->ts_pinctrl = NULL;
+        return error;
+    }
 
-	if (len < 10)
-		return -EINVAL;
+    data->gpio_state_suspend
+        = pinctrl_lookup_state(data->ts_pinctrl, "pmx_ts_suspend");
+    if (IS_ERR_OR_NULL(data->gpio_state_suspend)) {
+        dev_dbg(&data->client->dev,
+            "Can not get ts sleep pinstate\n");
+        error = PTR_ERR(data->gpio_state_suspend);
+        data->ts_pinctrl = NULL;
+        return error;
+    }
 
-	report_id = buf[SIS_PKT_REPORT_OFFSET];
-	count_idx  = len - 1;
-	*contact_size = SIS_BASE_LEN_PER_CONTACT;
-
-	if (report_id != SIS_ALL_IN_ONE_PACKAGE) {
-		if (SIS_PKT_IS_TOUCH(report_id)) {
-			/*
-			 * Calculate CRC ignoring packet length
-			 * in the beginning and CRC transmitted
-			 * at the end of the packet.
-			 */
-			crc = crc_itu_t(0, buf + 2, len - 2 - 2);
-			pkg_crc = get_unaligned_le16(&buf[len - 2]);
-
-			if (crc != pkg_crc) {
-				dev_err(&client->dev,
-					"%s: CRC Error (%d vs %d)\n",
-					__func__, crc, pkg_crc);
-				return -EINVAL;
-			}
-
-			count_idx -= 2;
-
-		} else if (!SIS_PKT_IS_HIDI2C(report_id)) {
-			dev_err(&client->dev,
-				"%s: invalid packet ID %#02x\n",
-				__func__, report_id);
-			return -EINVAL;
-		}
-
-		if (SIS_PKT_HAS_SCANTIME(report_id))
-			count_idx -= SIS_SCAN_TIME_LEN;
-
-		if (SIS_PKT_HAS_AREA(report_id))
-			*contact_size += SIS_AREA_LEN_PER_CONTACT;
-		if (SIS_PKT_HAS_PRESSURE(report_id))
-			*contact_size += SIS_PRESSURE_LEN_PER_CONTACT;
-	}
-
-	*num_contacts = buf[count_idx];
-	return 0;
+    return 0;
 }
 
-static int sis_ts_report_contact(struct sis_ts_data *ts, const u8 *data, u8 id)
+static int mxt_pinctrl_select(struct sis_ts_data *data, bool on)
 {
-	struct input_dev *input = ts->input;
-	int slot;
-	u8 status = data[SIS_CONTACT_STATUS_OFFSET];
-	u8 pressure;
-	u8 height, width;
-	u16 x, y;
+    struct pinctrl_state *pins_state;
+    int error;
 
-	if (status != SIS_STATUS_DOWN && status != SIS_STATUS_UP) {
-		dev_err(&ts->client->dev, "Unexpected touch status: %#02x\n",
-			data[SIS_CONTACT_STATUS_OFFSET]);
-		return -EINVAL;
-	}
+    pins_state = on ? data->gpio_state_active
+        : data->gpio_state_suspend;
+    if (!IS_ERR_OR_NULL(pins_state)) {
+        error = pinctrl_select_state(data->ts_pinctrl, pins_state);
+        if (error) {
+            dev_err(&data->client->dev,
+                "can not set %s pins\n",
+                on ? "pmx_ts_active" : "pmx_ts_suspend");
+            return error;
+        }
+    } else {
+        dev_err(&data->client->dev,
+            "not a valid '%s' pinstate\n",
+                on ? "pmx_ts_active" : "pmx_ts_suspend");
+    }
 
-	slot = input_mt_get_slot_by_key(input, data[SIS_CONTACT_ID_OFFSET]);
-	if (slot < 0)
-		return -ENOENT;
-
-	input_mt_slot(input, slot);
-	input_mt_report_slot_state(input, MT_TOOL_FINGER,
-				   status == SIS_STATUS_DOWN);
-
-	if (status == SIS_STATUS_DOWN) {
-		pressure = height = width = 1;
-		if (id != SIS_ALL_IN_ONE_PACKAGE) {
-			if (SIS_PKT_HAS_AREA(id)) {
-				width = data[SIS_CONTACT_WIDTH_OFFSET];
-				height = data[SIS_CONTACT_HEIGHT_OFFSET];
-			}
-
-			if (SIS_PKT_HAS_PRESSURE(id))
-				pressure =
-					data[SIS_CONTACT_PRESSURE_OFFSET(id)];
-		}
-
-		x = get_unaligned_le16(&data[SIS_CONTACT_X_OFFSET]);
-		y = get_unaligned_le16(&data[SIS_CONTACT_Y_OFFSET]);
-
-		input_report_abs(input, ABS_MT_TOUCH_MAJOR,
-				 width * SIS_AREA_UNIT);
-		input_report_abs(input, ABS_MT_TOUCH_MINOR,
-				 height * SIS_AREA_UNIT);
-		input_report_abs(input, ABS_MT_PRESSURE, pressure);
-		input_report_abs(input, ABS_MT_POSITION_X, x);
-		input_report_abs(input, ABS_MT_POSITION_Y, y);
-	}
-
-	return 0;
+    return 0;
 }
 
-static void sis_ts_handle_packet(struct sis_ts_data *ts)
+void PrintBuffer(int start, int length, char *buf)
 {
-	const u8 *contact;
-	unsigned int num_to_report = 0;
-	unsigned int num_contacts;
-	unsigned int num_reported;
-	unsigned int contact_size;
-	int error;
-	u8 report_id;
+	int i;
+	for (i = start; i < length; i++) {
+		pr_info("%02x ", buf[i]);
+		if (i != 0 && i % 30 == 0)
+			pr_info("\n");
+	}
+	pr_info("\n");
+}
 
+static int sis_command_for_write(struct i2c_client *client, int wlength,
+							unsigned char *wdata)
+{
+	int ret = SIS_ERR;
+	struct i2c_msg msg[1];
+
+	msg[0].addr = client->addr;
+	msg[0].flags = 0;/*Write*/
+	msg[0].len = wlength;
+	msg[0].buf = (unsigned char *)wdata;
+	ret = i2c_transfer(client->adapter, msg, 1);
+	return ret;
+}
+
+static int sis_command_for_read(struct i2c_client *client, int rlength,
+							unsigned char *rdata)
+{
+	int ret = SIS_ERR;
+	struct i2c_msg msg[1];
+
+	msg[0].addr = client->addr;
+	msg[0].flags = I2C_M_RD;/*Read*/
+	msg[0].len = rlength;
+	msg[0].buf = rdata;
+	ret = i2c_transfer(client->adapter, msg, 1);
+	return ret;
+}
+
+static int sis_cul_unit(uint8_t report_id)
+{
+	int ret = NORMAL_LEN_PER_POINT;
+
+	if (report_id != ALL_IN_ONE_PACKAGE) {
+		if (IS_AREA(report_id) /*&& IS_TOUCH(report_id)*/)
+			ret += AREA_LEN_PER_POINT;
+		if (IS_PRESSURE(report_id))
+			ret += PRESSURE_LEN_PER_POINT;
+	}
+
+	return ret;
+}
+
+static int sis_ReadPacket(struct i2c_client *client, uint8_t cmd, uint8_t *buf)
+{
+	uint8_t tmpbuf[MAX_BYTE] = {0};	/*MAX_BYTE = 64;*/
+#ifdef _CHECK_CRC
+	uint16_t buf_crc = 0;
+	uint16_t package_crc = 0;
+	int l_package_crc = 0;
+	int crc_end = 0;
+#endif
+	int ret = SIS_ERR;
+	int touchnum = 0;
+	int p_count = 0;
+	int touc_formate_id = 0;
+	int locate = 0;
+	bool read_first = true;
+	/*
+	* New i2c format
+	* buf[0] = Low 8 bits of byte count value
+	* buf[1] = High 8 bits of byte counte value
+	* buf[2] = Report ID
+	* buf[touch num * 6 + 2 ] = Touch informations;
+	* 1 touch point has 6 bytes, it could be none if no touch
+	* buf[touch num * 6 + 3] = Touch numbers
+	*
+	* One touch point information include 6 bytes, the order is
+	*
+	* 1. status = touch down or touch up
+	* 2. id = finger id
+	* 3. x axis low 8 bits
+	* 4. x axis high 8 bits
+	* 5. y axis low 8 bits
+	* 6. y axis high 8 bits
+	* */
 	do {
-		error = sis_read_packet(ts->client, ts->packet,
-					&num_contacts, &contact_size);
-		if (error)
-			break;
-
-		if (num_to_report == 0) {
-			num_to_report = num_contacts;
-		} else if (num_contacts != 0) {
-			dev_err(&ts->client->dev,
-				"%s: nonzero (%d) point count in tail packet\n",
-				__func__, num_contacts);
-			break;
+		if (locate >= PACKET_BUFFER_SIZE) {
+			pr_err("sis_ReadPacket: Buf Overflow\n");
+			return SIS_ERR;
 		}
+		ret = sis_command_for_read(client, MAX_BYTE, tmpbuf);
 
-		report_id = ts->packet[SIS_PKT_REPORT_OFFSET];
-		contact = &ts->packet[SIS_PKT_CONTACT_OFFSET];
-		num_reported = 0;
+#ifdef _DEBUG_PACKAGE
+		pr_info("sis_ReadPacket: Buf_Data [0~63]\n");
+		PrintBuffer(0, 64, tmpbuf);
+#endif
 
-		while (num_to_report > 0) {
-			error = sis_ts_report_contact(ts, contact, report_id);
-			if (error)
-				break;
-
-			contact += contact_size;
-			num_to_report--;
-			num_reported++;
-
-			if (report_id != SIS_ALL_IN_ONE_PACKAGE &&
-			    num_reported >= 5) {
-				/*
-				 * The remainder of contacts is sent
-				 * in the 2nd packet.
-				 */
-				break;
+		if (ret < 0) {
+			pr_err("sis_ReadPacket: i2c transfer error\n");
+			return ret;
+		}
+		/*error package length of receiving data*/
+		else if (tmpbuf[P_BYTECOUNT] > MAX_BYTE) {
+			pr_err("sis_ReadPacket: Error Bytecount\n");
+			return SIS_ERR;
+		}
+		if (read_first) {
+			/*access NO TOUCH event unless BUTTON NO TOUCH event*/
+#ifdef _SUPPORT_BUTTON_TOUCH
+			if (tmpbuf[P_REPORT_ID] ==  BUTTON_FORMAT) {
+				memcpy(&buf[0], &tmpbuf[0], 7);
+				return touchnum;/*touchnum is 0*/
+			}
+#endif
+			/* access NO TOUCH event unless BUTTON NO TOUCH event*/
+			if (tmpbuf[P_BYTECOUNT] == 0/*NO_TOUCH_BYTECOUNT*/)
+				return touchnum;/*touchnum is 0*/
+			if (tmpbuf[P_BYTECOUNT] == 3/*EMPRY PACKET*/) {
+#ifdef _DEBUG_REPORT
+				pr_err("sis_ReadPacket: Empty packet");
+				PrintBuffer(0, 64, tmpbuf);
+#endif
+				return -2;
 			}
 		}
-	} while (num_to_report > 0);
+		/*skip parsing data when two devices are registered
+		 * at the same slave address*/
+		/*parsing data when P_REPORT_ID && 0xf is TOUCH_FORMAT
+		 * or P_REPORT_ID is ALL_IN_ONE_PACKAGE*/
+		touc_formate_id = tmpbuf[P_REPORT_ID] & 0xf;
+		if ((touc_formate_id != TOUCH_FORMAT)
+		&& (touc_formate_id != HIDI2C_FORMAT)
+		&& (tmpbuf[P_REPORT_ID] != ALL_IN_ONE_PACKAGE)) {
+			pr_err("sis_ReadPacket: Error Report_ID\n");
+			return SIS_ERR;
+		}
+		p_count = (int) tmpbuf[P_BYTECOUNT] - 1;	/*start from 0*/
+		if (tmpbuf[P_REPORT_ID] != ALL_IN_ONE_PACKAGE) {
+			if (IS_TOUCH(tmpbuf[P_REPORT_ID])) {
+				p_count -= BYTE_CRC_I2C;/*delete 2 byte crc*/
+			} else if (IS_HIDI2C(tmpbuf[P_REPORT_ID])) {
+				p_count -= BYTE_CRC_HIDI2C;
+			} else {	/*should not be happen*/
+				pr_err("sis_ReadPacket: delete crc error\n");
+				return SIS_ERR;
+			}
+			if (IS_SCANTIME(tmpbuf[P_REPORT_ID]))
+				p_count -= BYTE_SCANTIME;
+		}
+		/*else {}*/ /*For ALL_IN_ONE_PACKAGE*/
+		if (read_first)
+			touchnum = tmpbuf[p_count];
+		else {
+			if (tmpbuf[p_count] != 0) {
+				pr_err("sis_ReadPacket: get error package\n");
+				return -1;
+			}
+		}
 
-	input_mt_sync_frame(ts->input);
-	input_sync(ts->input);
+#ifdef _CHECK_CRC
+		crc_end = p_count + (IS_SCANTIME(tmpbuf[P_REPORT_ID]) * 2);
+		buf_crc = cal_crc(tmpbuf, 2, crc_end);
+		/*sub bytecount (2 byte)*/
+		l_package_crc = p_count + 1
+		+ (IS_SCANTIME(tmpbuf[P_REPORT_ID]) * 2);
+		package_crc = ((tmpbuf[l_package_crc] & 0xff)
+		| ((tmpbuf[l_package_crc + 1] & 0xff) << 8));
+
+		if (buf_crc != package_crc)	{
+			pr_err("sis_ReadPacket: CRC Error\n");
+			return SIS_ERR;
+		}
+#endif
+		memcpy(&buf[locate], &tmpbuf[0], 64);
+		/*Buf_Data [0~63] [64~128]*/
+		locate += 64;
+		read_first = false;
+	} while (tmpbuf[P_REPORT_ID] != ALL_IN_ONE_PACKAGE &&
+			tmpbuf[p_count] > 5);
+	return touchnum;
+}
+
+int check_gpio_interrupt(int int_gpio)
+{
+	/* The INT pin comes from "sis,irq-gpio" in the device tree, the same
+	 * source client->irq is derived from. The old CONFIG_GPIO_INT_PIN_FOR_SIS
+	 * build-time constant is gone with it. */
+	if (!gpio_is_valid(int_gpio))
+		return 0;
+	return gpio_get_value(int_gpio);
+}
+
+void ts_report_key(struct i2c_client *client, uint8_t keybit_state)
+{
+	int i = 0;
+	/*check keybit_state is difference with pre_keybit_state*/
+	uint8_t diff_keybit_state = 0x0;
+	/*button location for binary*/
+	uint8_t key_value = 0x0;
+	/*button is up or down*/
+	uint8_t  key_pressed = 0x0;
+	struct sis_ts_data *ts = i2c_get_clientdata(client);
+
+	if (!ts) {
+		pr_err("%s error: Missing Platform Data!\n", __func__);
+		return;
+	}
+
+	diff_keybit_state = TPInfo->pre_keybit_state ^ keybit_state;
+
+	if (diff_keybit_state) {
+		for (i = 0; i < BUTTON_KEY_COUNT; i++) {
+			if ((diff_keybit_state >> i) & 0x01) {
+				key_value = diff_keybit_state & (0x01 << i);
+				key_pressed = (keybit_state >> i) & 0x01;
+				switch (key_value) {
+				case MSK_COMP:
+				input_report_key
+				(ts->input_dev, KEY_COMPOSE, key_pressed);
+				pr_err("%s : MSK_COMP %d\n"
+					, __func__ , key_pressed);
+					break;
+				case MSK_BACK:
+				input_report_key
+					(ts->input_dev, KEY_BACK, key_pressed);
+				pr_err("%s : MSK_BACK %d\n"
+					, __func__ , key_pressed);
+					break;
+				case MSK_MENU:
+				input_report_key
+					(ts->input_dev, KEY_MENU, key_pressed);
+				pr_err("%s : MSK_MENU %d\n"
+					, __func__ , key_pressed);
+					break;
+				case MSK_HOME:
+				input_report_key
+					(ts->input_dev, KEY_HOME, key_pressed);
+				pr_err("%s : MSK_HOME %d\n"
+					, __func__ , key_pressed);
+					break;
+				case MSK_NOBTN:
+				/*Release
+				the button if it touched.*/
+				default:
+					break;
+				}
+			}
+		}
+		TPInfo->pre_keybit_state = keybit_state;
+	}
+}
+
+
+static void sis_ts_work_func(struct work_struct *work)
+{
+	struct sis_ts_data *ts = container_of(work, struct sis_ts_data, work);
+	int ret = SIS_ERR;
+	int point_unit;
+	uint8_t buf[PACKET_BUFFER_SIZE] = {0};
+	uint8_t i = 0, fingers = 0;
+	uint8_t px = 0, py = 0, pstatus = 0;
+	uint8_t p_area = 0;
+	uint8_t p_preasure = 0;
+#ifdef _SUPPORT_BUTTON_TOUCH
+	int button_key;
+	uint8_t button_buf[10] = {0};
+#endif
+
+
+	bool all_touch_up = true;
+
+
+	mutex_lock(&ts->mutex_wq);
+	/* I2C or SMBUS block data read */
+	ret = sis_ReadPacket(ts->client, SIS_CMD_NORMAL, buf);
+#ifdef _DEBUG_PACKAGE_WORKFUNC
+	pr_info("sis_ts_work_func: Buf_Data [0~63]\n");
+	PrintBuffer(0, 64, buf);
+	if ((buf[P_REPORT_ID] != ALL_IN_ONE_PACKAGE) && (ret > 5)) {
+		pr_info("sis_ts_work_func: Buf_Data [64~125]\n");
+		PrintBuffer(64, 128, buf);
+	}
+#endif
+
+/* add */
+#ifdef _SUPPORT_BUTTON_TOUCH
+	sis_ReadPacket(ts->client, SIS_CMD_NORMAL, button_buf);
+#endif
+	/*Error Number*/
+	if (ret < 0) {
+		if (ret == -1)
+			pr_info("sis_ts_work_func: ret = -1\n");
+		goto err_free_allocate;
+	}
+#ifdef _SUPPORT_BUTTON_TOUCH
+	/* access BUTTON TOUCH event and BUTTON NO TOUCH even */
+	else if (button_buf[P_REPORT_ID] == BUTTON_FORMAT) {
+		button_key = ((button_buf[BUTTON_STATE] & 0xff)
+		| ((button_buf[BUTTON_STATE + 1] & 0xff) << 8));
+		ts_report_key(ts->client, button_key);
+	}
+#endif
+	/* access NO TOUCH event unless BUTTON NO TOUCH event */
+	else if (ret == 0) {
+		fingers = 0;
+		sis_tpinfo_clear(TPInfo, MAX_FINGERS);
+		goto label_send_report;
+	}
+	sis_tpinfo_clear(TPInfo, MAX_FINGERS);
+
+	/*Parser and Get the sis9200 data*/
+	point_unit = sis_cul_unit(buf[P_REPORT_ID]);
+	fingers = ret;
+
+	TPInfo->fingers = fingers = (fingers > MAX_FINGERS ? 0 : fingers);
+
+	/*fingers 10 =  0 ~ 9*/
+	for (i = 0; i < fingers; i++) {
+		if ((buf[P_REPORT_ID] != ALL_IN_ONE_PACKAGE) && (i >= 5)) {
+			/*Calc point status*/
+			pstatus = BYTE_BYTECOUNT + BYTE_ReportID
+					+ ((i - 5) * point_unit);
+			pstatus += 64;
+		} else {
+			pstatus = BYTE_BYTECOUNT + BYTE_ReportID
+					+ (i * point_unit);
+					/*Calc point status*/
+		}
+	    px = pstatus + 2;	/*Calc point x_coord*/
+	    py = px + 2;	/*Calc point y_coord*/
+		if ((buf[pstatus]) == TOUCHUP) {
+			TPInfo->pt[i].Width = 0;
+			TPInfo->pt[i].Height = 0;
+			TPInfo->pt[i].Pressure = 0;
+		} else if (buf[P_REPORT_ID] == ALL_IN_ONE_PACKAGE
+					&& (buf[pstatus]) == TOUCHDOWN) {
+			TPInfo->pt[i].Width = 1;
+			TPInfo->pt[i].Height = 1;
+			TPInfo->pt[i].Pressure = 1;
+		} else if ((buf[pstatus]) == TOUCHDOWN) {
+			p_area = py + 2;
+			p_preasure = py + 2 + (IS_AREA(buf[P_REPORT_ID]) * 2);
+			/*area*/
+			if (IS_AREA(buf[P_REPORT_ID])) {
+				TPInfo->pt[i].Width = buf[p_area];
+				TPInfo->pt[i].Height = buf[p_area + 1];
+			} else {
+				TPInfo->pt[i].Width = 1;
+				TPInfo->pt[i].Height = 1;
+			}
+			/*preasure*/
+			if (IS_PRESSURE(buf[P_REPORT_ID]))
+				TPInfo->pt[i].Pressure = (buf[p_preasure]);
+			else
+				TPInfo->pt[i].Pressure = 1;
+		} else {
+			pr_err("sis_ts_work_func: Error Touch Status\n");
+			goto err_free_allocate;
+		}
+		TPInfo->pt[i].id = (buf[pstatus + 1]);
+		TPInfo->pt[i].x = ((buf[px] & 0xff)
+		| ((buf[px + 1] & 0xff) << 8));
+		TPInfo->pt[i].y = ((buf[py] & 0xff)
+		| ((buf[py + 1] & 0xff) << 8));
+	}
+#ifdef _DEBUG_REPORT
+	for (i = 0; i < TPInfo->fingers; i++) {
+		pr_info("sis_ts_work_func: i = %d, id = %d, x = %d, y = %d"
+		", pstatus = %d, width = %d, height = %d, pressure = %d\n"
+		, i, TPInfo->pt[i].id, TPInfo->pt[i].x
+		, TPInfo->pt[i].y , buf[pstatus], TPInfo->pt[i].Width
+		, TPInfo->pt[i].Height, TPInfo->pt[i].Pressure);
+	}
+#endif
+
+label_send_report:
+/* Report co-ordinates to the multi-touch stack */
+
+	for (i = 0; ((i < TPInfo->fingers) && (i < MAX_FINGERS)); i++) {
+		if (TPInfo->pt[i].Pressure) {
+			input_report_key(ts->input_dev, BTN_TOUCH, 1);
+			TPInfo->pt[i].Width *= AREA_UNIT;
+			input_report_abs(ts->input_dev,
+				ABS_MT_TOUCH_MAJOR, TPInfo->pt[i].Width);
+			TPInfo->pt[i].Height *= AREA_UNIT;
+			input_report_abs(ts->input_dev,
+				ABS_MT_TOUCH_MINOR, TPInfo->pt[i].Height);
+			input_report_abs(ts->input_dev,
+				ABS_MT_PRESSURE, TPInfo->pt[i].Pressure);
+			input_report_abs(ts->input_dev,
+				ABS_MT_POSITION_X, TPInfo->pt[i].x);
+			input_report_abs(ts->input_dev,
+				ABS_MT_POSITION_Y, TPInfo->pt[i].y);
+			input_report_abs(ts->input_dev,
+			ABS_MT_TRACKING_ID, TPInfo->pt[i].id);
+			input_mt_sync(ts->input_dev);
+			all_touch_up = false;
+		}
+
+		if (i == (TPInfo->fingers - 1) && all_touch_up == true) {
+			input_report_key(ts->input_dev, BTN_TOUCH, 0);
+			input_mt_sync(ts->input_dev);
+		}
+	}
+
+	if (TPInfo->fingers == 0) {
+		input_report_key(ts->input_dev, BTN_TOUCH, 0);
+		input_mt_sync(ts->input_dev);
+	}
+
+	input_sync(ts->input_dev);
+
+err_free_allocate:
+	if (ts->use_irq) {
+#ifdef _INT_MODE_1 /* case 1 mode */
+		/* TODO: After interrupt status low,
+		read i2c bus data by polling, until interrupt status is high */
+		ret = check_gpio_interrupt(ts->INT_gpio);
+		/* nterrupt pin is still LOW,
+		read data until interrupt pin is released. */
+	    if (!ret) {
+			hrtimer_start(&ts->timer,
+			ktime_set(0, TIMER_NS), HRTIMER_MODE_REL);
+	    }  else {
+			if (TPInfo->pre_keybit_state)/* clear for interrupt */
+				ts_report_key(ts->client, 0x0);
+			if (irqd_irq_disabled(&ts->desc->irq_data))
+				enable_irq(ts->client->irq);
+	    }
+#else /* case 2 mode */
+		if (irqd_irq_disabled(&ts->desc->irq_data))
+			enable_irq(ts->client->irq);
+#endif
+	}
+
+	mutex_unlock(&ts->mutex_wq);
+	return;
+}
+
+static void sis_tpinfo_clear(struct sisTP_driver_data *TPInfo, int max)
+{
+	int i = 0;
+
+	for (i = 0; i < max; i++) {
+		TPInfo->pt[i].id = -1;
+		TPInfo->pt[i].x = 0;
+		TPInfo->pt[i].y = 0;
+		TPInfo->pt[i].Pressure = 0;
+		TPInfo->pt[i].Width = 0;
+	}
+	TPInfo->id = 0x0;
+	TPInfo->fingers = 0;
+}
+
+static enum hrtimer_restart sis_ts_timer_func(struct hrtimer *timer)
+{
+	struct sis_ts_data *ts = container_of(timer, struct sis_ts_data, timer);
+
+	queue_work(sis_wq, &ts->work);
+	if (!ts->use_irq)	/*For Polling mode*/
+	    hrtimer_start(&ts->timer, ktime_set(0, TIMER_NS), HRTIMER_MODE_REL);
+	return HRTIMER_NORESTART;
 }
 
 static irqreturn_t sis_ts_irq_handler(int irq, void *dev_id)
 {
 	struct sis_ts_data *ts = dev_id;
 
-	do {
-		sis_ts_handle_packet(ts);
-	} while (ts->attn_gpio && gpiod_get_value_cansleep(ts->attn_gpio));
-
+	if (!irqd_irq_disabled(&ts->desc->irq_data))
+		disable_irq_nosync(ts->client->irq);
+	queue_work(sis_wq, &ts->work);
 	return IRQ_HANDLED;
 }
 
-static void sis_ts_reset(struct sis_ts_data *ts)
+
+uint16_t cal_crc(char *cmd, int start, int end)
 {
-	if (ts->reset_gpio) {
-		/* Get out of reset */
-		usleep_range(1000, 2000);
-		gpiod_set_value(ts->reset_gpio, 1);
-		usleep_range(1000, 2000);
-		gpiod_set_value(ts->reset_gpio, 0);
-		msleep(100);
-	}
+	int i = 0;
+	uint16_t crc = 0;
+	for (i = start; i <= end ; i++)
+		crc = (crc<<8) ^ crc16tab[((crc>>8) ^ cmd[i])&0x00FF];
+	return crc;
 }
 
-static int sis_ts_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+uint16_t cal_crc_with_cmd(char *data, int start, int end, uint8_t cmd)
 {
-	struct sis_ts_data *ts;
-	struct input_dev *input;
-	int error;
+	int i = 0;
+	uint16_t crc = 0;
 
-	ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
-	if (!ts)
-		return -ENOMEM;
+	crc = (crc<<8) ^ crc16tab[((crc>>8) ^ cmd)&0x00FF];
+	for (i = start; i <= end ; i++)
+		crc = (crc<<8) ^ crc16tab[((crc>>8) ^ data[i])&0x00FF];
+	return crc;
+}
 
-	ts->client = client;
-	i2c_set_clientdata(client, ts);
+void write_crc(unsigned char *buf, int start, int end)
+{
+	uint16_t crc = 0;
+	crc = cal_crc(buf, start , end);
+	buf[end+1] = (crc >> 8) & 0xff;
+	buf[end+2] = crc & 0xff;
+}
 
-	ts->attn_gpio = devm_gpiod_get_optional(&client->dev,
-						"attn", GPIOD_IN);
-	if (IS_ERR(ts->attn_gpio)) {
-		error = PTR_ERR(ts->attn_gpio);
-		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev,
-				"Failed to get attention GPIO: %d\n", error);
-		return error;
+
+#ifdef _STD_RW_IO
+#define BUFFER_SIZE MAX_BYTE
+static ssize_t sis_cdev_write(struct file *file, const char __user *buf,
+								size_t count,
+								loff_t *f_pos)
+{
+	int ret = 0;
+	char *kdata;
+	char cmd;
+	pr_info("sis_cdev_write.\n");
+	if (ts_bak == 0)
+		return SIS_ERR_CLIENT;
+
+	ret = access_ok(VERIFY_WRITE, buf, BUFFER_SIZE);
+	if (!ret) {
+		pr_err("cannot access user space memory\n");
+		return SIS_ERR_ACCESS_USER_MEM;
 	}
 
-	ts->reset_gpio = devm_gpiod_get_optional(&client->dev,
-						 "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(ts->reset_gpio)) {
-		error = PTR_ERR(ts->reset_gpio);
-		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev,
-				"Failed to get reset GPIO: %d\n", error);
-		return error;
+	kdata = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+	if (kdata == 0)
+		return SIS_ERR_ALLOCATE_KERNEL_MEM;
+
+	ret = copy_from_user(kdata, buf, count);
+	if (ret) {
+		pr_err("copy_from_user fail\n");
+		kfree(kdata);
+		return SIS_ERR_COPY_FROM_USER;
+	}
+#if 0
+	PrintBuffer(0, count, kdata);
+#endif
+
+	cmd = kdata[6];
+
+/*Write & Read*/
+	ret = sis_command_for_write(ts_bak->client, count, kdata);
+	if (ret < 0) {
+		pr_err("i2c_transfer write error %d\n", ret);
+		kfree(kdata);
+		return SIS_ERR_TRANSMIT_I2C;
+	}
+	if (copy_to_user((char *) buf, kdata, count)) {
+		pr_err("copy_to_user fail\n");
+		ret = SIS_ERR_COPY_FROM_KERNEL;
+	}
+	kfree(kdata);
+	return ret;
+}
+
+/*for get system time*/
+static ssize_t sis_cdev_read(struct file *file, char __user *buf,
+								size_t count,
+								loff_t *f_pos)
+{
+	int ret = 0;
+	char *kdata;
+	char cmd;
+//	int i;
+
+	pr_info("sis_cdev_read.\n");
+	if (ts_bak == 0)
+		return SIS_ERR_CLIENT;
+	ret = access_ok(VERIFY_WRITE, buf, BUFFER_SIZE);
+	if (!ret) {
+		pr_err("cannot access user space memory\n");
+		return SIS_ERR_ACCESS_USER_MEM;
+	}
+	kdata = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+	if (kdata == 0)
+		return SIS_ERR_ALLOCATE_KERNEL_MEM;
+	ret = copy_from_user(kdata, buf, count);
+	if (ret) {
+		pr_err("copy_from_user fail\n");
+		kfree(kdata);
+		return SIS_ERR_COPY_FROM_USER;
+	}
+#if 0
+	PrintBuffer(0, count, kdata);
+#endif
+	cmd = kdata[6];
+	/*for making sure AP communicates with SiS driver */
+	if (cmd == 0xa2) {
+		kdata[0] = 5;
+		kdata[1] = 0;
+		kdata[3] = 'S';
+		kdata[4] = 'i';
+		kdata[5] = 'S';
+		if (copy_to_user((char *) buf, kdata, count)) {
+			pr_err("copy_to_user fail\n");
+			kfree(kdata);
+			return SIS_ERR_COPY_FROM_KERNEL;
+		}
+		kfree(kdata);
+		return 3;
+	}
+/* Write & Read */
+	ret = sis_command_for_read(ts_bak->client, MAX_BYTE, kdata);
+	if (ret < 0) {
+		pr_err("i2c_transfer read error %d\n", ret);
+		kfree(kdata);
+		return SIS_ERR_TRANSMIT_I2C;
 	}
 
-	sis_ts_reset(ts);
+	ret = kdata[0] | (kdata[1] << 8);
 
-	ts->input = input = devm_input_allocate_device(&client->dev);
-	if (!input) {
-		dev_err(&client->dev, "Failed to allocate input device\n");
-		return -ENOMEM;
+/*
+    for ( i = 0; i < BUFFER_SIZE - 1; i++ ) {
+	    kdata[i] = kdata[i+1];
+    }
+*/
+#ifdef _DEBUG_REPORT
+	pr_info("%d\n", ret);
+	for (i = 0; i < ret && i < BUFFER_SIZE; i++)
+		pr_info("%02x ", kdata[i]);
+	pr_info("\n");
+#endif
+	if (copy_to_user((char *) buf, kdata, count)) {
+		pr_info("copy_to_user fail\n");
+		ret = SIS_ERR_COPY_FROM_KERNEL;
 	}
+	kfree(kdata);
+	return ret;
+}
 
-	input->name = "SiS Touchscreen";
-	input->id.bustype = BUS_I2C;
+#undef BUFFER_SIZE
 
-	input_set_abs_params(input, ABS_MT_POSITION_X, 0, SIS_MAX_X, 0, 0);
-	input_set_abs_params(input, ABS_MT_POSITION_Y, 0, SIS_MAX_Y, 0, 0);
-	input_set_abs_params(input, ABS_MT_PRESSURE, 0, SIS_MAX_PRESSURE, 0, 0);
-	input_set_abs_params(input, ABS_MT_TOUCH_MAJOR,
-			     0, SIS_AREA_LENGTH_LONGER, 0, 0);
-	input_set_abs_params(input, ABS_MT_TOUCH_MINOR,
-			     0, SIS_AREA_LENGTH_SHORT, 0, 0);
+static int sis_cdev_open(struct inode *inode, struct file *filp)
+{
+	pr_info("sis_cdev_open.\n");
+	if (ts_bak == 0)
+		return SIS_ERR_CLIENT;
 
-	error = input_mt_init_slots(input, SIS_MAX_FINGERS, INPUT_MT_DIRECT);
-	if (error) {
-		dev_err(&client->dev,
-			"Failed to initialize MT slots: %d\n", error);
-		return error;
+	msleep(200);
+	if (ts_bak->use_irq) {
+		if (!irqd_irq_disabled(&ts_bak->desc->irq_data)) {
+			disable_irq(ts_bak->client->irq);
+		} else {
+			pr_info("sis_cdev_open:IRQ_STATUS: disabled\n");
+		}
 	}
+	hrtimer_cancel(&ts_bak->timer);
+	flush_workqueue(sis_wq);/* only flush sis_wq */
+	msleep(200);
+	return 0; /* success */
+}
 
-	error = devm_request_threaded_irq(&client->dev, client->irq,
-					  NULL, sis_ts_irq_handler,
-					  IRQF_ONESHOT,
-					  client->name, ts);
-	if (error) {
-		dev_err(&client->dev, "Failed to request IRQ: %d\n", error);
-		return error;
-	}
-
-	error = input_register_device(ts->input);
-	if (error) {
-		dev_err(&client->dev,
-			"Failed to register input device: %d\n", error);
-		return error;
-	}
-
+static int sis_cdev_release(struct inode *inode, struct file *filp)
+{
+	pr_info("sis_cdev_release.\\n");
+	msleep(200);
+	if (ts_bak == 0)
+		return SIS_ERR_CLIENT;
+	if (ts_bak->use_irq) {
+		if (irqd_irq_disabled(&ts_bak->desc->irq_data)) {
+			enable_irq(ts_bak->client->irq);
+		}
+	} else
+		hrtimer_start(&ts_bak->timer,
+			ktime_set(1, 0), HRTIMER_MODE_REL);
 	return 0;
 }
 
-#ifdef CONFIG_OF
-static const struct of_device_id sis_ts_dt_ids[] = {
-	{ .compatible = "sis,9200-ts" },
-	{ /* sentinel */ }
+static const struct file_operations sis_cdev_fops = {
+	.owner	= THIS_MODULE,
+	.read	= sis_cdev_read,
+	.write	= sis_cdev_write,
+	.open	= sis_cdev_open,
+	.release	= sis_cdev_release,
 };
-MODULE_DEVICE_TABLE(of, sis_ts_dt_ids);
+
+static int sis_setup_chardev(struct sis_ts_data *ts)
+{
+	dev_t dev = MKDEV(sis_char_major, 0);
+	int alloc_ret = 0;
+	int cdev_err = 0;
+	int input_err = 0;
+	struct device *class_dev = NULL;
+	void *ptr_err;
+	int err = 0;
+	pr_info("sis_setup_chardev.\n");
+	if (ts == NULL) {
+		input_err = -ENOMEM;
+		goto error;
+	}
+	/* dynamic allocate driver handle */
+	alloc_ret = alloc_chrdev_region(&dev, 0,
+			sis_char_devs_count, DEVICE_NAME);
+	if (alloc_ret)
+		goto error;
+	sis_char_major = MAJOR(dev);
+	cdev_init(&sis_char_cdev, &sis_cdev_fops);
+	sis_char_cdev.owner = THIS_MODULE;
+	cdev_err = cdev_add(&sis_char_cdev,
+		MKDEV(sis_char_major, 0), sis_char_devs_count);
+	if (cdev_err)
+		goto error;
+	pr_info("%s driver(major %d) installed.\n",
+			DEVICE_NAME, sis_char_major);
+	/* register class */
+	sis_char_class = class_create(THIS_MODULE, DEVICE_NAME);
+	err = IS_ERR(ptr_err = sis_char_class);
+	if (err)
+		goto err2;
+	class_dev = device_create(sis_char_class, NULL,
+		MKDEV(sis_char_major, 0), NULL, DEVICE_NAME);
+	err = IS_ERR(ptr_err = class_dev);
+	if (err)
+		goto err;
+	return 0;
+error:
+	if (cdev_err == 0)
+		cdev_del(&sis_char_cdev);
+	if (alloc_ret == 0)
+		unregister_chrdev_region
+				(MKDEV(sis_char_major, 0), sis_char_devs_count);
+	if (input_err != 0)
+		pr_err("sis_ts_bak error!\n");
+err:
+	device_destroy(sis_char_class, MKDEV(sis_char_major, 0));
+err2:
+	class_destroy(sis_char_class);
+	return SIS_ERR;
+}
+#endif
+#ifdef switch_tp
+static int __init oem_force_tp_usb_mode(char *str)
+{
+    pr_info("%s: tp_usb_if is enabled\n", __func__);
+    tp_usb_mode = 1;
+    return 1;
+}
+__setup("ro.oem.tp_usb_if=1", oem_force_tp_usb_mode);
+#endif
+static int sis_ts_probe(
+	struct i2c_client *client, const struct i2c_device_id *id)
+{
+	int ret = 0;
+	struct sis_ts_data *ts = NULL;
+	struct sis_i2c_rmi_platform_data *pdata = NULL;
+	int error;
+	int sis_active_level = 0;  // 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch
+
+	pr_info("sis_ts_probe\n");
+	TPInfo = kzalloc(sizeof(struct sisTP_driver_data), GFP_KERNEL);
+	if (TPInfo == NULL) {
+		ret = -ENOMEM;
+		goto err_alloc_data_failed;
+	}
+	ts = kzalloc(sizeof(struct sis_ts_data), GFP_KERNEL);
+	if (ts == NULL) {
+		ret = -ENOMEM;
+		goto err_alloc_data_failed;
+	}
+	ts->client=client;
+	ts_bak = ts;
+
+	/*parse DT*/
+/* 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch {*/
+	sis_enable_gpio = of_get_named_gpio(client->dev.of_node, "sis,enable-gpio", 0);
+	printk("Debug, sis_enable_gpio == %d\n", sis_enable_gpio);
+	if (gpio_is_valid(sis_enable_gpio)) {
+		dev_dbg(&client->dev, "Debug, %s: sis_enable_gpio request %d\n", __func__, sis_enable_gpio);
+		ret = gpio_request(sis_enable_gpio, "sis_enable_gpio");
+		if (ret) {
+			dev_err(&client->dev, "Debug, %s: sis_enable_gpio request failed, ret:%d\n", __func__, ret);
+		}
+		gpio_direction_output(sis_enable_gpio, 1);
+		sis_active_level = gpio_get_value(sis_enable_gpio);
+		msleep(500);
+		printk("Debug, at begin sis_enable_gpio = %d\n", sis_active_level);
+	}
+	else{
+		ret = -1;
+		dev_err(&client->dev, "Debug, %s: sis_enable_gpio gpio is unavailiable.\n",
+			__func__);
+	}
+/* 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch }*/
+	ts->INT_gpio= of_get_named_gpio(client->dev.of_node, "sis,irq-gpio",0);
+	ts->reset_gpio= of_get_named_gpio(client->dev.of_node, "sis,reset-gpio",0);
+	if (gpio_is_valid(ts->INT_gpio)) {
+        error = gpio_request(ts->INT_gpio,
+                "sis_touch_gpio_irq");
+        if (error) {
+            dev_err(&ts->client->dev,
+                    "unable to request %d gpio(%d)\n",
+                    ts->INT_gpio, error);
+            return error;
+        }
+        error = gpio_direction_input(ts->INT_gpio);
+        if (error) {
+            dev_err(&ts->client->dev,
+                    "unable to set dir for %d gpio(%d)\n",
+                    ts->INT_gpio, error);
+        }
+
+    }
+	else {
+        dev_err(&ts->client->dev, "irq gpio not provided\n");
+        return -EINVAL;
+    }
+
+	if (gpio_is_valid(ts->reset_gpio)) {
+        error = gpio_request(ts->reset_gpio,
+                "sis_touch_gpio_reset");
+        if (error) {
+            dev_err(&ts->client->dev,
+                    "unable to request %d gpio(%d)\n",
+                    ts->reset_gpio, error);
+            return error;
+        }
+/* 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch {*/
+        gpio_direction_output(ts->reset_gpio, 0);
+        msleep(100);
+/* 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch }*/
+        error = gpio_direction_output(ts->reset_gpio,1);
+        msleep(100);  // 2017/09/15, Jerry Zhai, enable 3v3 pin for sis touch
+        if (error) {
+            dev_err(&ts->client->dev,
+                    "unable to set dir for %d gpio(%d)\n",
+                    ts->INT_gpio, error);
+        }
+
+    }
+	else {
+        dev_err(&ts->client->dev, "irq gpio not provided\n");
+        return -EINVAL;
+    }
+
+	error = mxt_pinctrl_init(ts);
+    if (error)
+        dev_info(&client->dev, "No pinctrl support\n");
+
+    if (ts->ts_pinctrl) {
+        error = mxt_pinctrl_select(ts, true);
+        if (error < 0)
+            return error;
+    }
+
+	mutex_init(&ts->mutex_wq);
+	/*1. Init Work queue and necessary buffers*/
+	INIT_WORK(&ts->work, sis_ts_work_func);
+	ts->client = client;
+	i2c_set_clientdata(client, ts);
+	pdata = client->dev.platform_data;
+	if (pdata)
+		ts->power = pdata->power;
+	if (ts->power) {
+		ret = ts->power(1);
+		if (ret < 0) {
+			pr_err("sis_ts_probe power on failed\n");
+			goto err_power_failed;
+		}
+	}
+	/*2. Allocate input device*/
+	ts->input_dev = input_allocate_device();
+	if (ts->input_dev == NULL) {
+		ret = -ENOMEM;
+		pr_err("sis_ts_probe: Failed to allocate input device\n");
+		goto err_input_dev_alloc_failed;
+	}
+	/*This input device name should be the same to IDC file name.*/
+	/*"SiS9200-i2c-touchscreen"*/
+	ts->input_dev->name = "sis_touch";
+
+#ifdef CONFIG_FW_SUPPORT_POWERMODE
+	/*sis_check_fw_ready(client);*/
 #endif
 
-static const struct i2c_device_id sis_ts_id[] = {
-	{ SIS_I2C_NAME,	0 },
-	{ "9200-ts",	0 },
-	{ /* sentinel */  }
+	set_bit(EV_ABS, ts->input_dev->evbit);
+	set_bit(EV_KEY, ts->input_dev->evbit);
+	set_bit(ABS_MT_POSITION_X, ts->input_dev->absbit);
+	set_bit(ABS_MT_POSITION_Y, ts->input_dev->absbit);
+	set_bit(ABS_MT_TRACKING_ID, ts->input_dev->absbit);
+
+	set_bit(INPUT_PROP_DIRECT, ts->input_dev->propbit);
+	set_bit(ABS_MT_PRESSURE, ts->input_dev->absbit);
+	set_bit(ABS_MT_TOUCH_MAJOR, ts->input_dev->absbit);
+	set_bit(ABS_MT_TOUCH_MINOR, ts->input_dev->absbit);
+
+
+	input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE,
+						0, PRESSURE_MAX, 0, 0);
+	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR,
+						0, AREA_LENGTH_LONGER, 0, 0);
+	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MINOR,
+						0, AREA_LENGTH_SHORT, 0, 0);
+
+	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
+						0, SIS_MAX_X, 0, 0);
+	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y,
+						0, SIS_MAX_Y, 0, 0);
+	input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID,
+						0, 15, 0, 0);
+
+	/* add for touch keys */
+	set_bit(KEY_COMPOSE, ts->input_dev->keybit);
+	set_bit(KEY_BACK, ts->input_dev->keybit);
+	set_bit(KEY_MENU, ts->input_dev->keybit);
+	set_bit(KEY_HOME, ts->input_dev->keybit);
+	/*3. Register input device to core*/
+	ret = input_register_device(ts->input_dev);
+	if (ret) {
+		pr_err("sis_ts_probe: Unable to register %s input device\n",
+				ts->input_dev->name);
+		goto err_input_register_device_failed;
+	}
+
+#ifdef _STD_RW_IO
+	/*Safe to be done prior to request_irq(), because ts->use_irq & ts->desc is not used in sis_setup_chardev()*/
+	ret = sis_setup_chardev(ts);
+	if (ret)
+		pr_err("sis_setup_chardev fail\n");
+#endif
+
+	/*4. irq or timer setup*/
+	hrtimer_init(&ts->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	ts->timer.function = sis_ts_timer_func;
+#ifdef _I2C_INT_ENABLE
+	client->irq = gpio_to_irq(ts->INT_gpio);
+	ret = request_irq(client->irq, sis_ts_irq_handler,
+				IRQF_TRIGGER_FALLING, client->name, ts);
+	if (ret == 0)
+		ts->use_irq = 1;
+	else
+		dev_err(&client->dev, "request_irq failed\n");
+#endif
+	ts->desc = irq_to_desc(ts_bak->client->irq);
+
+	pr_info("sis_ts_probe: Start touchscreen %s in %s mode\n",
+			ts->input_dev->name,
+			ts->use_irq ? "interrupt" : "polling");
+	if (ts->use_irq) {
+#ifdef _INT_MODE_1
+		pr_info("sis_ts_probe: interrupt case 1 mode\n");
+#else
+		pr_info("sis_ts_probe: interrupt case 2 mode\n");
+#endif
+	}
+
+	if (!ts->use_irq)
+		hrtimer_start(&ts->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
+/* Jerry Zhai, 2017/08/23, Catch SIS blocked i2c data {*/
+	else {
+		ret = check_gpio_interrupt(ts->INT_gpio);
+		/* Interrupt pin is  LOW,  read blocked data */
+		if (!ret) {
+			printk("Debug: catch blocked data as SIS IRQ is low.\n");
+			sis_ts_irq_handler(ts_bak->client->irq, ts);
+		}
+	}
+/* Jerry Zhai, 2017/08/23, Catch SIS blocked i2c data }*/
+
+	return 0;
+err_input_register_device_failed:
+	input_free_device(ts->input_dev);
+err_input_dev_alloc_failed:
+err_power_failed:
+	kfree(ts);
+err_alloc_data_failed:
+	return ret;
+}
+
+static int sis_ts_remove(struct i2c_client *client)
+{
+	struct sis_ts_data *ts = i2c_get_clientdata(client);
+	if (ts->use_irq)
+		free_irq(client->irq, ts);
+	else
+		hrtimer_cancel(&ts->timer);
+	input_unregister_device(ts->input_dev);
+	kfree(ts);
+	return 0;
+}
+
+static struct of_device_id sis_match_table[] = {
+    { .compatible = "sisi,sis_i2c_ts",},
+    { },
 };
+
+static const struct i2c_device_id sis_ts_id[] = {
+	{ SIS_I2C_NAME, 0 },
+	{ }
+};
+
 MODULE_DEVICE_TABLE(i2c, sis_ts_id);
 
 static struct i2c_driver sis_ts_driver = {
+	.probe		= sis_ts_probe,
+	.remove		= sis_ts_remove,
+	/* No suspend/resume: this product is AC-only and never suspends. */
+#ifdef CONFIG_X86
+	.class		= I2C_CLASS_HWMON,
+	.detect		= sis_ts_detect,
+	.address_list	= normal_i2c,
+#endif
+	.id_table	= sis_ts_id,
 	.driver = {
 		.name	= SIS_I2C_NAME,
-		.of_match_table = of_match_ptr(sis_ts_dt_ids),
+		.of_match_table =of_match_ptr(sis_match_table),
 	},
-	.probe		= sis_ts_probe,
-	.id_table	= sis_ts_id,
 };
-module_i2c_driver(sis_ts_driver);
 
+static int __init sis_ts_init(void)
+{
+	pr_info("sis_ts_init\n");
+	sis_wq = create_singlethread_workqueue("sis_wq");
+
+	if (!sis_wq)
+		return -ENOMEM;
+	return i2c_add_driver(&sis_ts_driver);
+}
+
+#ifdef CONFIG_X86
+/* Return 0 if detection is successful, -ENODEV otherwise */
+static int sis_ts_detect(struct i2c_client *client,
+		       struct i2c_board_info *info)
+{
+	const char *type_name;
+	pr_info("sis_ts_detect\n");
+	type_name = "sis_i2c_ts";
+	strlcpy(info->type, type_name, I2C_NAME_SIZE);
+	return 0;
+}
+#endif
+
+static void __exit sis_ts_exit(void)
+{
+#ifdef _STD_RW_IO
+	dev_t dev;
+#endif
+
+	pr_info("sis_ts_exit\n");
+	i2c_del_driver(&sis_ts_driver);
+	if (sis_wq)
+		destroy_workqueue(sis_wq);
+
+#ifdef _STD_RW_IO
+	dev = MKDEV(sis_char_major, 0);
+	cdev_del(&sis_char_cdev);
+	unregister_chrdev_region(dev, sis_char_devs_count);
+	device_destroy(sis_char_class, MKDEV(sis_char_major, 0));
+	class_destroy(sis_char_class);
+#endif
+}
+
+module_init(sis_ts_init);
+module_exit(sis_ts_exit);
 MODULE_DESCRIPTION("SiS 9200 Family Touchscreen Driver");
-MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Mika Penttilä <mika.penttila@nextfour.com>");
+MODULE_LICENSE("GPL");
