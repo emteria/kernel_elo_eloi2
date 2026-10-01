@@ -23,6 +23,7 @@
 #include <linux/usb.h>
 #include <linux/crc32.h>
 #include <linux/usb/usbnet.h>
+#include <soc/qcom/socinfo.h>
 #include <uapi/linux/mdio.h>
 #include <linux/mdio.h>
 
@@ -1223,6 +1224,44 @@ static int ax88179_led_setting(struct usbnet *dev)
 	return 0;
 }
 
+/*
+ * The AX88179 on this board has an unprogrammed EEPROM, so its NODE_ID register
+ * reads back the same default address on every unit - a whole fleet on one
+ * segment ends up sharing one MAC. Elo fuse a unique address into the SoC OTP
+ * instead and the bootloader publishes it through SMEM; Android 7 took the
+ * address from there and this does the same.
+ *
+ * The result is also written into the controller, and this is called from
+ * ax88179_reset() as well as from bind, because the chip has no EEPROM to
+ * reload NODE_ID from after a reset. A MAC set from userspace does not survive
+ * a reset as a consequence; nothing on this product does that.
+ */
+static void ax88179_init_hwaddr(struct usbnet *dev)
+{
+	const char *otp_mac = socinfo_get_ethaddr();
+	u8 mac[ETH_ALEN];
+
+	if (otp_mac && mac_pton(otp_mac, mac) && is_valid_ether_addr(mac)) {
+		memcpy(dev->net->dev_addr, mac, ETH_ALEN);
+		netdev_info(dev->net, "using MAC %pM from OTP\n", mac);
+	} else {
+		/*
+		 * Deliberately not falling back to what the chip reports: that
+		 * value is identical on every unit. A random address is at
+		 * least unique, but it is not stable across reboots, so make
+		 * the real problem - an unfused device - loud.
+		 */
+		eth_hw_addr_random(dev->net);
+		netdev_err(dev->net,
+			   "no usable MAC in OTP (%s), using random %pM - this unit needs re-fusing\n",
+			   otp_mac ? otp_mac : "absent", dev->net->dev_addr);
+	}
+
+	ax88179_write_cmd(dev, AX_ACCESS_MAC, AX_NODE_ID, ETH_ALEN, ETH_ALEN,
+			  dev->net->dev_addr);
+	memcpy(dev->net->perm_addr, dev->net->dev_addr, ETH_ALEN);
+}
+
 static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 {
 	u8 buf[5];
@@ -1249,9 +1288,7 @@ static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 	ax88179_write_cmd(dev, AX_ACCESS_MAC, AX_CLK_SELECT, 1, 1, tmp);
 	msleep(100);
 
-	ax88179_read_cmd(dev, AX_ACCESS_MAC, AX_NODE_ID, ETH_ALEN,
-			 ETH_ALEN, dev->net->dev_addr);
-	memcpy(dev->net->perm_addr, dev->net->dev_addr, ETH_ALEN);
+	ax88179_init_hwaddr(dev);
 
 	/* RX bulk configuration */
 	memcpy(tmp, &AX88179_BULKIN_SIZE[0], 5);
@@ -1616,9 +1653,7 @@ static int ax88179_reset(struct usbnet *dev)
 	/* Ethernet PHY Auto Detach*/
 	ax88179_auto_detach(dev, 0);
 
-	ax88179_read_cmd(dev, AX_ACCESS_MAC, AX_NODE_ID, ETH_ALEN, ETH_ALEN,
-			 dev->net->dev_addr);
-	memcpy(dev->net->perm_addr, dev->net->dev_addr, ETH_ALEN);
+	ax88179_init_hwaddr(dev);
 
 	/* RX bulk configuration */
 	memcpy(tmp, &AX88179_BULKIN_SIZE[0], 5);
